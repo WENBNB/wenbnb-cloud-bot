@@ -1,6 +1,11 @@
 ﻿# WENBNB Cloud Bot (V1)
 # Confidential Prototype â€” Stage 1 Build
 
+try:
+    import imghdr
+except ModuleNotFoundError:
+    from imghdr_py import what as imghdr_what
+
 import os, logging, sqlite3, glob, importlib
 from telegram.ext import Updater, CommandHandler
 
@@ -63,3 +68,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
