@@ -1,19 +1,19 @@
 ﻿# WENBNB Cloud Bot (V1)
 # Confidential Prototype â€” Stage 1 Build
 
-# Fix for imghdr module on newer Python versions
-try:
-    import imghdr
-except ModuleNotFoundError:
-    import mimetypes
-    class imghdr:
-        @staticmethod
-        def what(filename):
-            t = mimetypes.guess_type(filename)[0]
-            if t and "image" in t:
-                return t.split("/")[-1]
-            return None
+import sys, types, mimetypes
 
+# Patch for imghdr module (Python 3.13 compatibility)
+imghdr = types.ModuleType("imghdr")
+
+def what(filename):
+    t = mimetypes.guess_type(filename)[0]
+    if t and "image" in t:
+        return t.split("/")[-1]
+    return None
+
+imghdr.what = what
+sys.modules["imghdr"] = imghdr
 
 import os, logging, sqlite3, glob, importlib
 from telegram.ext import Updater, CommandHandler
@@ -77,5 +77,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
