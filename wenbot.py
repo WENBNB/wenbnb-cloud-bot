@@ -1,4 +1,5 @@
 ﻿# WENBNB Cloud Bot (V1)
+# -*- coding: utf-8 -*-
 # Confidential Prototype â€” Stage 1 Build
 
 import sys, types, mimetypes
@@ -37,7 +38,7 @@ cur.execute('''CREATE TABLE IF NOT EXISTS giveaways (id INTEGER PRIMARY KEY, cha
 conn.commit()
 
 def start(update, context):
-    name = update.effective_user.first_name or "anon"
+    user_name = update.effective_user.first_name
     update.message.reply_text(f"🤖 Welcome {user_name}! I’m WENBNB Bot 🤝 — Type /help for commands.")
 
 def help_cmd(update, context):
@@ -77,6 +78,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
