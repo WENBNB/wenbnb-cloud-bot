@@ -38,7 +38,7 @@ conn.commit()
 
 def start(update, context):
     name = update.effective_user.first_name or "anon"
-    update.message.reply_text(f"ðŸ”¥ Welcome {name}! Iâ€™m WENBNB Bot ðŸ¤– â€” Type /help for commands.")
+    update.message.reply_text(f"🤖 Welcome {user_name}! I’m WENBNB Bot 🤝 — Type /help for commands.")
 
 def help_cmd(update, context):
     txt = (
@@ -77,6 +77,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
