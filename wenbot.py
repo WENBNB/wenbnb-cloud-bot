@@ -18,6 +18,23 @@ sys.modules["imghdr"] = imghdr
 
 import os, logging, sqlite3, glob, importlib
 from telegram.ext import Updater, CommandHandler
+# --- Fake web server for Render free plan ---
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+class PingHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"WENBNB Bot running")
+
+def run_server():
+    server = HTTPServer(("0.0.0.0", int(os.getenv("PORT", 10000))), PingHandler)
+    server.serve_forever()
+
+threading.Thread(target=run_server, daemon=True).start()
+# ---------------------------------------------
+
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or ""
@@ -78,6 +95,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
