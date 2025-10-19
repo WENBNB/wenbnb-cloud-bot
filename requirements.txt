@@ -7,4 +7,3 @@ aiohttp
 beautifulsoup4
 pillow
 web3
-imghdr-py
