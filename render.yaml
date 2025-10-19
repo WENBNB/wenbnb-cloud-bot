@@ -1,3 +1,5 @@
+runtime: python-3.11.8
+
 services:
   - type: web
     name: wenbnb-cloud-bot
@@ -5,6 +7,3 @@ services:
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python wenbot.py
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.8
