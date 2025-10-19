@@ -7,3 +7,4 @@ aiohttp
 beautifulsoup4
 pillow
 web3
+urllib3==1.26.16
