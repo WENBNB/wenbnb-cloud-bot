@@ -114,6 +114,13 @@ telegram.ext.Updater.stop = lambda self: None
 if __name__ == "__main__":
     main()
 
+import signal
+import sys
+import os
+
+# Auto-restart if Render sends stop signal
+signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
