@@ -92,9 +92,26 @@ def main():
     updater.start_polling()
     logger.info("WENBNB Cloud Bot started.")
     updater.idle()
+    
+# --- Keep Alive Ping (Render Safe 24x7 Mode) ---
+import requests, threading, os, time
+
+def keep_alive():
+    url = "https://wenbnb-cloud-bot.onrender.com"  # apna Render URL
+    while True:
+        try:
+            requests.get(url)
+            print("Pinged Render to stay awake ⏰")
+        except Exception as e:
+            print("Ping failed:", e)
+        time.sleep(600)  # ping every 10 minutes
+
+threading.Thread(target=keep_alive, daemon=True).start()
+# ------------------------------------------------
 
 if __name__ == "__main__":
     main()
+
 
 
 
