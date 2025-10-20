@@ -108,9 +108,12 @@ def keep_alive():
 
 threading.Thread(target=keep_alive, daemon=True).start()
 # ------------------------------------------------
+import telegram
+telegram.ext.Updater.stop = lambda self: None
 
 if __name__ == "__main__":
     main()
+
 
 
 
