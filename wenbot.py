@@ -35,8 +35,7 @@ load_dotenv()
 from flask import Flask
 import threading
 
-import telegram
-telegram.ext.Updater.stop = lambda self: None
+from telegram.ext import Updater
 
 app = Flask(__name__)
 
@@ -246,6 +245,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
