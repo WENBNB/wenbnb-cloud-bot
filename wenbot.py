@@ -180,6 +180,9 @@ def handle_buttons(update, context):
                 logger.info(f"Loaded plugin: {name}")
         except Exception as e:
             logger.exception(f"Plugin load failed: {name}, Error: {e}")
+            
+# Run Flask in background so Render stays awake
+threading.Thread(target=run_flask).start()
 
     updater.start_polling()
 
@@ -213,6 +216,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
