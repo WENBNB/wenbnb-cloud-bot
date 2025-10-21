@@ -73,22 +73,43 @@ def start(update, context):
         parse_mode="Markdown"
     )
 
+def menu_cmd(update, context):
+    keyboard = [
+        ["💰 Token Info", "📈 BNB Price"],
+        ["🎁 Airdrop Check", "😂 Meme Generator"],
+        ["🎉 Giveaway Info", "ℹ️ About WENBNB"]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    
+    update.message.reply_text(
+        "📋 Here’s the WENBNB Bot Menu 👇",
+        reply_markup=reply_markup
+    )
+
+
 def help_cmd(update, context):
     txt = (
-        "/meme <topic> - Generate meme caption\n"
-        "/price - Show BNB price\n"
-        "/tokeninfo - Token supply & stats\n"
-        "/airdropcheck <wallet> - Check airdrop eligibility\n"
-        "/giveaway_start - Admin only\n"
-        "/giveaway_end - Admin only\n"
+        "🧠 *Available Commands:*\n\n"
+        "/start — Welcome Message + Main Menu\n"
+        "/menu — Reopen Main Menu Buttons\n"
+        "/price — Show Live BNB Price\n"
+        "/tokeninfo — Token Supply & Stats\n"
+        "/airdropcheck <wallet> — Check Airdrop Eligibility\n"
+        "/meme <topic> — Generate Meme Caption\n"
+        "/giveaway_start — Start Giveaway (Admin Only)\n"
+        "/giveaway_end — End Giveaway (Admin Only)\n\n"
+        "💡 *Tip:* You can also use the buttons below the chat!"
     )
-    update.message.reply_text(txt)
+    update.message.reply_text(txt, parse_mode="Markdown")
+
 
 def main():
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("help", help_cmd))
+    dp.add_handler(CommandHandler("menu", menu_cmd))
+    
     from telegram.ext import MessageHandler, Filters
 
 def handle_buttons(update, context):
@@ -176,6 +197,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
