@@ -185,13 +185,13 @@ def handle_buttons(update, context):
         except Exception as e:
             logger.exception(f"Plugin load failed: {name}, Error: {e}")
 
-    # Run Flask in background so Render stays awake
-    threading.Thread(target=run_flask).start()
+# Run Flask in background so Render stays awake
+threading.Thread(target=run_flask).start()
 print("Bot connected successfully, polling started...")
 
-    updater.start_polling()
-    logger.info("WENBNB Cloud Bot started.")
-    updater.idle()
+updater.start_polling()
+logger.info("WENBNB Cloud Bot started.")
+updater.idle()
 
     
 # --- Keep Alive Ping (Render Safe 24x7 Mode) ---
@@ -222,6 +222,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
