@@ -39,6 +39,12 @@ from telegram.ext import Updater, CommandHandler
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+
+updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
+dp = updater.dispatcher
+
+
 class PingHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -224,6 +230,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
