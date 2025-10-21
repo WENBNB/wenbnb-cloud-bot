@@ -1,5 +1,5 @@
 python-telegram-bot==13.15
-requests
+requests==2.31.0
 openai
 imgkit
 python-dotenv
@@ -7,5 +7,6 @@ aiohttp
 beautifulsoup4
 pillow
 web3
-urllib3==1.26.16
-Flask
+setuptools==68.0.0
+urllib3==1.26.18
+Flask==2.3.2
