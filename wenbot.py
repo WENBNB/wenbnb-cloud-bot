@@ -15,6 +15,10 @@ def what(filename):
 
 imghdr.what = what
 sys.modules["imghdr"] = imghdr
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask
 import threading
 
@@ -217,6 +221,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
