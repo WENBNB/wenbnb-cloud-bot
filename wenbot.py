@@ -61,36 +61,6 @@ dp = updater.dispatcher
 
 # --- Telegram Command Handlers (Premium AI Version) ---
 
-def start(update, context):
-    update.message.reply_text(
-        "🤖 **Welcome to WENBNB Bot — Your AI Web3 Assistant!** 🚀\n\n"
-        "Powered by next-gen AI, I help you explore the entire **WENBNB ecosystem** seamlessly. 💫\n\n"
-        "💰 Get live token info & BNB price\n"
-        "🎁 Check airdrop eligibility instantly\n"
-        "😂 Create AI-powered memes\n"
-        "🎉 Manage community giveaways\n"
-        "🌎 Always online — powered by AI Cloud\n\n"
-        "👉 Type /help to view all commands or tap a menu button below ⤵️"
-    )
-
-
-def help_cmd(update, context):
-    update.message.reply_text(
-        "🧩 **WENBNB Bot Commands (AI Edition)** 🧩\n\n"
-        "🚀 /start — Activate your AI Assistant\n"
-        "🧩 /help — Show all available commands\n"
-        "🪄 /menu — Open quick-access menu\n"
-        "💰 /tokeninfo — View WENBNB token stats & supply\n"
-        "📈 /price — Check live BNB + WENBNB price\n"
-        "🎁 /airdropcheck — Verify airdrop eligibility (enter wallet)\n"
-        "😂 /meme — Generate meme caption using AI\n"
-        "🎉 /giveaway_start — Start a giveaway (Admin only)\n"
-        "🔒 /giveaway_end — End giveaway (Admin only)\n"
-        "💫 /about — Learn more about the WENBNB ecosystem\n\n"
-        "⚡ *Tip:* Use /menu anytime for shortcuts or try /about to know more about me 😉"
-    )
-
-
 class PingHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -125,59 +95,104 @@ conn.commit()
 
 from telegram import ReplyKeyboardMarkup
 
+# ----------------- START / MENU / HELP (replace lines 128-176) -----------------
 def start(update, context):
+    """
+    Friendly AI-styled welcome + main quick keyboard (page 1).
+    """
     keyboard = [
         ["💰 Token Info", "📈 BNB Price"],
         ["🎁 Airdrop Check", "😂 Meme Generator"],
-        ["🎉 Giveaway Info", "ℹ️ About WENBNB"]
+        ["🎉 Giveaway Info", "💫 About WENBNB"],
+        ["⚙️ More Options ▶️"]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    
+
+    # Personalized, AI-feel welcome
     update.message.reply_text(
         f"👋 Hey {update.effective_user.first_name}!\n\n"
-        "Welcome to *WENBNB Cloud Bot* 💎\n"
-        "I'm your AI-powered assistant for price, token info, memes & more.\n\n"
+        "*Welcome to WENBNB Bot — Your AI Web3 Assistant!* 🚀\n\n"
+        "Powered by next-gen AI. I can fetch token stats, check airdrops, "
+        "generate memes and manage giveaways — all from here.\n\n"
         "Choose an option below 👇",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
 
+
 def menu_cmd(update, context):
+    """
+    Menu command shows main keyboard (same as start).
+    """
     keyboard = [
         ["💰 Token Info", "📈 BNB Price"],
         ["🎁 Airdrop Check", "😂 Meme Generator"],
-        ["🎉 Giveaway Info", "ℹ️ About WENBNB"]
+        ["🎉 Giveaway Info", "💫 About WENBNB"],
+        ["⚙️ More Options ▶️"]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    
-    update.message.reply_text(
-        "📋 Here’s the WENBNB Bot Menu 👇",
-        reply_markup=reply_markup
-    )
+    update.message.reply_text("📚 Here’s the WENBNB Bot menu — choose one:", reply_markup=reply_markup)
+
+
+def more_options_cmd(update, context):
+    """
+    Second page (advanced / admin / navigation). Text of buttons matches help.
+    """
+    keyboard = [
+        ["🧩 Help", "🚀 Start"],
+        ["🎉 Start Giveaway", "🔒 End Giveaway"],
+        ["⬅️ Back to Main"]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    update.message.reply_text("🛠 Advanced / Admin options — choose:", reply_markup=reply_markup)
 
 
 def help_cmd(update, context):
+    """
+    Full help text listing all available commands and a small tip.
+    """
     txt = (
-        "🧠 *Available Commands:*\n\n"
-        "/start — Welcome Message + Main Menu\n"
-        "/menu — Reopen Main Menu Buttons\n"
-        "/price — Show Live BNB Price\n"
-        "/tokeninfo — Token Supply & Stats\n"
-        "/airdropcheck <wallet> — Check Airdrop Eligibility\n"
-        "/meme <topic> — Generate Meme Caption\n"
-        "/giveaway_start — Start Giveaway (Admin Only)\n"
-        "/giveaway_end — End Giveaway (Admin Only)\n\n"
-        "💡 *Tip:* You can also use the buttons below the chat!"
+        "💡 *Available Commands:*\n\n"
+        "/start - 🚀 Start the WENBNB Bot & open main menu\n"
+        "/help - 🧩 Show all available commands\n"
+        "/menu - 🪄 Open quick-access menu\n"
+        "/price - 📈 Show live BNB + WENBNB price\n"
+        "/tokeninfo - 💰 Show WENBNB token stats & supply\n"
+        "/airdropcheck <wallet> - 🎁 Verify airdrop eligibility\n"
+        "/meme <topic> - 😂 Generate meme caption using AI\n"
+        "/giveaway_start - 🎉 Start a giveaway (Admin only)\n"
+        "/giveaway_end - 🔒 End giveaway (Admin only)\n"
+        "/about - 💫 Learn about the WENBNB ecosystem\n\n"
+        "💡 *Tip:* You can also use the menu buttons below the chat for quick access."
     )
     update.message.reply_text(txt, parse_mode="Markdown")
 
 
-def main():
-    updater = Updater(TELEGRAM_TOKEN, use_context=True)
-    dp = updater.dispatcher
+# Register handlers in the bot main dispatcher
+def register_menu_handlers(dp):
+    """Call this from your main() or where you set up handlers."""
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("help", help_cmd))
     dp.add_handler(CommandHandler("menu", menu_cmd))
+    dp.add_handler(CommandHandler("more", more_options_cmd))  # optional shortcut
+    # buttons on keyboard like "⚙️ More Options ▶️" or "⬅️ Back to Main"
+    dp.add_handler(MessageHandler(Filters.regex(r"^⚙️ More Options ▶️$"), more_options_cmd))
+    dp.add_handler(MessageHandler(Filters.regex(r"^⬅️ Back to Main$"), menu_cmd))
+    dp.add_handler(MessageHandler(Filters.regex(r"^🚀 Start$"), start))
+    dp.add_handler(MessageHandler(Filters.regex(r"^🧩 Help$"), help_cmd))
+# ----------------- END REPLACEMENT BLOCK -----------------
+
+def main():
+    updater = Updater(TELEGRAM_TOKEN, use_context=True)
+    dp = updater.dispatcher
+
+    # ✅ Register all handlers (start, help, menu, more, etc.)
+    register_menu_handlers(dp)
+
+    # ❌ These below lines are now duplicates — remove or comment them
+    # dp.add_handler(CommandHandler("start", start))
+    # dp.add_handler(CommandHandler("help", help_cmd))
+    # dp.add_handler(CommandHandler("menu", menu_cmd))
     
     from telegram.ext import MessageHandler, Filters
 
@@ -279,6 +294,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
