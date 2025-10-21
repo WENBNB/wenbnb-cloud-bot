@@ -202,20 +202,23 @@ def help_command(update: Update, context: CallbackContext):
         disable_web_page_preview=True
     )
 
-
-
-# 🌟 REGISTER HANDLERS
+# 🌐 REGISTER ALL BOT COMMANDS
 def register_menu_handlers(dp):
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("help", help_cmd))
-    dp.add_handler(CommandHandler("menu", menu_cmd))
-    dp.add_handler(CommandHandler("aianalyze", aianalyze))
-    dp.add_handler(MessageHandler(Filters.regex("^💰 Token Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, "Fetching token info...")))
-    dp.add_handler(MessageHandler(Filters.regex("^📈 BNB Price$"), lambda u, c: c.bot.send_message(u.effective_chat.id, "Fetching live BNB price...")))
-    dp.add_handler(MessageHandler(Filters.regex("^🎁 Airdrop Check$"), lambda u, c: c.bot.send_message(u.effective_chat.id, "Send your wallet to check eligibility.")))
-    dp.add_handler(MessageHandler(Filters.regex("^😂 Meme Generator$"), lambda u, c: c.bot.send_message(u.effective_chat.id, "Send meme topic for AI caption.")))
-    dp.add_handler(MessageHandler(Filters.regex("^🎉 Giveaway Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, "Giveaway module coming soon! 🎁")))
-    dp.add_handler(MessageHandler(Filters.regex("^💫 About WENBNB$"), lambda u, c: c.bot.send_message(u.effective_chat.id, "WENBNB — Web3 + AI ecosystem built for the future! 🚀")))
+    # --- Core Commands ---
+    dp.add_handler(CommandHandler("start", start))          # 🚀 Activate AI Assistant
+    dp.add_handler(CommandHandler("help", help_cmd))        # 🧩 Command reference
+    dp.add_handler(CommandHandler("menu", menu_cmd))        # 🪄 Open main menu
+
+    # --- Advanced AI Tools ---
+    dp.add_handler(CommandHandler("aianalyze", aianalyze))  # 🧠 Neural analysis engine
+
+    # --- Button-Based Interactions ---
+    dp.add_handler(MessageHandler(Filters.regex("^🔥 Token Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/tokeninfo")))
+    dp.add_handler(MessageHandler(Filters.regex("^📈 BNB Price$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/price")))
+    dp.add_handler(MessageHandler(Filters.regex("^🎁 Airdrop Check$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/airdropcheck")))
+    dp.add_handler(MessageHandler(Filters.regex("^😂 Meme Generator$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/meme")))
+    dp.add_handler(MessageHandler(Filters.regex("^🎉 Giveaway Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/giveawayinfo")))
+    dp.add_handler(MessageHandler(Filters.regex("^💫 About WENBNB$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/about")))
 
 
 # 🌟 MAIN FUNCTION
@@ -378,6 +381,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
