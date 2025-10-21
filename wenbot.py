@@ -236,7 +236,10 @@ threading.Thread(target=keep_alive, daemon=True).start()
 if __name__ == "__main__":
     import threading
     threading.Thread(target=run_flask).start()
-    main()
+    print("🚀 Bot connected successfully, polling started...")
+
+    updater.start_polling()
+    updater.idle()
 
 
 import signal
@@ -245,6 +248,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
