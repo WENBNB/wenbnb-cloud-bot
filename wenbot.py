@@ -16,6 +16,18 @@ def what(filename):
 imghdr.what = what
 sys.modules["imghdr"] = imghdr
 import os
+import signal
+import psutil  # make sure psutil is in requirements.txt too
+
+# Kill old bot instance if already running
+for proc in psutil.process_iter():
+    try:
+        if 'wenbot.py' in proc.cmdline() and proc.pid != os.getpid():
+            os.kill(proc.pid, signal.SIGTERM)
+            print("🛑 Old bot instance stopped.")
+    except Exception:
+        pass
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -234,6 +246,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
