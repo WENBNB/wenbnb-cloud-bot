@@ -278,14 +278,17 @@ def keep_alive():
 
 threading.Thread(target=keep_alive, daemon=True).start()
 
-# 🩵 Telegram Bot Start (Main Entry)
 if __name__ == "__main__":
     import threading
-    threading.Thread(target=run_flask).start()
-    print("🚀 Bot connected successfully, polling started...")
 
-    updater.start_polling()
-    updater.idle()
+    # Run Flask (keep-alive server) on a separate thread
+    threading.Thread(target=run_flask, daemon=True).start()
+
+    # Start the Telegram bot polling
+    try:
+        main()
+    except Exception as e:
+        print(f"Bot stopped due to error: {e}")
 
 
 import signal
@@ -294,6 +297,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
