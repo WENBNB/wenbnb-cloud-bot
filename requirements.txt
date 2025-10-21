@@ -10,3 +10,4 @@ web3
 setuptools==68.0.0
 urllib3==1.26.18
 Flask==2.3.2
+psutil
