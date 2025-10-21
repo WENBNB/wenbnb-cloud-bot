@@ -132,34 +132,75 @@ def start(update: Update, context: CallbackContext):
         disable_web_page_preview=True
     )
 
-# 🌟 MENU COMMAND
-def menu_cmd(update, context):
+# 🪄 MENU COMMAND — WENBNB Neural Engine Edition
+def menu(update: Update, context: CallbackContext):
     keyboard = [
         ["💰 Token Info", "📈 BNB Price"],
-        ["🎁 Airdrop Check", "😂 Meme Generator"],
-        ["🎉 Giveaway Info", "💫 About WENBNB"]
+        ["🎁 Airdrop Check", "🧠 AI Analyze"],
+        ["😂 Meme Generator", "🎉 Giveaway Info"],
+        ["💫 About WENBNB", "🧩 Help"]
     ]
+
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    update.message.reply_text("📋 Here's the WENBNB Bot Menu 👇", reply_markup=reply_markup)
 
-
-# 🌟 HELP COMMAND
-def help_cmd(update, context):
-    txt = (
-        "🧩 *Available Commands:*\n\n"
-        "/start — Welcome Message + Main Menu\n"
-        "/menu — Reopen Main Menu Buttons\n"
-        "/price — Show Live BNB Price\n"
-        "/tokeninfo — Token Supply & Stats\n"
-        "/airdropcheck <wallet> — Check Airdrop Eligibility\n"
-        "/meme <topic> — Generate Meme Caption\n"
-        "/giveaway_start — Start Giveaway (Admin Only)\n"
-        "/giveaway_end — End Giveaway (Admin Only)\n"
-        "/about — Learn about the WENBNB ecosystem\n\n"
-        "💡 *Tip:* You can also use the buttons below the chat!"
+    menu_text = (
+        "🪄 <b>WENBNB Command Menu</b>\n\n"
+        "Choose what you’d like me to do 👇\n"
+        "Each option is powered by the <b>WENBNB Neural Engine</b> 🤖\n\n"
+        "💰 — Get live token stats\n"
+        "📈 — Check BNB + WENBNB prices\n"
+        "🎁 — Verify your airdrop status\n"
+        "🧠 — Let AI analyze wallets or trends\n"
+        "😂 — Generate memes with WENBNB humor\n"
+        "🎉 — Manage community giveaways\n"
+        "💫 — Explore the full WENBNB ecosystem\n\n"
+        "🚀 <b>Powered by WENBNB Neural Engine — AI Core Intelligence 24×7</b>"
     )
-    update.message.reply_text(txt, parse_mode="Markdown")
 
+    update.message.reply_text(
+        menu_text,
+        reply_markup=reply_markup,
+        parse_mode="HTML",
+        disable_web_page_preview=True
+    )
+
+
+# 🧩 HELP COMMAND — WENBNB Neural Engine Edition
+def help_command(update: Update, context: CallbackContext):
+    help_text = (
+        "🧩 <b>WENBNB Bot Command Center</b>\n\n"
+        "Here’s everything I can do for you — intelligently powered by AI ⚙️\n\n"
+        
+        "🚀 <b>Core Commands</b>\n"
+        "/start — Activate the AI Assistant & show quick menu\n"
+        "/help — Display this command list anytime\n"
+        "/menu — Open the interactive button menu\n\n"
+
+        "💰 <b>Token & Market Tools</b>\n"
+        "/tokeninfo — View WENBNB token stats & supply\n"
+        "/price — Check live BNB + WENBNB price (via Binance + CoinGecko)\n"
+        "/aianalyze — AI-powered insight for wallet, trend, or text\n\n"
+
+        "🎁 <b>Community Tools</b>\n"
+        "/airdropcheck — Verify airdrop eligibility instantly\n"
+        "/giveaway_start — Start a giveaway (Admin only)\n"
+        "/giveaway_end — End giveaway (Admin only)\n\n"
+
+        "😂 <b>Entertainment & AI Fun</b>\n"
+        "/meme — Generate a fresh meme caption using WENBNB AI Humor Engine\n\n"
+
+        "💫 <b>About</b>\n"
+        "/about — Learn more about the WENBNB Ecosystem & Vision\n\n"
+
+        "⚙️ <i>Pro Tip:</i> Use buttons from the /menu or type any command directly.\n\n"
+        "🚀 <b>Powered by WENBNB Neural Engine — AI Core Intelligence 24×7</b>"
+    )
+
+    update.message.reply_text(
+        help_text,
+        parse_mode="HTML",
+        disable_web_page_preview=True
+    )
 
 # 🌟 REGISTER HANDLERS
 def register_menu_handlers(dp):
@@ -295,6 +336,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
