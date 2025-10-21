@@ -157,16 +157,21 @@ dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_buttons))
         try:
             mod = importlib.import_module(f"plugins.{name}")
             if hasattr(mod, "register"):
-                mod.register(dp, {"conn": conn, "cur": cur, "logger": logger,
-                                  "BSCSCAN_API_KEY": BSCSCAN_API_KEY,
-                                  "OPENAI_API_KEY": OPENAI_API_KEY,
-                                  "WEN_TOKEN_ADDRESS": WEN_TOKEN_ADDRESS,
-                                  "OWNER_ID": OWNER_ID})
+                mod.register(dp, {
+                    "conn": conn,
+                    "cur": cur,
+                    "logger": logger,
+                    "BSCSCAN_API_KEY": BSCSCAN_API_KEY,
+                    "OPENAI_API_KEY": OPENAI_API_KEY,
+                    "WEN_TOKEN_ADDRESS": WEN_TOKEN_ADDRESS,
+                    "OWNER_ID": OWNER_ID
+                })
                 logger.info("Loaded plugin %s", name)
         except Exception as e:
             logger.exception("Plugin load failed: %s", e)
 
     updater.start_polling()
+
     logger.info("WENBNB Cloud Bot started.")
     updater.idle()
     
@@ -197,6 +202,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
