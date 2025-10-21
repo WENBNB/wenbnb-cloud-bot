@@ -89,6 +89,47 @@ def main():
     dp = updater.dispatcher
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("help", help_cmd))
+    from telegram.ext import MessageHandler, Filters
+
+def handle_buttons(update, context):
+    text = update.message.text
+
+    if "Token Info" in text:
+        update.message.reply_text("💰 Fetching WENBNB Token Info... Please wait.")
+        context.bot.send_message(chat_id=update.effective_chat.id, text="/tokeninfo")
+
+    elif "BNB Price" in text:
+        update.message.reply_text("📈 Getting live BNB price...")
+        context.bot.send_message(chat_id=update.effective_chat.id, text="/price")
+
+    elif "Airdrop Check" in text:
+        update.message.reply_text("🎁 Please send your wallet address to check eligibility.")
+
+    elif "Meme Generator" in text:
+        update.message.reply_text("😂 Send a meme idea or topic, and I’ll generate one!")
+
+    elif "Giveaway Info" in text:
+        update.message.reply_text(
+            "🎉 Giveaway Commands:\n"
+            "/giveaway_start — Start Giveaway (Admin Only)\n"
+            "/giveaway_end — End Giveaway (Admin Only)"
+        )
+
+    elif "About WENBNB" in text or "About" in text:
+        update.message.reply_text(
+            "💫 *About WENBNB Bot:*\n"
+            "Your all-in-one AI-powered assistant for WENBNB Ecosystem.\n\n"
+            "📊 Token Info | 🎁 Airdrops | 😂 Memes | 🎉 Giveaways\n"
+            "24x7 Active — Powered by Render Cloud ☁️",
+            parse_mode="Markdown"
+        )
+
+    else:
+        update.message.reply_text("Please choose a valid option from the menu 👇")
+
+# 👇 Add handler for buttons
+dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_buttons))
+
 
     for path in sorted(glob.glob("plugins/*.py")):
         name = os.path.basename(path)[:-3]
@@ -135,6 +176,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
