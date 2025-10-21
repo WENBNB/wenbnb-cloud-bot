@@ -54,9 +54,24 @@ cur = conn.cursor()
 cur.execute('''CREATE TABLE IF NOT EXISTS giveaways (id INTEGER PRIMARY KEY, chat_id INTEGER, message_id INTEGER, entrants TEXT, active INTEGER DEFAULT 1, created_at INTEGER)''')
 conn.commit()
 
+from telegram import ReplyKeyboardMarkup
+
 def start(update, context):
-    user_name = update.effective_user.first_name
-    update.message.reply_text(f"🤖 Welcome {user_name}! I’m WENBNB Bot 🤝 — Type /help for commands.")
+    keyboard = [
+        ["💰 Token Info", "📈 BNB Price"],
+        ["🎁 Airdrop Check", "😂 Meme Generator"],
+        ["🎉 Giveaway Info", "ℹ️ About WENBNB"]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    
+    update.message.reply_text(
+        f"👋 Hey {update.effective_user.first_name}!\n\n"
+        "Welcome to *WENBNB Cloud Bot* 💎\n"
+        "I'm your AI-powered assistant for price, token info, memes & more.\n\n"
+        "Choose an option below 👇",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
 
 def help_cmd(update, context):
     txt = (
@@ -120,6 +135,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
