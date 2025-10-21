@@ -15,6 +15,17 @@ def what(filename):
 
 imghdr.what = what
 sys.modules["imghdr"] = imghdr
+from flask import Flask
+import threading
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "WENBNB Bot is alive 💫"
+
+def run_flask():
+    app.run(host='0.0.0.0', port=8080)
 
 import os, logging, sqlite3, glob, importlib
 from telegram.ext import Updater, CommandHandler
@@ -202,6 +213,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
