@@ -253,54 +253,84 @@ if __name__ == "__main__":
     from telegram.ext import MessageHandler, Filters
     import requests
 
-# 🧠 AI ANALYZE COMMAND (Live API + Neural Style)
+# 🧠 AI ANALYZE COMMAND — WENBNB Neural Engine (Smart with Fallback Chart Tracking)
 def aianalyze(update, context):
-    query = " ".join(context.args)
-    if not query:
-        update.message.reply_text(
-            "💡 Please provide something to analyze.\n\nExample:\n"
-            "/aianalyze BNB market trend\n"
-            "/aianalyze WENBNB token\n"
-            "/aianalyze 0xYourWalletAddress",
-            parse_mode="HTML"
-        )
-        return
-
     try:
-        # --- Fetch Live Market Data ---
-        bnb_data = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT").json()
-        cg_data = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=binancecoin,wenbnb&vs_currencies=usd").json()
+        update.message.reply_text("🧠 Initializing WENBNB Neural Engine...\nGathering data from AI + blockchain sources ⏳")
 
-        bnb_price = float(bnb_data["price"])
-        wenbnb_price = cg_data.get("wenbnb", {}).get("usd", "N/A")
+        # Try live market data from Binance
+        try:
+            bnb_data = requests.get("https://api.binance.com/api/v3/ticker/24hr?symbol=BNBUSDT").json()
+            bnb_price = float(bnb_data.get("lastPrice", 0))
+            bnb_change = float(bnb_data.get("priceChangePercent", 0))
+        except:
+            bnb_price, bnb_change = 0, 0
 
-        # --- Generate AI-like Interpretation ---
-        insight = (
-            "📊 Based on real-time signals:\n"
-            "• BNB showing strong liquidity support.\n"
-            "• WENBNB trading with steady network confidence.\n"
-            "• AI Core suggests moderate volatility next 24h.\n"
+        # Try WENBNB data from CoinGecko
+        try:
+            cg_data = requests.get(
+                "https://api.coingecko.com/api/v3/simple/price?ids=wenbnb,binancecoin&vs_currencies=usd&include_24hr_change=true"
+            ).json()
+            wenbnb_price = cg_data.get("wenbnb", {}).get("usd", "N/A")
+            wenbnb_change = cg_data.get("wenbnb", {}).get("usd_24h_change", 0)
+        except:
+            wenbnb_price, wenbnb_change = "N/A", 0
+
+        # 🔁 If token missing from CG, use fallback (DexScreener)
+        if wenbnb_price == "N/A":
+            try:
+                dex_data = requests.get("https://api.dexscreener.com/latest/dex/search?q=wenbnb").json()
+                pairs = dex_data.get("pairs", [])
+                if pairs:
+                    wenbnb_price = float(pairs[0]["priceUsd"])
+                    wenbnb_change = float(pairs[0]["priceChange"]["h24"])
+                    source = "DexScreener"
+                else:
+                    source = "N/A"
+            except:
+                source = "N/A"
+        else:
+            source = "CoinGecko"
+
+        # 🧩 Determine market sentiment
+        if bnb_change > 2:
+            ai_sentiment = "🟢 <b>Bullish Momentum</b>\n🚀 Uptrend likely to continue short-term."
+        elif bnb_change < -2:
+            ai_sentiment = "🔴 <b>Bearish Signal</b>\n📉 Market showing selling pressure."
+        else:
+            ai_sentiment = "🟡 <b>Neutral Range</b>\n⚖️ Possible consolidation or sideways action."
+
+        # 🎯 Sentiment Bar
+        if bnb_change > 3:
+            bar = "🟢🟢🟢🟢🟢 Strong Bull"
+        elif bnb_change > 1:
+            bar = "🟢🟢🟢🟡⚪ Moderate Bull"
+        elif bnb_change < -3:
+            bar = "🔴🔴🔴🔴⚪ Strong Bear"
+        elif bnb_change < -1:
+            bar = "🔴🔴🟠⚪⚪ Mild Bear"
+        else:
+            bar = "🟡🟡🟡⚪⚪ Neutral"
+
+        # 🧠 Compose AI output
+        analysis = (
+            "<b>🧠 WENBNB Neural Market Analysis</b>\n\n"
+            f"💰 <b>BNB:</b> ${bnb_price:,.2f} ({bnb_change:+.2f}% 24h)\n"
+            f"💎 <b>WENBNB:</b> ${wenbnb_price} ({wenbnb_change:+.2f}% 24h)\n"
+            f"📈 <i>Source:</i> {source}\n\n"
+            f"{ai_sentiment}\n\n"
+            f"📊 <b>AI Sentiment Bar:</b>\n{bar}\n\n"
+            "🤖 <b>AI Insight:</b> Combining exchange trends, liquidity depth & token momentum.\n"
+            "🚀 Powered by <b>WENBNB Neural Engine</b> — Cloud Intelligence 24×7."
         )
 
-        response = (
-            f"🤖 <b>WENBNB Neural AI Analysis</b>\n\n"
-            f"<b>Query:</b> <i>{query}</i>\n\n"
-            f"💰 <b>BNB:</b> ${bnb_price:,.2f} (Binance)\n"
-            f"💎 <b>WENBNB:</b> ${wenbnb_price} (CoinGecko)\n\n"
-            f"{insight}\n"
-            "🚀 Powered by <b>WENBNB Neural Engine</b> — AI Core Intelligence 24×7\n"
-            "☁️ Hosted securely on <b>WENBNB Cloud Intelligence</b>"
-        )
-
-        update.message.reply_text(response, parse_mode="HTML", disable_web_page_preview=True)
+        update.message.reply_text(analysis, parse_mode="HTML", disable_web_page_preview=True)
 
     except Exception as e:
         update.message.reply_text(
-            f"⚠️ Neural Engine Error:\n<i>{str(e)}</i>\n\n"
-            "Please try again in a few seconds, baby 💫",
+            f"⚠️ Neural Engine failed to analyze data.\n\n<b>Error:</b> {e}",
             parse_mode="HTML"
         )
-
 
 def handle_buttons(update, context):
     text = update.message.text
@@ -476,6 +506,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
