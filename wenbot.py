@@ -148,10 +148,10 @@ def handle_buttons(update, context):
     else:
         update.message.reply_text("Please choose a valid option from the menu 👇")
 
-# 👇 Add handler for buttons
-dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_buttons))
+    # 👇 Add handler for buttons
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_buttons))
 
-
+    # 👇 Load all plugins from plugins folder
     for path in sorted(glob.glob("plugins/*.py")):
         name = os.path.basename(path)[:-3]
         try:
@@ -166,9 +166,9 @@ dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_buttons))
                     "WEN_TOKEN_ADDRESS": WEN_TOKEN_ADDRESS,
                     "OWNER_ID": OWNER_ID
                 })
-                logger.info("Loaded plugin %s", name)
+                logger.info(f"Loaded plugin: {name}")
         except Exception as e:
-            logger.exception("Plugin load failed: %s", e)
+            logger.exception(f"Plugin load failed: {name}, Error: {e}")
 
     updater.start_polling()
 
@@ -202,6 +202,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
