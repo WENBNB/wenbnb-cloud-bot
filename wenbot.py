@@ -100,29 +100,37 @@ from telegram import ReplyKeyboardMarkup
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import CommandHandler, MessageHandler, Filters
 
-# 🌟 START COMMAND
-def start(update, context):
+# 🚀 START COMMAND — WENBNB Neural Engine Edition
+def start(update: Update, context: CallbackContext):
     keyboard = [
         ["💰 Token Info", "📈 BNB Price"],
-        ["🎁 Airdrop Check", "😂 Meme Generator"],
-        ["🎉 Giveaway Info", "💫 About WENBNB"]
+        ["🎁 Airdrop Check", "🧠 AI Analyze"],
+        ["😂 Meme Generator", "💫 About WENBNB"]
     ]
+
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
     welcome_text = (
-        f"👋 Hey {update.effective_user.first_name}!\n\n"
-        "🚀 *Welcome to WENBNB Bot — Your Web3 + AI Cloud Assistant!*\n\n"
-        "🤖 Powered by next-gen AI, I help you explore the entire *WENBNB ecosystem*.\n\n"
-        "💰 Get live token info & BNB price\n"
-        "🎁 Check airdrop eligibility\n"
-        "😂 Generate AI-powered memes\n"
-        "🎉 Manage community giveaways\n"
-        "💫 Always online — hosted on AI Cloud\n\n"
-        "👉 Type /help to view all commands or tap a button below 👇"
+        f"<b>👋 Hey {update.effective_user.first_name}!</b>\n\n"
+        "🤖 <b>Welcome to WENBNB Bot</b> — your intelligent Web3 assistant.\n\n"
+        "🧠 I operate on the <b>WENBNB Neural Engine</b> — "
+        "an AI Core built to empower your crypto journey 24×7.\n\n"
+        "💫 What I can do for you:\n"
+        "• 💰 Show live token stats & BNB price (via Binance + CoinGecko APIs)\n"
+        "• 🎁 Check airdrop eligibility instantly\n"
+        "• 🧠 Analyze wallets, trends, or markets using AI\n"
+        "• 😂 Generate custom memes with WENBNB flavor\n"
+        "• 🎉 Manage giveaways & engage your community\n\n"
+        "✨ Type /help to see all commands or tap a button below 👇\n\n"
+        "🚀 <b>Powered by WENBNB Neural Engine — AI Core Intelligence 24×7</b>"
     )
 
-    update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode="Markdown")
-
+    update.message.reply_text(
+        welcome_text,
+        reply_markup=reply_markup,
+        parse_mode="HTML",
+        disable_web_page_preview=True
+    )
 
 # 🌟 MENU COMMAND
 def menu_cmd(update, context):
@@ -287,6 +295,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
