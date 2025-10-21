@@ -1,6 +1,4 @@
-﻿# WENBNB Cloud Bot (V1)
-# -*- coding: utf-8 -*-
-# Confidential Prototype â€” Stage 1 Build
+# --- WENBNB Cloud Bot (Stable Build) ---
 
 import sys, types, mimetypes
 
@@ -15,9 +13,12 @@ def what(filename):
 
 imghdr.what = what
 sys.modules["imghdr"] = imghdr
+
+# --- Load environment variables ---
 import os
 import signal
-import psutil  # make sure psutil is in requirements.txt too
+import psutil  # for auto-kill of old instance
+from dotenv import load_dotenv
 
 # Kill old bot instance if already running
 for proc in psutil.process_iter():
@@ -28,21 +29,20 @@ for proc in psutil.process_iter():
     except Exception:
         pass
 
-from dotenv import load_dotenv
 load_dotenv()
 
+# --- Flask Keep-Alive Server ---
 from flask import Flask
 import threading
 
 import telegram
 telegram.ext.Updater.stop = lambda self: None
 
-
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "WENBNB Bot is alive 💫"
+    return "WENBNB Bot is alive 🌙"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -246,6 +246,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
