@@ -103,7 +103,7 @@ from telegram.ext import CommandHandler, MessageHandler, Filters
 # 🚀 START COMMAND — WENBNB Neural Engine Edition
 def start(update: Update, context: CallbackContext):
     keyboard = [
-        ["💰 Token Info", "📈 BNB Price"],
+        ["💰 Token Info", "📈 Price"],
         ["🎁 Airdrop Check", "🧠 AI Analyze"],
         ["😂 Meme Generator", "💫 About WENBNB"]
     ]
@@ -135,7 +135,7 @@ def start(update: Update, context: CallbackContext):
 # 🪄 MENU COMMAND — WENBNB Neural Engine Edition
 def menu(update: Update, context: CallbackContext):
     keyboard = [
-        ["💰 Token Info", "📈 BNB Price"],
+        ["💰 Token Info", "📈 Price"],
         ["🎁 Airdrop Check", "🧠 AI Analyze"],
         ["😂 Meme Generator", "🎉 Giveaway Info"],
         ["💫 About WENBNB", "🧩 Help"]
@@ -208,13 +208,14 @@ def register_menu_handlers(dp):
     dp.add_handler(CommandHandler("start", start))          # 🚀 Activate AI Assistant
     dp.add_handler(CommandHandler("help", help_cmd))        # 🧩 Command reference
     dp.add_handler(CommandHandler("menu", menu_cmd))        # 🪄 Open main menu
+    
 
     # --- Advanced AI Tools ---
     dp.add_handler(CommandHandler("aianalyze", aianalyze))  # 🧠 Neural analysis engine
 
     # --- Button-Based Interactions ---
     dp.add_handler(MessageHandler(Filters.regex("^🔥 Token Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/tokeninfo")))
-    dp.add_handler(MessageHandler(Filters.regex("^📈 BNB Price$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/price")))
+    dp.add_handler(MessageHandler(Filters.regex("^📈 Price$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/price")))
     dp.add_handler(MessageHandler(Filters.regex("^🎁 Airdrop Check$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/airdropcheck")))
     dp.add_handler(MessageHandler(Filters.regex("^😂 Meme Generator$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/meme")))
     dp.add_handler(MessageHandler(Filters.regex("^🎉 Giveaway Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/giveawayinfo")))
@@ -465,6 +466,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
