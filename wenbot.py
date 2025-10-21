@@ -197,18 +197,19 @@ def keep_alive():
     while True:
         try:
             requests.get(url)
-            print("Pinged Render to stay awake ⏰")
+            print("💖 Pinged Render to stay awake 💖")
         except Exception as e:
             print("Ping failed:", e)
         time.sleep(600)  # ping every 10 minutes
 
 threading.Thread(target=keep_alive, daemon=True).start()
-# ------------------------------------------------
-import telegram
-telegram.ext.Updater.stop = lambda self: None
 
+# 🩵 Telegram Bot Start (Main Entry)
 if __name__ == "__main__":
+    import threading
+    threading.Thread(target=run_flask).start()
     main()
+
 
 import signal
 import sys
@@ -216,6 +217,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
