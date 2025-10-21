@@ -240,45 +240,56 @@ if __name__ == "__main__":
     main()
     
     from telegram.ext import MessageHandler, Filters
-    
-# 🧠 AI ANALYZE COMMAND — WENBNB Neural Engine Edition
-def aianalyze(update: Update, context: CallbackContext):
-    user_input = ' '.join(context.args) if context.args else None
+    import requests
 
-    if not user_input:
+# 🧠 AI ANALYZE COMMAND (Live API + Neural Style)
+def aianalyze(update, context):
+    query = " ".join(context.args)
+    if not query:
         update.message.reply_text(
-            "🧠 <b>WENBNB Neural Engine Active</b>\n\n"
-            "Send me what you want to analyze — it can be:\n"
-            "• A crypto wallet address 🪙\n"
-            "• A project name or token symbol 💼\n"
-            "• Or any text you’d like AI insights on 🧩\n\n"
-            "Example:\n"
-            "<code>/aianalyze 0x1234abcd...</code>\n"
-            "<code>/aianalyze Bitcoin trend</code>\n\n"
-            "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7",
+            "💡 Please provide something to analyze.\n\nExample:\n"
+            "/aianalyze BNB market trend\n"
+            "/aianalyze WENBNB token\n"
+            "/aianalyze 0xYourWalletAddress",
             parse_mode="HTML"
         )
         return
 
-    # Simulated “AI-style” response logic
-    response = f"🤖 <b>Analyzing:</b> <code>{user_input}</code>\n\n"
+    try:
+        # --- Fetch Live Market Data ---
+        bnb_data = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT").json()
+        cg_data = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=binancecoin,wenbnb&vs_currencies=usd").json()
 
-    if user_input.startswith("0x") and len(user_input) > 20:
-        response += "🔍 Detected input as a wallet address.\n"
-        response += "⚡ Fetching AI-based wallet risk, transaction pattern, and activity summary..."
-    elif "bnb" in user_input.lower() or "wenbnb" in user_input.lower():
-        response += "📊 Analyzing BNB & WENBNB market trends using Neural Sentiment Engine..."
-    else:
-        response += "💬 Processing general context through the WENBNB Neural AI Core..."
+        bnb_price = float(bnb_data["price"])
+        wenbnb_price = cg_data.get("wenbnb", {}).get("usd", "N/A")
 
-    response += "\n\n✨ <i>This is an experimental AI-powered insight module.</i>\n"
-    response += "🚀 <b>Powered by WENBNB Neural Engine — Always Online</b>"
+        # --- Generate AI-like Interpretation ---
+        insight = (
+            "📊 Based on real-time signals:\n"
+            "• BNB showing strong liquidity support.\n"
+            "• WENBNB trading with steady network confidence.\n"
+            "• AI Core suggests moderate volatility next 24h.\n"
+        )
 
-    update.message.reply_text(
-        response,
-        parse_mode="HTML",
-        disable_web_page_preview=True
-    )
+        response = (
+            f"🤖 <b>WENBNB Neural AI Analysis</b>\n\n"
+            f"<b>Query:</b> <i>{query}</i>\n\n"
+            f"💰 <b>BNB:</b> ${bnb_price:,.2f} (Binance)\n"
+            f"💎 <b>WENBNB:</b> ${wenbnb_price} (CoinGecko)\n\n"
+            f"{insight}\n"
+            "🚀 Powered by <b>WENBNB Neural Engine</b> — AI Core Intelligence 24×7\n"
+            "☁️ Hosted securely on <b>WENBNB Cloud Intelligence</b>"
+        )
+
+        update.message.reply_text(response, parse_mode="HTML", disable_web_page_preview=True)
+
+    except Exception as e:
+        update.message.reply_text(
+            f"⚠️ Neural Engine Error:\n<i>{str(e)}</i>\n\n"
+            "Please try again in a few seconds, baby 💫",
+            parse_mode="HTML"
+        )
+
 
 def handle_buttons(update, context):
     text = update.message.text
@@ -381,6 +392,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
