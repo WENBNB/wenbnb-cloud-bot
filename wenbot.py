@@ -205,21 +205,31 @@ def help_command(update: Update, context: CallbackContext):
 # 🌐 REGISTER ALL BOT COMMANDS
 def register_menu_handlers(dp):
     # --- Core Commands ---
-    dp.add_handler(CommandHandler("start", start))          # 🚀 Activate AI Assistant
-    dp.add_handler(CommandHandler("help", help_cmd))        # 🧩 Command reference
-    dp.add_handler(CommandHandler("menu", menu_cmd))        # 🪄 Open main menu
-    
+    dp.add_handler(CommandHandler("start", start))               # 🚀 Activate AI Assistant
+    dp.add_handler(CommandHandler("help", help_cmd))             # 🧩 Show all available commands
+    dp.add_handler(CommandHandler("menu", menu_cmd))             # 🪄 Open quick-access menu
 
-    # --- Advanced AI Tools ---
-    dp.add_handler(CommandHandler("aianalyze", aianalyze))  # 🧠 Neural analysis engine
+    # --- AI + API Powered Features ---
+    dp.add_handler(CommandHandler("tokeninfo", tokeninfo))       # 💰 Token data via WENBNB API
+    dp.add_handler(CommandHandler("price", price))               # 📈 Live market price (BNB + WENBNB)
+    dp.add_handler(CommandHandler("airdropcheck", airdropcheck)) # 🎁 Airdrop eligibility verification
+    dp.add_handler(CommandHandler("meme", meme))                 # 😂 AI meme generation
+    dp.add_handler(CommandHandler("giveaway_start", giveaway_start)) # 🎉 Start giveaway (Admin)
+    dp.add_handler(CommandHandler("giveaway_end", giveaway_end))     # 🔒 End giveaway (Admin)
+    dp.add_handler(CommandHandler("aianalyze", aianalyze))       # 🧠 Neural data analysis (AI Core)
+    dp.add_handler(CommandHandler("about", about))               # 💫 Ecosystem info
 
-    # --- Button-Based Interactions ---
-    dp.add_handler(MessageHandler(Filters.regex("^🔥 Token Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/tokeninfo")))
-    dp.add_handler(MessageHandler(Filters.regex("^📈 Price$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/price")))
-    dp.add_handler(MessageHandler(Filters.regex("^🎁 Airdrop Check$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/airdropcheck")))
-    dp.add_handler(MessageHandler(Filters.regex("^😂 Meme Generator$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/meme")))
-    dp.add_handler(MessageHandler(Filters.regex("^🎉 Giveaway Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/giveawayinfo")))
-    dp.add_handler(MessageHandler(Filters.regex("^💫 About WENBNB$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/about")))
+    # --- Button Interactions (from Start/Menu UI) ---
+    dp.add_handler(MessageHandler(Filters.regex(r"^💰 Token Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/tokeninfo")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^📈 Price$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/price")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^🎁 Airdrop Check$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/airdropcheck")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^😂 Meme Generator$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/meme")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^🎉 Giveaway Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/giveaway_start")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^🧠 AI Analyze$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/aianalyze")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^💫 About WENBNB$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/about")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^🍀 Help$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/help")))
+
+    print("✅ All bot handlers registered successfully (AI + API integrated).")
 
 
 # 🌟 MAIN FUNCTION
