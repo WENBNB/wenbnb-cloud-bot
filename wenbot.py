@@ -59,6 +59,37 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
 dp = updater.dispatcher
 
+# --- Telegram Command Handlers (Premium AI Version) ---
+
+def start(update, context):
+    update.message.reply_text(
+        "🤖 **Welcome to WENBNB Bot — Your AI Web3 Assistant!** 🚀\n\n"
+        "Powered by next-gen AI, I help you explore the entire **WENBNB ecosystem** seamlessly. 💫\n\n"
+        "💰 Get live token info & BNB price\n"
+        "🎁 Check airdrop eligibility instantly\n"
+        "😂 Create AI-powered memes\n"
+        "🎉 Manage community giveaways\n"
+        "🌎 Always online — powered by AI Cloud\n\n"
+        "👉 Type /help to view all commands or tap a menu button below ⤵️"
+    )
+
+
+def help_cmd(update, context):
+    update.message.reply_text(
+        "🧩 **WENBNB Bot Commands (AI Edition)** 🧩\n\n"
+        "🚀 /start — Activate your AI Assistant\n"
+        "🧩 /help — Show all available commands\n"
+        "🪄 /menu — Open quick-access menu\n"
+        "💰 /tokeninfo — View WENBNB token stats & supply\n"
+        "📈 /price — Check live BNB + WENBNB price\n"
+        "🎁 /airdropcheck — Verify airdrop eligibility (enter wallet)\n"
+        "😂 /meme — Generate meme caption using AI\n"
+        "🎉 /giveaway_start — Start a giveaway (Admin only)\n"
+        "🔒 /giveaway_end — End giveaway (Admin only)\n"
+        "💫 /about — Learn more about the WENBNB ecosystem\n\n"
+        "⚡ *Tip:* Use /menu anytime for shortcuts or try /about to know more about me 😉"
+    )
+
 
 class PingHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -248,6 +279,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
