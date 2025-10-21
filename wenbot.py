@@ -45,7 +45,7 @@ def home():
     return "WENBNB Bot is alive 🌙"
 
 def run_flask():
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 9090))
     app.run(host='0.0.0.0', port=port)
 
 
@@ -246,6 +246,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
