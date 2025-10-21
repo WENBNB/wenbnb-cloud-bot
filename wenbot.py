@@ -1,306 +1,243 @@
-# --- WENBNB Cloud Bot (Stable Build) ---
+#!/usr/bin/env python3
+"""
+WENBNB Neural Engine V2 - Smart+Chill Hybrid Telegram Bot
+Paste into wenbot.py, set TELEGRAM_TOKEN and other env vars, then run.
+Dependencies: python-telegram-bot, requests
+pip install python-telegram-bot requests
+"""
 
-import sys, types, mimetypes
-
-# Patch for imghdr module (Python 3.13 compatibility)
-imghdr = types.ModuleType("imghdr")
-
-def what(filename):
-    t = mimetypes.guess_type(filename)[0]
-    if t and "image" in t:
-        return t.split("/")[-1]
-    return None
-
-imghdr.what = what
-sys.modules["imghdr"] = imghdr
-
-# --- Load environment variables ---
 import os
-import signal
-import psutil  # for auto-kill of old instance
-from dotenv import load_dotenv
+import logging
+import random
+import requests
+from html import escape
+from typing import Optional
 
-# Kill old bot instance if already running
-for proc in psutil.process_iter():
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+
+# Optional OpenAI integration (uncomment if you want OpenAI fallback)
+# import openai
+# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# if OPENAI_API_KEY:
+#     openai.api_key = OPENAI_API_KEY
+
+# Logging
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("wenbnb_bot")
+
+# Brand signature (do NOT forget to keep this)
+NEURAL_TAGLINE = "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7"
+
+# ----------------------
+# Utility helpers
+# ----------------------
+def safe_get_json(url: str, timeout: int = 6) -> Optional[dict]:
     try:
-        if 'wenbot.py' in proc.cmdline() and proc.pid != os.getpid():
-            os.kill(proc.pid, signal.SIGTERM)
-            print("🛑 Old bot instance stopped.")
-    except Exception:
-        pass
+        resp = requests.get(url, timeout=timeout)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        log.warning("safe_get_json failed for %s: %s", url, str(e))
+        return None
 
-load_dotenv()
+def format_money(v):
+    try:
+        return f"${float(v):,.6f}"
+    except:
+        return str(v)
 
-# --- Flask Keep-Alive Server ---
-from flask import Flask
-import threading
-
-from telegram.ext import Updater
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "WENBNB Bot is alive 🌙"
-
-def run_flask():
-    port = int(os.environ.get("PORT", 9090))
-    app.run(host='0.0.0.0', port=port)
-
-
-import os, logging, sqlite3, glob, importlib
-from telegram.ext import Updater, CommandHandler
-# --- Fake web server for Render free plan ---
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
-
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-
-updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
-dp = updater.dispatcher
-
-# --- Telegram Command Handlers (Premium AI Version) ---
-
-class PingHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"WENBNB Bot running")
-
-def run_server():
-    server = HTTPServer(("0.0.0.0", int(os.getenv("PORT", 10000))), PingHandler)
-    server.serve_forever()
-
-threading.Thread(target=run_server, daemon=True).start()
-# ---------------------------------------------
-
-
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or ""
-BSCSCAN_API_KEY = os.getenv("BSCSCAN_API_KEY") or ""
-WEN_TOKEN_ADDRESS = os.getenv("WEN_TOKEN_ADDRESS") or "0x0000000000000000000000000000000000000000"
-OWNER_ID = int(os.getenv("OWNER_ID") or 0)
-DB_FILE = os.getenv("DB_FILE") or "wenbot.db"
-
-if not TELEGRAM_TOKEN:
-    raise SystemExit("Please set TELEGRAM_TOKEN in environment variables.")
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-logger = logging.getLogger("WENBNBCloudBot")
-
-conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-cur = conn.cursor()
-cur.execute('''CREATE TABLE IF NOT EXISTS giveaways (id INTEGER PRIMARY KEY, chat_id INTEGER, message_id INTEGER, entrants TEXT, active INTEGER DEFAULT 1, created_at INTEGER)''')
-conn.commit()
-
-from telegram import ReplyKeyboardMarkup
-
-# ---------------- WENBNB Bot: Main Commands ---------------- #
-
-from telegram import ReplyKeyboardMarkup
-from telegram.ext import CommandHandler, MessageHandler, Filters
-
-# 🚀 START COMMAND — WENBNB Neural Engine Edition
+# ----------------------
+# Commands
+# ----------------------
 def start(update: Update, context: CallbackContext):
-    keyboard = [
-        ["💰 Token Info", "📈 Price"],
-        ["🎁 Airdrop Check", "🧠 AI Analyze"],
-        ["😂 Meme Generator", "💫 About WENBNB"]
-    ]
-
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-    welcome_text = (
-        f"<b>👋 Hey {update.effective_user.first_name}!</b>\n\n"
-        "🤖 <b>Welcome to WENBNB Bot</b> — your intelligent Web3 assistant.\n\n"
-        "🧠 I operate on the <b>WENBNB Neural Engine</b> — "
-        "an AI Core built to empower your crypto journey 24×7.\n\n"
-        "💫 What I can do for you:\n"
-        "• 💰 Show live token stats & BNB price (via Binance + CoinGecko APIs)\n"
-        "• 🎁 Check airdrop eligibility instantly\n"
-        "• 🧠 Analyze wallets, trends, or markets using AI\n"
-        "• 😂 Generate custom memes with WENBNB flavor\n"
-        "• 🎉 Manage giveaways & engage your community\n\n"
-        "✨ Type /help to see all commands or tap a button below 👇\n\n"
-        "🚀 <b>Powered by WENBNB Neural Engine — AI Core Intelligence 24×7</b>"
-    )
-
-    update.message.reply_text(
-        welcome_text,
-        reply_markup=reply_markup,
-        parse_mode="HTML",
-        disable_web_page_preview=True
-    )
-
-# 🪄 MENU COMMAND — WENBNB Neural Engine Edition
-def menu(update: Update, context: CallbackContext):
+    name = escape(update.effective_user.first_name or "friend")
     keyboard = [
         ["💰 Token Info", "📈 Price"],
         ["🎁 Airdrop Check", "🧠 AI Analyze"],
         ["😂 Meme Generator", "🎉 Giveaway Info"],
-        ["💫 About WENBNB", "🧩 Help"]
+        ["💫 About WENBNB", "🍀 Help"]
     ]
-
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-    menu_text = (
-        "🪄 <b>WENBNB Command Menu</b>\n\n"
-        "Choose what you’d like me to do 👇\n"
-        "Each option is powered by the <b>WENBNB Neural Engine</b> 🤖\n\n"
-        "💰 — Get live token stats\n"
-        "📈 — Check BNB + WENBNB prices\n"
-        "🎁 — Verify your airdrop status\n"
-        "🧠 — Let AI analyze wallets or trends\n"
-        "😂 — Generate memes with WENBNB humor\n"
-        "🎉 — Manage community giveaways\n"
-        "💫 — Explore the full WENBNB ecosystem\n\n"
-        "🚀 <b>Powered by WENBNB Neural Engine — AI Core Intelligence 24×7</b>"
+    welcome_text = (
+        f"<b>👋 Hey {name}!</b>\n\n"
+        "🤖 <b>Welcome to WENBNB Bot</b> — your smart + chill Web3 assistant.\n\n"
+        "🧠 I operate on the <b>WENBNB Neural Engine</b> — an AI Core built to empower your crypto journey 24×7.\n\n"
+        "💫 What I can do:\n"
+        "• 💰 Live token & BSC stats\n"
+        "• 📈 Price & chart tracking\n"
+        "• 🎁 Airdrop eligibility checks\n"
+        "• 😂 AI meme captions\n"
+        "• 🧠 AI-powered analysis & sentiment\n\n"
+        f"✨ Type /help or tap a button below 👇\n\n<b>{NEURAL_TAGLINE}</b>"
     )
+    update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode="HTML", disable_web_page_preview=True)
 
-    update.message.reply_text(
-        menu_text,
-        reply_markup=reply_markup,
-        parse_mode="HTML",
-        disable_web_page_preview=True
-    )
-
-
-# 🧩 HELP COMMAND — WENBNB Neural Engine Edition
-def help_command(update: Update, context: CallbackContext):
+def help_cmd(update: Update, context: CallbackContext):
     help_text = (
         "🧩 <b>WENBNB Bot Command Center</b>\n\n"
-        "Here’s everything I can do for you — intelligently powered by AI ⚙️\n\n"
-        
-        "🚀 <b>Core Commands</b>\n"
-        "/start — Activate the AI Assistant & show quick menu\n"
-        "/help — Display this command list anytime\n"
-        "/menu — Open the interactive button menu\n\n"
-
-        "💰 <b>Token & Market Tools</b>\n"
-        "/tokeninfo — View WENBNB token stats & supply\n"
-        "/price — Check live BNB + WENBNB price (via Binance + CoinGecko)\n"
-        "/aianalyze — AI-powered insight for wallet, trend, or text\n\n"
-
-        "🎁 <b>Community Tools</b>\n"
-        "/airdropcheck — Verify airdrop eligibility instantly\n"
-        "/giveaway_start — Start a giveaway (Admin only)\n"
-        "/giveaway_end — End giveaway (Admin only)\n\n"
-
-        "😂 <b>Entertainment & AI Fun</b>\n"
-        "/meme — Generate a fresh meme caption using WENBNB AI Humor Engine\n\n"
-
-        "💫 <b>About</b>\n"
-        "/about — Learn more about the WENBNB Ecosystem & Vision\n\n"
-
-        "⚙️ <i>Pro Tip:</i> Use buttons from the /menu or type any command directly.\n\n"
-        "🚀 <b>Powered by WENBNB Neural Engine — AI Core Intelligence 24×7</b>"
+        "🚀 Core:\n"
+        "/start — Activate the assistant\n"
+        "/help — This message\n"
+        "/menu — Quick button menu\n\n"
+        "💰 Market & Token:\n"
+        "/tokeninfo — Token stats (BscScan)\n"
+        "/price — Live BNB + WENBNB price\n"
+        "/aianalyze — Deep AI market analysis\n\n"
+        "🎁 Community & Fun:\n"
+        "/airdropcheck <wallet> — Check airdrop eligibility\n"
+        "/meme — Generate a meme caption\n"
+        "/giveaway_start — Start giveaway (admin)\n"
+        "/giveaway_end — End giveaway (admin)\n\n"
+        f"{NEURAL_TAGLINE}"
     )
+    update.message.reply_text(help_text, parse_mode="HTML", disable_web_page_preview=True)
 
-    update.message.reply_text(
-        help_text,
-        parse_mode="HTML",
-        disable_web_page_preview=True
+def menu_cmd(update: Update, context: CallbackContext):
+    keyboard = [
+        ["💰 Token Info", "📈 Price"],
+        ["🎁 Airdrop Check", "🧠 AI Analyze"],
+        ["😂 Meme Generator", "🎉 Giveaway Info"],
+        ["💫 About WENBNB", "🍀 Help"]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    menu_text = (
+        "🪄 <b>WENBNB Quick Menu</b>\n\n"
+        "Choose an option — each powered by the WENBNB Neural Engine.\n\n"
+        f"{NEURAL_TAGLINE}"
     )
+    update.message.reply_text(menu_text, reply_markup=reply_markup, parse_mode="HTML", disable_web_page_preview=True)
 
-# 🌐 REGISTER ALL BOT COMMANDS
-def register_menu_handlers(dp):
-    # --- Core Commands ---
-    dp.add_handler(CommandHandler("start", start))               # 🚀 Activate AI Assistant
-    dp.add_handler(CommandHandler("help", help_cmd))             # 🧩 Show all available commands
-    dp.add_handler(CommandHandler("menu", menu_cmd))             # 🪄 Open quick-access menu
-
-    # --- AI + API Powered Features ---
-    dp.add_handler(CommandHandler("tokeninfo", tokeninfo))       # 💰 Token data via WENBNB API
-    dp.add_handler(CommandHandler("price", price))               # 📈 Live market price (BNB + WENBNB)
-    dp.add_handler(CommandHandler("airdropcheck", airdropcheck)) # 🎁 Airdrop eligibility verification
-    dp.add_handler(CommandHandler("meme", meme))                 # 😂 AI meme generation
-    dp.add_handler(CommandHandler("giveaway_start", giveaway_start)) # 🎉 Start giveaway (Admin)
-    dp.add_handler(CommandHandler("giveaway_end", giveaway_end))     # 🔒 End giveaway (Admin)
-    dp.add_handler(CommandHandler("aianalyze", aianalyze))       # 🧠 Neural data analysis (AI Core)
-    dp.add_handler(CommandHandler("about", about))               # 💫 Ecosystem info
-
-    # --- Button Interactions (from Start/Menu UI) ---
-    dp.add_handler(MessageHandler(Filters.regex(r"^💰 Token Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/tokeninfo")))
-    dp.add_handler(MessageHandler(Filters.regex(r"^📈 Price$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/price")))
-    dp.add_handler(MessageHandler(Filters.regex(r"^🎁 Airdrop Check$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/airdropcheck")))
-    dp.add_handler(MessageHandler(Filters.regex(r"^😂 Meme Generator$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/meme")))
-    dp.add_handler(MessageHandler(Filters.regex(r"^🎉 Giveaway Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/giveaway_start")))
-    dp.add_handler(MessageHandler(Filters.regex(r"^🧠 AI Analyze$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/aianalyze")))
-    dp.add_handler(MessageHandler(Filters.regex(r"^💫 About WENBNB$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/about")))
-    dp.add_handler(MessageHandler(Filters.regex(r"^🍀 Help$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/help")))
-
-    print("✅ All bot handlers registered successfully (AI + API integrated).")
-
-
-# 🌟 MAIN FUNCTION
-def main():
-    updater = Updater(TELEGRAM_TOKEN, use_context=True)
-    dp = updater.dispatcher
-
-    register_menu_handlers(dp)
-
-    print("✨ Bot connected successfully, polling started...")
-    updater.start_polling()
-    updater.idle()
-
-
-# 🌟 ENTRY POINT
-if __name__ == "__main__":
-    import threading
-    threading.Thread(target=run_flask).start()
-    main()
-    
-    from telegram.ext import MessageHandler, Filters
-    import requests
-
-# 🧠 AI ANALYZE COMMAND — WENBNB Neural Engine (Smart with Fallback Chart Tracking)
-def aianalyze(update, context):
+# Token info using BscScan (basic)
+def tokeninfo(update: Update, context: CallbackContext):
+    contract = os.getenv("TOKEN_CONTRACT")
+    bsc_api = os.getenv("BSCSCAN_API_KEY")
+    if not contract or not bsc_api:
+        update.message.reply_text("⚠️ Token contract or BscScan API key not configured.")
+        return
     try:
-        update.message.reply_text("🧠 Initializing WENBNB Neural Engine...\nGathering data from AI + blockchain sources ⏳")
+        url = f"https://api.bscscan.com/api?module=stats&action=tokensupply&contractaddress={contract}&apikey={bsc_api}"
+        data = safe_get_json(url)
+        total = int(data.get("result", 0)) / 1e18 if data else 0
+        msg = (
+            f"💎 <b>WENBNB Token Report</b>\n\n"
+            f"🪙 <b>Total Supply:</b> {total:,.0f} WENBNB\n"
+            f"🔗 <a href='https://bscscan.com/token/{contract}'>View on BscScan</a>\n\n"
+            f"{NEURAL_TAGLINE}"
+        )
+        update.message.reply_text(msg, parse_mode="HTML", disable_web_page_preview=False)
+    except Exception as e:
+        update.message.reply_text(f"⚠️ Error fetching token info: {e}")
 
-        # Try live market data from Binance
-        try:
-            bnb_data = requests.get("https://api.binance.com/api/v3/ticker/24hr?symbol=BNBUSDT").json()
-            bnb_price = float(bnb_data.get("lastPrice", 0))
-            bnb_change = float(bnb_data.get("priceChangePercent", 0))
-        except:
-            bnb_price, bnb_change = 0, 0
+# Price - BNB + WENBNB (CoinGecko + Binance with fallback)
+def price(update: Update, context: CallbackContext):
+    try:
+        # Binance BNB
+        bnb_json = safe_get_json("https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT")
+        bnb_price = float(bnb_json["price"]) if bnb_json and "price" in bnb_json else None
 
-        # Try WENBNB data from CoinGecko
-        try:
-            cg_data = requests.get(
-                "https://api.coingecko.com/api/v3/simple/price?ids=wenbnb,binancecoin&vs_currencies=usd&include_24hr_change=true"
-            ).json()
-            wenbnb_price = cg_data.get("wenbnb", {}).get("usd", "N/A")
-            wenbnb_change = cg_data.get("wenbnb", {}).get("usd_24h_change", 0)
-        except:
-            wenbnb_price, wenbnb_change = "N/A", 0
+        # CoinGecko WENBNB + BNB
+        cg_json = safe_get_json("https://api.coingecko.com/api/v3/simple/price?ids=wenbnb,binancecoin&vs_currencies=usd&include_24hr_change=true")
+        wen_price = cg_json.get("wenbnb", {}).get("usd") if cg_json else None
+        wen_change = cg_json.get("wenbnb", {}).get("usd_24h_change") if cg_json else None
 
-        # 🔁 If token missing from CG, use fallback (DexScreener)
-        if wenbnb_price == "N/A":
-            try:
-                dex_data = requests.get("https://api.dexscreener.com/latest/dex/search?q=wenbnb").json()
-                pairs = dex_data.get("pairs", [])
-                if pairs:
-                    wenbnb_price = float(pairs[0]["priceUsd"])
-                    wenbnb_change = float(pairs[0]["priceChange"]["h24"])
-                    source = "DexScreener"
-                else:
-                    source = "N/A"
-            except:
+        if wen_price is None:
+            # DexScreener fallback
+            ds = safe_get_json("https://api.dexscreener.com/latest/dex/search?q=wenbnb")
+            pairs = ds.get("pairs", []) if ds else []
+            if pairs:
+                wen_price = float(pairs[0].get("priceUsd", 0))
+                source = "DexScreener"
+            else:
                 source = "N/A"
         else:
             source = "CoinGecko"
 
-        # 🧩 Determine market sentiment
-        if bnb_change > 2:
-            ai_sentiment = "🟢 <b>Bullish Momentum</b>\n🚀 Uptrend likely to continue short-term."
-        elif bnb_change < -2:
-            ai_sentiment = "🔴 <b>Bearish Signal</b>\n📉 Market showing selling pressure."
-        else:
-            ai_sentiment = "🟡 <b>Neutral Range</b>\n⚖️ Possible consolidation or sideways action."
+        text = (
+            f"📊 <b>Live Market Intelligence</b>\n\n"
+            f"💰 <b>BNB:</b> {format_money(bnb_price) if bnb_price else 'N/A'}\n"
+            f"💎 <b>WENBNB:</b> {format_money(wen_price) if wen_price else 'N/A'}\n\n"
+            f"📈 Source: {source}\n\n"
+            f"{NEURAL_TAGLINE}"
+        )
+        update.message.reply_text(text, parse_mode="HTML", disable_web_page_preview=False)
+    except Exception as e:
+        update.message.reply_text(f"⚠️ Error fetching prices: {e}")
 
-        # 🎯 Sentiment Bar
+# Airdrop check (simple simulation or hook to real logic)
+def airdropcheck(update: Update, context: CallbackContext):
+    if not context.args:
+        update.message.reply_text("💳 Please send wallet address: /airdropcheck 0xYourAddress")
+        return
+    wallet = context.args[0]
+    # Simple simulated logic — replace with real eligibility checks as needed
+    resp = random.choice([
+        "✅ Eligible — congratulations! Claim instructions will be posted soon.",
+        "❌ Not eligible currently. Stay active in the community!",
+        "⚠️ Pending verification — re-check in a few minutes."
+    ])
+    update.message.reply_text(f"🎁 <b>Airdrop Check</b>\nWallet: <code>{escape(wallet)}</code>\n\n{resp}\n\n{NEURAL_TAGLINE}", parse_mode="HTML")
+
+# Meme generator (simple caption generator; optionally call an AI API)
+def meme(update: Update, context: CallbackContext):
+    samples = [
+        "When BNB pumps and your coffee spills ☕📈",
+        "Bought the dip. It dipped more. 😭",
+        "WENBNB to the moon? Hold tight and HODL 🚀",
+        "Me: 'I’ll sell at profit'. Market: 'LOL' 😂"
+    ]
+    caption = random.choice(samples)
+    update.message.reply_text(f"😂 <b>WENBNB Meme</b>\n\n{caption}\n\n{NEURAL_TAGLINE}", parse_mode="HTML")
+
+# Giveaway stubs (admin only enforcement should be added)
+def giveaway_start(update: Update, context: CallbackContext):
+    # Add admin checks here (e.g., owner IDs)
+    update.message.reply_text("🎉 Giveaway started! Follow pinned message to participate.")
+
+def giveaway_end(update: Update, context: CallbackContext):
+    update.message.reply_text("🔒 Giveaway ended. Winners will be announced shortly.")
+
+# AI analyze - hybrid, with CoinGecko & DexScreener fallback, sentiment bar
+def aianalyze(update: Update, context: CallbackContext):
+    query = " ".join(context.args) if context.args else ""
+    try:
+        update.message.reply_text("🧠 WENBNB Neural Engine — analyzing... ⏳")
+
+        # Basic market data
+        bnb_json = safe_get_json("https://api.binance.com/api/v3/ticker/24hr?symbol=BNBUSDT")
+        bnb_price = float(bnb_json.get("lastPrice", 0)) if bnb_json else 0
+        bnb_change = float(bnb_json.get("priceChangePercent", 0)) if bnb_json else 0
+
+        # Try CoinGecko for a token name if query contains token symbol or 'wenbnb'
+        # If query is a wallet (0x...), reply that wallet analysis is currently limited
+        wen_price = None
+        wen_change = 0
+        source = "CoinGecko"
+        cg = safe_get_json("https://api.coingecko.com/api/v3/simple/price?ids=wenbnb,binancecoin&vs_currencies=usd&include_24hr_change=true")
+        if cg:
+            wen_price = cg.get("wenbnb", {}).get("usd")
+            wen_change = cg.get("wenbnb", {}).get("usd_24h_change", 0)
+
+        if wen_price is None:
+            # DexScreener fallback
+            ds = safe_get_json("https://api.dexscreener.com/latest/dex/search?q=wenbnb")
+            pairs = ds.get("pairs", []) if ds else []
+            if pairs:
+                wen_price = float(pairs[0].get("priceUsd", 0))
+                wen_change = float(pairs[0].get("priceChange", {}).get("h24", 0) if pairs[0].get("priceChange") else 0)
+                source = "DexScreener"
+            else:
+                source = "N/A"
+
+        # sentiment logic (based on BNB change)
+        if bnb_change > 2:
+            sentiment_text = "🟢 Bullish momentum detected — accumulation likely."
+        elif bnb_change < -2:
+            sentiment_text = "🔴 Bearish pressure — caution advised."
+        else:
+            sentiment_text = "🟡 Market showing neutral/sideways action."
+
+        # sentiment bar
         if bnb_change > 3:
             bar = "🟢🟢🟢🟢🟢 Strong Bull"
         elif bnb_change > 1:
@@ -312,238 +249,139 @@ def aianalyze(update, context):
         else:
             bar = "🟡🟡🟡⚪⚪ Neutral"
 
-        # 🧠 Compose AI output
         analysis = (
             "<b>🧠 WENBNB Neural Market Analysis</b>\n\n"
-            f"💰 <b>BNB:</b> ${bnb_price:,.2f} ({bnb_change:+.2f}% 24h)\n"
-            f"💎 <b>WENBNB:</b> ${wenbnb_price} ({wenbnb_change:+.2f}% 24h)\n"
-            f"📈 <i>Source:</i> {source}\n\n"
-            f"{ai_sentiment}\n\n"
+            f"💰 <b>BNB:</b> {format_money(bnb_price)} ({bnb_change:+.2f}% 24h)\n"
+            f"💎 <b>WENBNB:</b> {format_money(wen_price) if wen_price else 'N/A'} ({wen_change:+.2f}% 24h)\n"
+            f"📈 Source: {source}\n\n"
+            f"{sentiment_text}\n\n"
             f"📊 <b>AI Sentiment Bar:</b>\n{bar}\n\n"
-            "🤖 <b>AI Insight:</b> Combining exchange trends, liquidity depth & token momentum.\n"
-            "🚀 Powered by <b>WENBNB Neural Engine</b> — Cloud Intelligence 24×7."
+            f"🤖 AI Insight: Combining exchange trends, volume & momentum.\n\n"
+            f"{NEURAL_TAGLINE}"
         )
-
         update.message.reply_text(analysis, parse_mode="HTML", disable_web_page_preview=True)
-
     except Exception as e:
-        update.message.reply_text(
-            f"⚠️ Neural Engine failed to analyze data.\n\n<b>Error:</b> {e}",
-            parse_mode="HTML"
-        )
+        update.message.reply_text(f"⚠️ Neural Engine failed to analyze data.\n\n<b>Error:</b> {escape(str(e))}", parse_mode="HTML")
 
-def handle_buttons(update, context):
-    text = update.message.text
+# About
+def about(update: Update, context: CallbackContext):
+    text = (
+        "<b>WENBNB Ecosystem</b>\n\n"
+        "WENBNB is a hybrid meme-AI project on BSC — built for community, memes, and utility.\n\n"
+        f"{NEURAL_TAGLINE}"
+    )
+    update.message.reply_text(text, parse_mode="HTML", disable_web_page_preview=True)
 
-import os, requests, random
-from telegram import Update
-from telegram.ext import CallbackContext
+# ----------------------
+# AI Auto Context Reply (intent detection)
+# ----------------------
+def ai_auto_reply(update: Update, context: CallbackContext):
+    # Hybrid behavior: adjust tone for groups vs private chat
+    chat_type = update.effective_chat.type
+    text = update.message.text or ""
+    text_lower = text.lower()
 
-# 🧠 AI Utility (Neural Style Text Generator)
-def ai_format(text):
-    return f"🤖 <b>AI Insight:</b>\n<i>{text}</i>\n\n🚀 Powered by <b>WENBNB Neural Engine</b> — Cloud AI 24×7 ⚙️"
+    # Priority intent detection
+    if any(k in text_lower for k in ["price", "bnb", "wenbnb", "chart", "token"]):
+        # trigger price command
+        context.bot.send_message(chat_id=update.effective_chat.id, text="/price")
+        return
 
-# 💰 TOKEN INFO (BscScan + AI-verified)
-def tokeninfo(update: Update, context: CallbackContext):
-    try:
-        contract = "0x1B7402155E88BFbb577163990562cC23f8Ae432f"
-        api_key = os.getenv("BSCSCAN_API_KEY")
-        url = f"https://api.bscscan.com/api?module=stats&action=tokensupply&contractaddress={contract}&apikey={api_key}"
-        data = requests.get(url).json()
-        supply = int(data.get("result", 0)) / 1e18
+    if any(k in text_lower for k in ["airdrop", "wallet", "eligible", "claim"]):
+        context.bot.send_message(chat_id=update.effective_chat.id, text="/airdropcheck")
+        return
 
-        text = (
-            "💎 <b>WENBNB Token Analytics</b>\n\n"
-            f"🪙 <b>Total Supply:</b> {supply:,.0f} WENBNB\n"
-            f"🔗 <a href='https://bscscan.com/token/{contract}'>View on BscScan</a>\n"
-            "🌐 Network: Binance Smart Chain (BEP-20)\n\n"
-            "🧠 Verified by WENBNB Neural Engine — AI Blockchain Monitor"
-        )
-        update.message.reply_text(text, parse_mode="HTML", disable_web_page_preview=False)
-    except Exception as e:
-        update.message.reply_text(f"⚠️ Error fetching token data: {e}")
-
-# 📈 PRICE TRACKER (BNB + WENBNB, fallback if not listed)
-def price(update: Update, context: CallbackContext):
-    try:
-        bnb = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT").json()
-        cg = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=wenbnb,binancecoin&vs_currencies=usd").json()
-
-        bnb_price = float(bnb["price"])
-        wenbnb_price = cg.get("wenbnb", {}).get("usd", None)
-
-        if not wenbnb_price:
-            wenbnb_price = "Not yet on CoinGecko ⚠️ (tracking via DEX Screener)"
-            chart = "https://dexscreener.com/bsc/0x1B7402155E88BFbb577163990562cC23f8Ae432f"
+    if any(k in text_lower for k in ["analyze", "analysis", "ai", "sentiment", "trend"]):
+        # if there's a specific token or wallet, pass as args when possible
+        if "0x" in text_lower:
+            # pass wallet as argument to aianalyze
+            context.bot.send_message(chat_id=update.effective_chat.id, text=f"/aianalyze {text}")
         else:
-            chart = "https://www.coingecko.com/en/coins/wenbnb"
+            context.bot.send_message(chat_id=update.effective_chat.id, text="/aianalyze")
+        return
 
-        text = (
-            "📊 <b>Live Market Intelligence</b>\n\n"
-            f"💰 <b>BNB:</b> ${bnb_price:,.2f} (Binance)\n"
-            f"💎 <b>WENBNB:</b> {wenbnb_price}\n\n"
-            f"📈 <a href='{chart}'>View Price Chart</a>\n\n"
-            "📡 Auto-refreshed by <b>WENBNB AI Cloud</b> — 24×7 Neural Sync"
-        )
-        update.message.reply_text(text, parse_mode="HTML", disable_web_page_preview=False)
-    except Exception as e:
-        update.message.reply_text(f"⚠️ Error fetching prices: {e}")
+    if any(k in text_lower for k in ["meme", "funny", "caption", "joke"]):
+        context.bot.send_message(chat_id=update.effective_chat.id, text="/meme")
+        return
 
-# 🎁 AIRDROP CHECK (Wallet Verification)
-def airdropcheck(update: Update, context: CallbackContext):
-    try:
-        if len(context.args) == 0:
-            update.message.reply_text("💳 Please enter your wallet address.\n\nExample:\n<code>/airdropcheck 0x1234...</code>", parse_mode="HTML")
-            return
+    if any(k in text_lower for k in ["about", "wenbnb", "what is wenbnb", "info"]):
+        context.bot.send_message(chat_id=update.effective_chat.id, text="/about")
+        return
 
-        wallet = context.args[0]
-        result = random.choice([
-            "✅ Eligible for Airdrop Round 2 — Claim soon!",
-            "❌ Not found in the whitelist — Keep engaging!",
-            "⚠️ Pending AI Verification — Try again later."
-        ])
+    # Fallback: Use local witty replies or OpenAI fallback if configured
+    fallback_options = [
+        "🤖 Nice question — I can check that. Try phrasing like 'price', 'analyze', or 'airdrop'.",
+        "🧠 I’m here — ask me about prices, airdrops, or say 'analyze' to get insights.",
+        "✨ Want a meme? Type 'meme' or ask for token info."
+    ]
+    # If OpenAI is configured and you'd like a conversational fallback, call it here (optional)
+    # if OPENAI_API_KEY:
+    #     try:
+    #         ai_resp = openai.Completion.create(
+    #             engine="text-davinci-003",
+    #             prompt=f"User asked: {text}\nAnswer in a friendly, concise style about crypto.",
+    #             max_tokens=120
+    #         )
+    #         reply = ai_resp.choices[0].text.strip()
+    #         context.bot.send_message(chat_id=update.effective_chat.id, text=reply)
+    #         return
+    #     except Exception as e:
+    #         log.warning("OpenAI fallback failed: %s", e)
 
-        update.message.reply_text(ai_format(f"Wallet: {wallet}\nStatus: {result}"), parse_mode="HTML")
-    except Exception as e:
-        update.message.reply_text(f"⚠️ Error checking airdrop: {e}")
+    context.bot.send_message(chat_id=update.effective_chat.id, text=random.choice(fallback_options))
 
-# 😂 MEME GENERATOR (AI Caption Engine)
-def meme(update: Update, context: CallbackContext):
-    try:
-        memes = [
-            "“When BNB pumps, I refresh charts every 3 seconds.” 📱📈",
-            "“Me: Just one more trade… Market: Liquidated.” 💀",
-            "“Bought the dip. It dipped more.” 😭",
-            "“WENBNB going to the moon 🚀 — but gas fees already there.” 😂"
-        ]
-        caption = random.choice(memes)
-        update.message.reply_text(ai_format(caption), parse_mode="HTML")
-    except Exception as e:
-        update.message.reply_text(f"⚠️ Meme generation failed: {e}")
+# ----------------------
+# Register handlers
+# ----------------------
+def register_menu_handlers(dp):
+    # Core
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("help", help_cmd))
+    dp.add_handler(CommandHandler("menu", menu_cmd))
 
-# 🎉 GIVEAWAY MODULE (Admin Controlled)
-def giveaway_start(update: Update, context: CallbackContext):
-    update.message.reply_text("🎁 <b>Giveaway Started!</b>\nUsers can now participate by following instructions in the pinned post.", parse_mode="HTML")
+    # AI + API commands
+    dp.add_handler(CommandHandler("tokeninfo", tokeninfo))
+    dp.add_handler(CommandHandler("price", price))
+    dp.add_handler(CommandHandler("airdropcheck", airdropcheck))
+    dp.add_handler(CommandHandler("meme", meme))
+    dp.add_handler(CommandHandler("giveaway_start", giveaway_start))
+    dp.add_handler(CommandHandler("giveaway_end", giveaway_end))
+    dp.add_handler(CommandHandler("aianalyze", aianalyze))
+    dp.add_handler(CommandHandler("about", about))
 
-def giveaway_end(update: Update, context: CallbackContext):
-    update.message.reply_text("🔒 <b>Giveaway Closed!</b>\nWinners will be announced soon via AI draw system 🤖", parse_mode="HTML")
+    # Button interactions (UI shortcuts)
+    dp.add_handler(MessageHandler(Filters.regex(r"^💰 Token Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/tokeninfo")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^📈 Price$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/price")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^🎁 Airdrop Check$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/airdropcheck")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^😂 Meme Generator$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/meme")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^🎉 Giveaway Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/giveaway_start")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^🧠 AI Analyze$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/aianalyze")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^💫 About WENBNB$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/about")))
+    dp.add_handler(MessageHandler(Filters.regex(r"^🍀 Help$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/help")))
 
+    # Auto context replies for any plain text
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply))
 
-    elif "About WENBNB" in text or "About" in text:
-        update.message.reply_text(
-            "💫 *About WENBNB Bot:*\n"
-            "Your all-in-one AI-powered assistant for WENBNB Ecosystem.\n\n"
-            "📊 Token Info | 🎁 Airdrops | 😂 Memes | 🎉 Giveaways\n"
-            "24x7 Active — Powered by Render Cloud ☁️",
-            parse_mode="Markdown"
-        )
+    log.info("✅ Handlers registered")
 
-    else:
-        update.message.reply_text("Please choose a valid option from the menu 👇")
+# ----------------------
+# Main runner
+# ----------------------
+def main():
+    token = os.getenv("TELEGRAM_TOKEN")
+    if not token:
+        log.error("TELEGRAM_TOKEN not set in environment variables.")
+        return
 
-    # 👇 Add handler for buttons
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_buttons))
+    updater = Updater(token=token, use_context=True)
+    dp = updater.dispatcher
 
-    # 👇 Load all plugins from plugins folder
-    for path in sorted(glob.glob("plugins/*.py")):
-        name = os.path.basename(path)[:-3]
-        try:
-            mod = importlib.import_module(f"plugins.{name}")
-            if hasattr(mod, "register"):
-                mod.register(dp, {
-                    "conn": conn,
-                    "cur": cur,
-                    "logger": logger,
-                    "BSCSCAN_API_KEY": BSCSCAN_API_KEY,
-                    "OPENAI_API_KEY": OPENAI_API_KEY,
-                    "WEN_TOKEN_ADDRESS": WEN_TOKEN_ADDRESS,
-                    "OWNER_ID": OWNER_ID
-                })
-                logger.info(f"Loaded plugin: {name}")
-        except Exception as e:
-            logger.exception(f"Plugin load failed: {name}, Error: {e}")
+    register_menu_handlers(dp)
 
-# Run Flask in background so Render stays awake
-threading.Thread(target=run_flask).start()
-print("Bot connected successfully, polling started...")
-
-updater.start_polling()
-logger.info("WENBNB Cloud Bot started.")
-updater.idle()
-
-    
-# --- Keep Alive Ping (Render Safe 24x7 Mode) ---
-import requests, threading, os, time
-
-def keep_alive():
-    url = "https://wenbnb-cloud-bot.onrender.com"  # apna Render URL
-    while True:
-        try:
-            requests.get(url)
-            print("💖 Pinged Render to stay awake 💖")
-        except Exception as e:
-            print("Ping failed:", e)
-        time.sleep(600)  # ping every 10 minutes
-
-threading.Thread(target=keep_alive, daemon=True).start()
+    # Start
+    updater.start_polling()
+    log.info("WENBNB Neural Engine bot started. %s", NEURAL_TAGLINE)
+    updater.idle()
 
 if __name__ == "__main__":
-    import threading
-
-    # Run Flask (keep-alive server) on a separate thread
-    threading.Thread(target=run_flask, daemon=True).start()
-
-    # Start the Telegram bot polling
-    try:
-        main()
-    except Exception as e:
-        print(f"Bot stopped due to error: {e}")
-
-
-import signal
-import sys
-import os
-
-# Auto-restart if Render sends stop signal
-signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    main()
