@@ -29,7 +29,9 @@ def home():
     return "WENBNB Bot is alive 💫"
 
 def run_flask():
-    app.run(host='0.0.0.0', port=8080)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
 
 import os, logging, sqlite3, glob, importlib
 from telegram.ext import Updater, CommandHandler
@@ -222,6 +224,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
