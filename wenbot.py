@@ -202,11 +202,14 @@ def help_command(update: Update, context: CallbackContext):
         disable_web_page_preview=True
     )
 
+
+
 # 🌟 REGISTER HANDLERS
 def register_menu_handlers(dp):
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("help", help_cmd))
     dp.add_handler(CommandHandler("menu", menu_cmd))
+    dp.add_handler(CommandHandler("aianalyze", aianalyze))
     dp.add_handler(MessageHandler(Filters.regex("^💰 Token Info$"), lambda u, c: c.bot.send_message(u.effective_chat.id, "Fetching token info...")))
     dp.add_handler(MessageHandler(Filters.regex("^📈 BNB Price$"), lambda u, c: c.bot.send_message(u.effective_chat.id, "Fetching live BNB price...")))
     dp.add_handler(MessageHandler(Filters.regex("^🎁 Airdrop Check$"), lambda u, c: c.bot.send_message(u.effective_chat.id, "Send your wallet to check eligibility.")))
@@ -234,6 +237,45 @@ if __name__ == "__main__":
     main()
     
     from telegram.ext import MessageHandler, Filters
+    
+# 🧠 AI ANALYZE COMMAND — WENBNB Neural Engine Edition
+def aianalyze(update: Update, context: CallbackContext):
+    user_input = ' '.join(context.args) if context.args else None
+
+    if not user_input:
+        update.message.reply_text(
+            "🧠 <b>WENBNB Neural Engine Active</b>\n\n"
+            "Send me what you want to analyze — it can be:\n"
+            "• A crypto wallet address 🪙\n"
+            "• A project name or token symbol 💼\n"
+            "• Or any text you’d like AI insights on 🧩\n\n"
+            "Example:\n"
+            "<code>/aianalyze 0x1234abcd...</code>\n"
+            "<code>/aianalyze Bitcoin trend</code>\n\n"
+            "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7",
+            parse_mode="HTML"
+        )
+        return
+
+    # Simulated “AI-style” response logic
+    response = f"🤖 <b>Analyzing:</b> <code>{user_input}</code>\n\n"
+
+    if user_input.startswith("0x") and len(user_input) > 20:
+        response += "🔍 Detected input as a wallet address.\n"
+        response += "⚡ Fetching AI-based wallet risk, transaction pattern, and activity summary..."
+    elif "bnb" in user_input.lower() or "wenbnb" in user_input.lower():
+        response += "📊 Analyzing BNB & WENBNB market trends using Neural Sentiment Engine..."
+    else:
+        response += "💬 Processing general context through the WENBNB Neural AI Core..."
+
+    response += "\n\n✨ <i>This is an experimental AI-powered insight module.</i>\n"
+    response += "🚀 <b>Powered by WENBNB Neural Engine — Always Online</b>"
+
+    update.message.reply_text(
+        response,
+        parse_mode="HTML",
+        disable_web_page_preview=True
+    )
 
 def handle_buttons(update, context):
     text = update.message.text
@@ -336,6 +378,7 @@ import os
 
 # Auto-restart if Render sends stop signal
 signal.signal(signal.SIGTERM, lambda signum, frame: os.execv(sys.executable, ['python'] + sys.argv))
+
 
 
 
