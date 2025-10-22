@@ -440,8 +440,11 @@ def main():
     # Register handlers
     register_menu_handlers(dp)
 
-    # 🌐 AI AUTO-REPLY (Contextual Chat Mode with Typing Effect + Personality)
+# 🤖 AI AUTO-REPLY (Contextual Chat Mode)
 from telegram.ext import MessageHandler, Filters
+import os
+import requests
+import random
 import time
 
 AI_PROXY_URL = "https://api.openai.com/v1/chat/completions"
@@ -450,11 +453,11 @@ AI_KEY = os.getenv("OPENAI_API_KEY")
 def ai_auto_reply(update, context):
     user_msg = update.message.text
     user_name = update.effective_user.first_name or "User"
-    print(f"[AI DEBUG] Incoming message: {user_msg}")
+    print(f"[AI DEBUG] Incoming message from {user_name}: {user_msg}")
 
-    # Show typing action
+    # Simulate typing action
     context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-    time.sleep(1.2)  # Small delay to simulate thinking 🧠
+    time.sleep(1.5)
 
     try:
         headers = {"Authorization": f"Bearer {AI_KEY}"}
@@ -466,9 +469,9 @@ def ai_auto_reply(update, context):
                     "content": (
                         "You are WENBNB Neural Engine — an intelligent AI assistant "
                         "for the crypto, BNB, and meme ecosystem. "
-                        "You reply in a warm, confident, futuristic tone like an AI companion. "
-                        "Keep messages short, stylish, and a bit fun — use emojis when relevant."
-                    ),
+                        "You reply in a confident, futuristic tone with humor and emojis. "
+                        "Keep responses short, stylish, and smart."
+                    )
                 },
                 {"role": "user", "content": user_msg},
             ],
@@ -478,31 +481,30 @@ def ai_auto_reply(update, context):
         r = requests.post(AI_PROXY_URL, headers=headers, json=payload, timeout=20)
         print(f"[AI DEBUG] Response status: {r.status_code}")
 
-if r.status_code == 200:
-    ai_reply = r.json()["choices"][0]["message"]["content"].strip()
+        if r.status_code == 200:
+            ai_reply = r.json()["choices"][0]["message"]["content"].strip()
 
-    # ✨ Dynamic Neural Signature Footer
-    footer_styles = [
-        "🚀 Powered by WENBNB Neural Engine • AI Core Intelligence 24x7",
-        "🧠 WENBNB Neural Brain Active • Running on Cloud AI Core",
-        "🔗 WENBNB AI Node Synced • Smarter Every Block",
-        "⚙️ Neural Thread v2.1 • WENBNB Intelligence Operational",
-        "💫 WENBNB Neural Engine — Always Online, Always Learning"
-    ]
+            # ✨ Dynamic Neural Signature Footer
+            footer_styles = [
+                "🚀 Powered by WENBNB Neural Engine • AI Core Intelligence 24x7",
+                "🧠 WENBNB Neural Brain Active • Running on Cloud AI Core",
+                "🔗 WENBNB AI Node Synced • Smarter Every Block",
+                "⚙️ Neural Thread v2.1 • WENBNB Intelligence Operational",
+                "💫 WENBNB Neural Engine — Always Online, Always Learning",
+            ]
+            signature = random.choice(footer_styles)
+            ai_reply += f"\n\n{signature}"
 
-    import random
-    signature = random.choice(footer_styles)
-    ai_reply += f"\n\n{signature}"
+            update.message.reply_text(ai_reply, parse_mode="Markdown")
 
-    update.message.reply_text(ai_reply, parse_mode="Markdown")
+        else:
+            print(f"[AI DEBUG] API Error: {r.text}")
+            update.message.reply_text("⚙️ Neural Engine syncing... please retry in a moment.")
 
-else:
-    print(f"[AI DEBUG] Error Response: {r.text}")
-    update.message.reply_text("⚙️ Neural Engine syncing... please retry in a moment.")
+    except Exception as e:
+        print(f"[AI DEBUG] Exception: {e}")
+        update.message.reply_text("❌ AI Core temporarily offline — rebooting neural thread.")
 
-except Exception as e:
-    print(f"[AI DEBUG] Exception: {e}")
-    update.message.reply_text("❌ AI Core temporarily offline — rebooting neural thread.")
 
 # Add AI Auto-Reply Handler
 dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply))
@@ -532,6 +534,7 @@ if __name__ == "__main__":
         print(f"❌ Telegram Bot failed to start: {e}")
 
     print("✅ WENBNB Neural Engine: Telegram Bot + Cloud Server Active")
+
 
 
 
