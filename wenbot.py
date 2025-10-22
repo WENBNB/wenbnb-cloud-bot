@@ -150,7 +150,7 @@ def help_cmd(update: Update, context: CallbackContext):
         "/giveaway_end — End giveaway (admin)\n\n"
         f"{NEURAL_TAGLINE}"
     )
-    update.message.reply_text(help_text, parse_mode="HTML", disable_web_page_preview=True)
+    update.message.reply_text(help_text, parse_mode="Markdown", disable_web_page_preview=True)
 
 def menu_cmd(update: Update, context: CallbackContext):
     keyboard = [
@@ -533,6 +533,7 @@ if __name__ == "__main__":
         print(f"❌ Telegram Bot failed to start: {e}")
 
     print("✅ WENBNB Neural Engine: Telegram Bot + Cloud Server Active")
+
 
 
 
