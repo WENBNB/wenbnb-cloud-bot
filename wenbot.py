@@ -438,17 +438,27 @@ def main():
 
 if __name__ == "__main__":
     import threading
+    import time
 
-    # Start Flask server in background (Render keep-alive)
+    # Start Flask keep-alive (Render requirement)
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
 
-    # Start Telegram Bot Polling
+    # Wait a bit for Flask to initialize
+    time.sleep(3)
+
+    # Start Telegram Bot
     print("🚀 Starting WENBNB Neural Engine — AI Core Intelligence 24x7")
-    main()
-    print("🤖 Bot connected successfully, polling started...")
+    try:
+        main()
+        print("🤖 Bot connected successfully, polling started...")
+    except Exception as e:
+        print(f"❌ Telegram Bot failed to start: {e}")
+
     print("✅ WENBNB Neural Engine: Telegram Bot + Cloud Server Active")
+
+
 
 
 
