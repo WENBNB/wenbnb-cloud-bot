@@ -390,27 +390,35 @@ def register_menu_handlers(dp):
 
     log.info("✅ Handlers registered")
 
-# ----------------------
-# Main runner
-# ----------------------
+# ----------------------------
+# 🧠 Main runner
+# ----------------------------
 def main():
     token = os.getenv("TELEGRAM_TOKEN")
     if not token:
-        log.error("TELEGRAM_TOKEN not set in environment variables.")
+        print("❌ TELEGRAM_TOKEN not found in environment variables.")
         return
 
     updater = Updater(token=token, use_context=True)
     dp = updater.dispatcher
 
+    # Register handlers
     register_menu_handlers(dp)
 
-    # Start
+    print("🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7")
     updater.start_polling()
-    log.info("WENBNB Neural Engine bot started. %s", NEURAL_TAGLINE)
     updater.idle()
 
+
 if __name__ == "__main__":
+    # Start Flask in background (Render keep-alive)
+    threading.Thread(target=run_flask).start()
+
+    # Start Telegram Bot
     main()
+
+
+
 
 
 
