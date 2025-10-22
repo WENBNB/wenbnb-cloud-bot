@@ -439,6 +439,8 @@ def main():
 
     # Register handlers
     register_menu_handlers(dp)
+    # Add AI Auto-Reply Handler
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply))
 
 # 🤖 AI AUTO-REPLY (Contextual Chat Mode)
 from telegram.ext import MessageHandler, Filters
@@ -506,9 +508,6 @@ def ai_auto_reply(update, context):
         update.message.reply_text("❌ AI Core temporarily offline — rebooting neural thread.")
 
 
-# Add AI Auto-Reply Handler
-dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply))
-
 print("🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7")
 updater.start_polling()
 updater.idle()
@@ -534,6 +533,7 @@ if __name__ == "__main__":
         print(f"❌ Telegram Bot failed to start: {e}")
 
     print("✅ WENBNB Neural Engine: Telegram Bot + Cloud Server Active")
+
 
 
 
