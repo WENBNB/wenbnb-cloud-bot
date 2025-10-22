@@ -437,13 +437,13 @@ def main():
     updater = Updater(token=token, use_context=True)
     dp = updater.dispatcher
 
-    # Register handlers
+    # Register all core menu handlers
     register_menu_handlers(dp)
-    
-    # Add AI Auto-Reply Handler
+
+    # Add AI Auto-Reply Handler (ChatGPT Mode)
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply))
-    
-    print("🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7")
+
+    print("🚀 Powered by WENBNB Neural Engine – AI Core Intelligence 24x7")
     updater.start_polling()
     updater.idle()
 
@@ -533,6 +533,7 @@ if __name__ == "__main__":
         print(f"❌ Telegram Bot failed to start: {e}")
 
     print("✅ WENBNB Neural Engine: Telegram Bot + Cloud Server Active")
+
 
 
 
