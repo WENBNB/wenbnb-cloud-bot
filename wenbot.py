@@ -11,11 +11,6 @@ try:
 except ModuleNotFoundError:
     import mimetypes as imghdr
 
-try:
-    import imghdr
-except ModuleNotFoundError:
-    import mimetypes as imghdr
-
 # 🌐 Flask setup for Render port
 from flask import Flask
 import threading
@@ -416,6 +411,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
