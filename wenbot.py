@@ -436,19 +436,20 @@ def main():
     updater.start_polling()
     updater.idle()
 
-
 if __name__ == "__main__":
     import threading
 
-    # Start Flask in a background thread (for Render keep-alive)
+    # Start Flask server in background (Render keep-alive)
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
 
-    # Start Telegram bot main loop
+    # Start Telegram Bot Polling
+    print("🚀 Starting WENBNB Neural Engine — AI Core Intelligence 24x7")
     main()
-
+    print("🤖 Bot connected successfully, polling started...")
     print("✅ WENBNB Neural Engine: Telegram Bot + Cloud Server Active")
+
 
 
 
