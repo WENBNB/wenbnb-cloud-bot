@@ -444,6 +444,35 @@ def main():
     updater.start_polling()
     updater.idle()
 
+# 🌐 AI AUTO-REPLY (Contextual Chat Mode)
+from telegram.ext import MessageHandler, Filters
+
+AI_PROXY_URL = "https://api.openai.com/v1/chat/completions"
+AI_KEY = os.getenv("OPENAI_API_KEY")
+
+def ai_auto_reply(update, context):
+    user_msg = update.message.text
+    try:
+        headers = {"Authorization": f"Bearer {AI_KEY}"}
+        payload = {
+            "model": "gpt-3.5-turbo",
+            "messages": [
+                {"role": "system", "content": "You are WENBNB Neural Engine — an intelligent AI assistant for crypto, markets, and memes."},
+                {"role": "user", "content": user_msg}
+            ]
+        }
+        r = requests.post(AI_PROXY_URL, headers=headers, json=payload)
+        if r.status_code == 200:
+            ai_reply = r.json()["choices"][0]["message"]["content"]
+            update.message.reply_text(ai_reply)
+        else:
+            update.message.reply_text("⚙️ AI Core temporary down. Try again later.")
+    except Exception as e:
+        update.message.reply_text(f"❌ AI Core error: {e}")
+
+# Add AI Auto-Reply Handler (after all commands)
+dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply))
+
 if __name__ == "__main__":
     import threading
     import time
@@ -465,6 +494,7 @@ if __name__ == "__main__":
         print(f"❌ Telegram Bot failed to start: {e}")
 
     print("✅ WENBNB Neural Engine: Telegram Bot + Cloud Server Active")
+
 
 
 
