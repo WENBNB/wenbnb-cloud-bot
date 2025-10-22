@@ -11,6 +11,29 @@ try:
 except ModuleNotFoundError:
     import mimetypes as imghdr
 
+try:
+    import imghdr
+except ModuleNotFoundError:
+    import mimetypes as imghdr
+
+# 🌐 Flask setup for Render port
+from flask import Flask
+import threading
+import os
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "✅ WENBNB Bot is alive and running!"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
+
+# Thread start for Flask server
+threading.Thread(target=run_flask).start()
+
 
 import os
 import logging
@@ -393,5 +416,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
