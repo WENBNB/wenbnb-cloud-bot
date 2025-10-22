@@ -6,6 +6,12 @@ Dependencies: python-telegram-bot, requests
 pip install python-telegram-bot requests
 """
 
+try:
+    import imghdr
+except ModuleNotFoundError:
+    import mimetypes as imghdr
+
+
 import os
 import logging
 import random
@@ -387,4 +393,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
