@@ -144,7 +144,7 @@ def help_cmd(update: Update, context: CallbackContext):
         "/price — Live BNB + WENBNB price\n"
         "/aianalyze — Deep AI market analysis\n\n"
         "🎁 Community & Fun:\n"
-        "/airdropcheck <wallet> — Check airdrop eligibility\n"
+        "/airdropcheck wallet — Check airdrop eligibility\n"
         "/meme — Generate a meme caption\n"
         "/giveaway_start — Start giveaway (admin)\n"
         "/giveaway_end — End giveaway (admin)\n\n"
@@ -533,6 +533,7 @@ if __name__ == "__main__":
         print(f"❌ Telegram Bot failed to start: {e}")
 
     print("✅ WENBNB Neural Engine: Telegram Bot + Cloud Server Active")
+
 
 
 
