@@ -20,7 +20,34 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "✅ WENBNB Bot is alive and running!"
+    return """
+    <html>
+        <head>
+            <title>WENBNB Neural Engine</title>
+            <style>
+                body {
+                    background-color: #0a0a0a;
+                    color: #00ffc3;
+                    font-family: 'Segoe UI', sans-serif;
+                    text-align: center;
+                    padding-top: 100px;
+                }
+                h1 {
+                    font-size: 26px;
+                    margin-bottom: 15px;
+                }
+                p {
+                    color: #b3b3b3;
+                    font-size: 15px;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7</h1>
+            <p>🧠 Cloud AI System Active • Telegram Bot Running Live</p>
+        </body>
+    </html>
+    """
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -416,6 +443,7 @@ if __name__ == "__main__":
 
     # Start Telegram Bot
     main()
+
 
 
 
