@@ -438,11 +438,18 @@ def main():
 
 
 if __name__ == "__main__":
-    # Start Flask in background (Render keep-alive)
-    threading.Thread(target=run_flask).start()
+    import threading
 
-    # Start Telegram Bot
+    # Start Flask in a background thread (for Render keep-alive)
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+
+    # Start Telegram bot main loop
     main()
+
+    print("✅ WENBNB Neural Engine: Telegram Bot + Cloud Server Active")
+
 
 
 
