@@ -6,10 +6,15 @@ Dependencies: python-telegram-bot, requests
 pip install python-telegram-bot requests
 """
 
+import sys
+import types
+
 try:
     import imghdr
 except ModuleNotFoundError:
-    import mimetypes as imghdr
+    imghdr = types.SimpleNamespace()
+    imghdr.what = lambda file, h=None: mimetypes.guess_type(file)[0]
+    sys.modules['imghdr'] = imghdr
 
 # 🌐 Flask setup for Render port
 from flask import Flask
@@ -61,6 +66,9 @@ import os
 import logging
 import random
 import requests
+
+
+
 from html import escape
 from typing import Optional
 
@@ -457,6 +465,7 @@ if __name__ == "__main__":
         print(f"❌ Telegram Bot failed to start: {e}")
 
     print("✅ WENBNB Neural Engine: Telegram Bot + Cloud Server Active")
+
 
 
 
