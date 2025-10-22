@@ -74,4 +74,5 @@ Remove-Item $staging -Recurse -Force
 Write-Host "`n🎉 Build complete!" -ForegroundColor Green
 Write-Host "📁 ZIP saved to: $zipPath"
 Write-Host "🔑 SHA256 checksum saved to: $shaFile"
-Write-Host "`n🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7`n" -ForegroundColor Cyan
+Write-Host '🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24x7' -ForegroundColor Cyan
+
