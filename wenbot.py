@@ -478,29 +478,31 @@ def ai_auto_reply(update, context):
         r = requests.post(AI_PROXY_URL, headers=headers, json=payload, timeout=20)
         print(f"[AI DEBUG] Response status: {r.status_code}")
 
-        if r.status_code == 200:
-            ai_reply = r.json()["choices"][0]["message"]["content"].strip()
-            
-            # ✨ Dynamic Neural Signature Footer
-            footer_styles = [
-                "🤖 Powered by WENBNB Neural Engine • AI Core Intelligence 24×7",
-                "🚀 WENBNB Neural Brain Active • Running on Cloud AI Core",
-                "💫 WENBNB AI Node Synced • Smarter Every Block",
-                "🌌 Neural Thread v2.1 • WENBNB Intelligence Operational",
-                "🧠 WENBNB Neural Engine — Always Online, Always Learning"
-            ]    
+if r.status_code == 200:
+    ai_reply = r.json()["choices"][0]["message"]["content"].strip()
 
-import random
-signature = random.choice(footer_styles)
-ai_reply += f"\n\n{signature}"
+    # ✨ Dynamic Neural Signature Footer
+    footer_styles = [
+        "🚀 Powered by WENBNB Neural Engine • AI Core Intelligence 24x7",
+        "🧠 WENBNB Neural Brain Active • Running on Cloud AI Core",
+        "🔗 WENBNB AI Node Synced • Smarter Every Block",
+        "⚙️ Neural Thread v2.1 • WENBNB Intelligence Operational",
+        "💫 WENBNB Neural Engine — Always Online, Always Learning"
+    ]
 
-            update.message.reply_text(ai_reply, parse_mode="Markdown")
-        else:
-            print(f"[AI DEBUG] Error Response: {r.text}")
-            update.message.reply_text("⚙️ Neural Engine syncing… please retry in a moment.")
-    except Exception as e:
-        print(f"[AI DEBUG] Exception: {e}")
-        update.message.reply_text("❌ AI Core temporarily offline — rebooting neural thread...")
+    import random
+    signature = random.choice(footer_styles)
+    ai_reply += f"\n\n{signature}"
+
+    update.message.reply_text(ai_reply, parse_mode="Markdown")
+
+else:
+    print(f"[AI DEBUG] Error Response: {r.text}")
+    update.message.reply_text("⚙️ Neural Engine syncing... please retry in a moment.")
+
+except Exception as e:
+    print(f"[AI DEBUG] Exception: {e}")
+    update.message.reply_text("❌ AI Core temporarily offline — rebooting neural thread.")
 
 # Add AI Auto-Reply Handler
 dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply))
@@ -530,6 +532,7 @@ if __name__ == "__main__":
         print(f"❌ Telegram Bot failed to start: {e}")
 
     print("✅ WENBNB Neural Engine: Telegram Bot + Cloud Server Active")
+
 
 
 
