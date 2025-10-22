@@ -480,7 +480,20 @@ def ai_auto_reply(update, context):
 
         if r.status_code == 200:
             ai_reply = r.json()["choices"][0]["message"]["content"].strip()
-            ai_reply += f"\n\n🤖 *Powered by WENBNB Neural Engine • AI Core Intelligence 24×7*"
+            
+            # ✨ Dynamic Neural Signature Footer
+            footer_styles = [
+                "🤖 Powered by WENBNB Neural Engine • AI Core Intelligence 24×7",
+                "🚀 WENBNB Neural Brain Active • Running on Cloud AI Core",
+                "💫 WENBNB AI Node Synced • Smarter Every Block",
+                "🌌 Neural Thread v2.1 • WENBNB Intelligence Operational",
+                "🧠 WENBNB Neural Engine — Always Online, Always Learning"
+            ]    
+
+import random
+signature = random.choice(footer_styles)
+ai_reply += f"\n\n{signature}"
+
             update.message.reply_text(ai_reply, parse_mode="Markdown")
         else:
             print(f"[AI DEBUG] Error Response: {r.text}")
@@ -492,9 +505,9 @@ def ai_auto_reply(update, context):
 # Add AI Auto-Reply Handler
 dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply))
 
-    print("🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7")
-    updater.start_polling()
-    updater.idle()
+print("🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7")
+updater.start_polling()
+updater.idle()
 
 if __name__ == "__main__":
     import threading
@@ -517,6 +530,7 @@ if __name__ == "__main__":
         print(f"❌ Telegram Bot failed to start: {e}")
 
     print("✅ WENBNB Neural Engine: Telegram Bot + Cloud Server Active")
+
 
 
 
