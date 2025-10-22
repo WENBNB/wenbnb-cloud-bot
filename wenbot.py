@@ -360,7 +360,9 @@ def register_menu_handlers(dp):
     dp.add_handler(MessageHandler(Filters.regex(r"^🍀 Help$"), lambda u, c: c.bot.send_message(u.effective_chat.id, text="/help")))
 
     # Auto context replies for any plain text
+    from plugins.ai_auto_reply import ai_auto_reply
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply))
+
 
     log.info("✅ Handlers registered")
 
@@ -385,3 +387,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
