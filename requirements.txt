@@ -16,6 +16,7 @@ tiktoken==0.7.0
 
 # Web3 / Blockchain
 web3==6.13.0
+cryptography
 
 # Parsing, Utils & HTML
 beautifulsoup4==4.12.3
@@ -40,3 +41,4 @@ matplotlib==3.9.2
 # ============================================================
 # ✅ Optimized and Verified for Render Cloud (WENBNB v5.5)
 # ============================================================
+
