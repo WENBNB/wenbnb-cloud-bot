@@ -1,0 +1,41 @@
+{
+  "version": "WENBNB Neural Engine v5.0",
+  "ai_engine": {
+    "model": "gpt-3.5-turbo",
+    "temperature": 0.8,
+    "max_tokens": 800
+  },
+  "admin": {
+    "primary_id": 123456789,
+    "secondary_id": 987654321,
+    "allowed_admins": [123456789, 987654321]
+  },
+  "branding": {
+    "bot_name": "WENBNB Bot 🤖",
+    "tagline": "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7",
+    "footer": "🧠 WENBNB AI Cloud — Evolving with Emotion Context Mode v4.1"
+  },
+  "apis": {
+    "openai_key_env": "OPENAI_API_KEY",
+    "bscscan_key_env": "BSCSCAN_API_KEY",
+    "coingecko_url": "https://api.coingecko.com/api/v3/simple/price",
+    "ai_proxy_url": "https://api.openai.com/v1/chat/completions"
+  },
+  "web3": {
+    "default_chain": "bsc",
+    "rpc_url": "https://bsc-dataseed.binance.org/",
+    "default_token": "wenbnb"
+  },
+  "ai_modes": {
+    "auto_reply": true,
+    "emotion_context": true,
+    "web3_connect": true,
+    "meme_generator": true,
+    "giveaway_enabled": true,
+    "admin_dashboard": true
+  },
+  "memory": {
+    "mode": "Emotion Context Mode v4.1",
+    "storage": "memory.json"
+  }
+}
