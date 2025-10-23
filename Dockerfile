@@ -1,24 +1,34 @@
-# ============================================================
-#   WENBNB Neural Engine v5.5 - Dockerfile (Render Compatible)
-# ============================================================
+# =========================================================
+# 🧠 WENBNB Neural Engine v5.5 — Render Optimized Build
+# =========================================================
 
-FROM python:3.11-slim
+# Base image (lightweight, secure & fast)
+FROM python:3.10-slim
 
-# Work directory
+# Set working directory
 WORKDIR /app
 
-# Copy all files
-COPY . .
+# Copy everything
+COPY . /app
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Prevent Python from writing .pyc files and enable logs
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Expose the Render port
-ENV PORT=10000
-EXPOSE 10000
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libssl-dev \
+    libffi-dev \
+    wkhtmltopdf \
+    && rm -rf /var/lib/apt/lists/*
 
-# Health check (Render-style)
-HEALTHCHECK CMD curl --fail http://localhost:10000/ping || exit 1
+# Install Python dependencies
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
 
-# Default command
-CMD ["python", "wenbot.py"]
+# Expose default Render port
+EXPOSE 8080
+
+# Default startup command
+CMD gunicorn wenbot:app --bind 0.0.0.0:8080 --timeout 120 --log-level info
