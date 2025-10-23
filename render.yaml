@@ -1,41 +1,74 @@
-# =========================
-# 🧠 WENBNB Neural Engine v5.0
-# Render Deployment Config
-# =========================
+# ==========================================
+# ⚙️ WENBNB Neural Engine v5.0
+# Render Deployment Configuration
+# ==========================================
 
 services:
   - type: web
-    name: wenbnb-dashboard
+    name: wenbnb-ai-engine
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn dashboard.dashboard:app --workers 2 --threads 2 --timeout 120
-    plan: starter
-    envVars:
-      - key: FLASK_ENV
-        value: production
-      - key: PYTHON_VERSION
-        value: 3.10.13
+    plan: free
+    region: singapore
 
-  - type: worker
-    name: wenbnb-ai-bot
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python3 wenbot.py
-    plan: starter
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+
+    startCommand: |
+      python wenbot.py
+
+    autoDeploy: true
+
     envVars:
       - key: TELEGRAM_TOKEN
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: BSCSCAN_API_KEY
+        sync: false
+      - key: OWNER_ID
+        sync: false
       - key: ADMIN_CHAT_ID
         sync: false
-      - key: WEB3_PROVIDER
+      - key: WEN_TOKEN_ADDRESS
         sync: false
-      - key: R2_ACCESS_KEY_ID
+      - key: DB_FILE
+        value: memory_data.db
+      - key: DASHBOARD_URL
         sync: false
-      - key: R2_SECRET_ACCESS_KEY
+      - key: DASHBOARD_KEY
         sync: false
-      - key: R2_BUCKET_NAME
+      - key: R2_ACCESS_KEY
+        sync: false
+      - key: R2_SECRET_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_ENDPOINT
         sync: false
       - key: PORT
         value: 10000
+      - key: BRAND_SIGNATURE
+        value: "Powered by WENBNB Neural Engine — AI Core Intelligence 24×7"
+
+    healthCheckPath: /
+    autoDeployOnGitPush: true
+    buildFilter:
+      paths:
+        - requirements.txt
+        - wenbot.py
+        - render.yaml
+        - dashboard/**
+        - plugins/**
+
+# ==========================================
+# 🧠 Auto Start Tasks
+# ==========================================
+# This ensures the dashboard sync + monitor runs on boot
+
+jobs:
+  - type: worker
+    name: wenbnb-monitor
+    env: python
+    startCommand: |
+      python plugins/system_monitor.py
