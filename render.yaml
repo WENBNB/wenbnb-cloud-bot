@@ -1,19 +1,41 @@
+# =========================
+# 🧠 WENBNB Neural Engine v5.0
+# Render Deployment Config
+# =========================
+
 services:
   - type: web
-    name: wenbnb-neural-engine
+    name: wenbnb-dashboard
     env: python
-    plan: free
-    buildCommand: |
-      pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn dashboard.dashboard:app --workers 2 --threads 2 --timeout 120
+    plan: starter
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: 3.10.13
+
+  - type: worker
+    name: wenbnb-ai-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
     startCommand: python3 wenbot.py
+    plan: starter
     envVars:
       - key: TELEGRAM_TOKEN
         sync: false
       - key: OPENAI_API_KEY
         sync: false
-      - key: BSCSCAN_KEY
-        sync: false
       - key: ADMIN_CHAT_ID
+        sync: false
+      - key: WEB3_PROVIDER
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
         sync: false
       - key: PORT
         value: 10000
