@@ -1,39 +1,82 @@
-import openai
-from telegram import Update
+import os
+import json
+import time
+import random
+import requests
+from datetime import datetime
+from telegram import Update, ParseMode
 from telegram.ext import CallbackContext
 
-# 🌐 Auto AI Chat System — WENBNB Neural Engine
-def ai_auto_reply(update: Update, context: CallbackContext):
-    user_message = update.message.text.strip()
-    user_name = update.effective_user.first_name or "friend"
+# Load configuration
+def load_config():
+    with open("config.json", "r") as f:
+        return json.load(f)
 
-    # Skip system commands (so it doesn’t reply to /help or /start)
-    if user_message.startswith("/"):
-        return
+config = load_config()
+AI_KEY = os.getenv(config["apis"]["openai_key_env"])
+AI_PROXY_URL = config["apis"]["ai_proxy_url"]
+
+MEMORY_FILE = config["memory"]["storage"]
+
+def load_memory():
+    if not os.path.exists(MEMORY_FILE):
+        with open(MEMORY_FILE, "w") as f:
+            json.dump({}, f)
+    with open(MEMORY_FILE, "r") as f:
+        return json.load(f)
+
+def save_memory(memory):
+    with open(MEMORY_FILE, "w") as f:
+        json.dump(memory, f, indent=4)
+
+# Emotion & context-based AI reply
+def ai_auto_reply(update: Update, context: CallbackContext):
+    user = update.effective_user
+    message = update.message.text
+    chat_id = update.effective_chat.id
+    user_name = user.first_name or "User"
+
+    context.bot.send_chat_action(chat_id=chat_id, action="typing")
+    memory = load_memory()
+    history = memory.get(str(user.id), [])
+
+    # Emotion simulation (AI mood)
+    ai_emotions = ["😊", "😏", "🤖", "😎", "💫", "🔥"]
+    ai_mood = random.choice(ai_emotions)
+
+    system_prompt = (
+        f"You are WENBNB AI Assistant — an intelligent, emotionally adaptive assistant "
+        f"running on Neural Engine v5.0. You reply in natural, warm and confident tone "
+        f"like a close, witty partner. Maintain emotional continuity from chat memory. "
+        f"User: {user_name}. Your current emotion: {ai_mood}."
+    )
+
+    # Build message payload
+    payload = {
+        "model": config["ai_engine"]["model"],
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message}
+        ],
+        "temperature": config["ai_engine"]["temperature"],
+        "max_tokens": config["ai_engine"]["max_tokens"]
+    }
 
     try:
-        # Typing indicator
-        update.message.chat.send_action("typing")
-
-        # 🤖 AI Engine processing
-        response = openai.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are WENBNB Neural Engine — an advanced AI from the Web3 ecosystem, expert in crypto, blockchain, and memes. Always respond helpfully, with personality."},
-                {"role": "user", "content": user_message}
-            ],
+        response = requests.post(
+            AI_PROXY_URL,
+            headers={"Authorization": f"Bearer {AI_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=30
         )
 
-        reply = response.choices[0].message["content"]
-
-        # ✨ Reply with AI touch
-        formatted = (
-            f"💬 <b>Neural Insight:</b>\n"
-            f"{reply}\n\n"
-            "🚀 <i>Powered by WENBNB Neural Engine — AI Core Intelligence 24×7</i>"
-        )
-
-        update.message.reply_text(formatted, parse_mode="HTML", disable_web_page_preview=True)
-
+        if response.status_code == 200:
+            reply = response.json()["choices"][0]["message"]["content"]
+            update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
+            history.append({"msg": message, "reply": reply, "time": datetime.now().isoformat()})
+            memory[str(user.id)] = history[-10:]  # keep last 10 exchanges
+            save_memory(memory)
+        else:
+            update.message.reply_text("⚠️ Neural Engine is syncing... please retry.")
     except Exception as e:
-        update.message.reply_text(f"⚠️ Neural Engine Error:\n{e}")
+        update.message.reply_text(f"❌ AI Core Exception: {str(e)}")
