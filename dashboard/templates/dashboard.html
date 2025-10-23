@@ -1,41 +1,64 @@
-<!DOCTYPE html>
-<html>
+<!-- dashboard/templates/index.html -->
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>🧠 WENBNB Neural Pulse Dashboard</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WENBNB Dashboard — Neural v3.8</title>
   <link rel="stylesheet" href="/static/style.css">
-  <script>
-    async function updateDashboard() {
-      const res = await fetch('/live_data');
-      const data = await res.json();
-      document.getElementById("emotion").textContent = data.emotion;
-      document.getElementById("activity").style.width = data.activity + "%";
-      document.getElementById("activity").setAttribute("data-level", data.activity + "%");
-
-      const logsDiv = document.getElementById("logs");
-      logsDiv.innerHTML = "";
-      data.logs.slice().reverse().forEach(log => {
-        logsDiv.innerHTML += `<p>🕒 ${log.timestamp} — ${log.event}</p>`;
-      });
-    }
-    setInterval(updateDashboard, 3000);
-    window.onload = updateDashboard;
-  </script>
 </head>
 <body>
-  <div class="container">
-    <h1>🧠 WENBNB Neural Pulse Console</h1>
-    <p>📅 Last Sync: {{ timestamp }}</p>
-    <h3 id="emotion" class="pulse">💫 Analytical</h3>
+  <div class="wrap">
+    <header class="topbar">
+      <div class="brand">WENBNB <span class="neon">Neural</span> Engine</div>
+      <div class="signature">{{ status.version }}</div>
+    </header>
 
-    <div class="bar">
-      <div id="activity" class="level" data-level="42%"></div>
-    </div>
+    <main class="main-grid">
+      <section class="card status-card">
+        <h3>System Status</h3>
+        <div class="status-row">
+          <div><strong>Bot:</strong> <span id="bot-status">—</span></div>
+          <div><strong>Uptime:</strong> <span id="bot-uptime">—</span></div>
+          <div><strong>Users:</strong> <span id="bot-users">—</span></div>
+        </div>
+        <div class="controls">
+          <button class="btn" id="btn-restart">Restart Bot</button>
+          <button class="btn" id="btn-backup">Trigger Backup</button>
+          <button class="btn" id="btn-clear">Clear Cache</button>
+        </div>
+      </section>
 
-    <h3>🧩 Neural Memory Logs</h3>
-    <div id="logs"></div>
+      <section class="card feed-card">
+        <h3>Live AI Log Feed</h3>
+        <div id="logfeed" class="logfeed"></div>
+      </section>
 
-    <footer>🚀 Powered by <b>WENBNB Neural Engine</b> — AI Core Intelligence 24×7</footer>
+      <section class="card misc-card">
+        <h3>Quick Actions</h3>
+        <div class="misc-list">
+          <button class="btn small" id="btn-price">Refresh Price</button>
+          <button class="btn small" id="btn-airdrop">Check Airdrop</button>
+          <button class="btn small" id="btn-giveaway">Run Giveaway</button>
+        </div>
+      </section>
+
+      <section class="card about-card">
+        <h3>About</h3>
+        <p>🚀 <strong>Powered by</strong> {{ status.version }}</p>
+        <p class="muted">Built for WENBNB — neon cyber control console.</p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div>© {{ datetime.utcnow().year }} WENBNB</div>
+      <div class="small">🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7</div>
+    </footer>
   </div>
+
+  <script>
+    const DASHBOARD_KEY = "{{ (ENV.DASHBOARD_KEY or '') }}";
+  </script>
+  <script src="/static/main.js"></script>
 </body>
 </html>
