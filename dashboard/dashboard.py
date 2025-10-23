@@ -33,6 +33,11 @@ status_state = {
 
 @app.route("/")
 def index():
+    status_data = {
+    "version": "v5.0",
+    "uptime": "Active",
+    "users": "N/A"
+}
     return render_template("index.html", status=status_state)
 
 @app.route("/status", methods=["GET"])
