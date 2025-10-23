@@ -1,10 +1,7 @@
-# =========================
-# 🧠 WENBNB Neural Engine v5.0
-# Dual Engine Launch (AI + Dashboard)
-# =========================
+# ================================
+# 🧠 WENBNB Neural Engine v5.5
+# Render Cloud Procfile
+# ================================
 
-# Main AI Telegram Bot
-worker: python3 wenbot.py
-
-# Flask Web Dashboard
-web: gunicorn dashboard.dashboard:app --workers 2 --threads 2 --timeout 120
+web: gunicorn wenbot:app --timeout 120 --log-level info
+worker: python wenbot.py
