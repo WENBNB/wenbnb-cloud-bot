@@ -38,7 +38,10 @@ def index():
     "uptime": "Active",
     "users": "N/A"
 }
-    return render_template("index.html", status=status_data, datetime=datetime)
+    import os  # make sure this line is already at top
+
+    dashboard_key = os.getenv("DASHBOARD_KEY", "")
+    return render_template("index.html", status=status_data, datetime=datetime, DASHBOARD_KEY=dashboard_key)
 
 @app.route("/status", methods=["GET"])
 def get_status():
