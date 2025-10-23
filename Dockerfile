@@ -62,5 +62,6 @@ EOF
 EXPOSE 10000
 
 # Start both Dashboard (Gunicorn) + Telegram Bot (WenBot)
-CMD bash -c "python3 wenbot.py & gunicorn -w 2 -b 0.0.0.0:10000 dashboard.dashboard:app"
+CMD bash -c "python3 wenbot.py & gunicorn -w 2 -t 180 -b 0.0.0.0:10000 dashboard.dashboard:app"
+
 
