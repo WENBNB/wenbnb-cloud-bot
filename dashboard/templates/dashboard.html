@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>🧠 WENBNB Neural Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>🧠 WENBNB Neural Intelligence Console</h1>
+    <p>📅 Last Sync: {{ timestamp }}</p>
+    <h3>🩵 Current AI Emotion: {{ emotion }}</h3>
+
+    <div class="stats">
+      <p><b>AI Status:</b> Online ✅</p>
+      <p><b>Tracked Tokens:</b> {{ data.tokens }}</p>
+      <p><b>Total Users:</b> {{ data.users }}</p>
+      <p><b>System Load:</b> {{ data.load }}</p>
+    </div>
+
+    <hr>
+
+    <h3>🧩 Recent Neural Memory Logs</h3>
+    <div class="logs">
+      {% for entry in context_memory %}
+        <p>🕒 {{ entry.timestamp }} — {{ entry.event }}</p>
+      {% endfor %}
+    </div>
+
+    <footer>
+      🚀 Powered by <b>WENBNB Neural Engine</b> — AI Core Intelligence 24×7
+    </footer>
+  </div>
+</body>
+</html>
