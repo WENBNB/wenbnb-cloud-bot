@@ -65,3 +65,4 @@ EXPOSE 10000
 # Start the Neural Engine (Telegram AI Bot)
 CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:10000", "dashboard.dashboard:app"]
 
+
