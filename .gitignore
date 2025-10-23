@@ -1,0 +1,66 @@
+# =========================
+# 🧠 WENBNB AI BOT v5.0
+# Secure Git Ignore Rules
+# =========================
+
+# 🔒 Environment files
+.env
+.env.*
+config.json
+*.key
+*.pem
+*.crt
+
+# 🔧 Python cache & compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.pdb
+*.log
+
+# 🧰 Build & temp files
+*.zip
+*.tar
+*.gz
+*.sha256
+*.bak
+*.tmp
+*.swp
+dist/
+build/
+staging/
+
+# 🧠 IDE / Editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 💾 OS system files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# 🧱 Virtual environments
+venv/
+env/
+.venv/
+ENV/
+Scripts/
+Lib/
+Include/
+
+# 🌩 Cloud / Render cache
+*.pid
+*.sock
+*.db
+*.sqlite3
+
+# 🔐 Local backups
+backup/
+archive/
+temp/
+logs/
