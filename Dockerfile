@@ -61,8 +61,6 @@ EOF
 # Expose the Render port
 EXPOSE 10000
 
-# ============================================
-# Start the Neural Engine (Telegram AI Bot)
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:10000", "dashboard.dashboard:app"]
-
+# Start both Dashboard (Gunicorn) + Telegram Bot (WenBot)
+CMD bash -c "python3 wenbot.py & gunicorn -w 2 -b 0.0.0.0:10000 dashboard.dashboard:app"
 
