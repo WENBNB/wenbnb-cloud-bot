@@ -1,0 +1,7 @@
+# ==========================================
+# ⚡ WENBNB Neural Engine v5.0 (Lite Mode)
+# Single-process optimized for Render Free Plan
+# ==========================================
+
+# Main AI Bot + Flask + Monitor combo (auto-manages health)
+worker: python wenbot.py
