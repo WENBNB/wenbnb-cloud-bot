@@ -124,8 +124,11 @@ def healthz():
     return jsonify({"status": "ok", "time": datetime.utcnow().isoformat()})
 
 if __name__ == "__main__":
-    # If you want the bot to POST status to dashboard, set env DASHBOARD_KEY and call /update_status from wenbot
     push_log("info", "Dashboard starting server...")
-    port = int(os.getenv("PORT", 10000))
+    port_str = os.getenv("PORT", "10000")
+    try:
+        port = int(port_str) if port_str else 10000
+    except ValueError:
+        port = 10000
     print(f"🚀 Dashboard running on port {port} ...")
     app.run(host="0.0.0.0", port=port)
