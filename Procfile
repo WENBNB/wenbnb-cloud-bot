@@ -1,1 +1,1 @@
-worker: python wenbot.py
+web: python3 wenbot.py
