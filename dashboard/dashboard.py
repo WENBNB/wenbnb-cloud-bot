@@ -38,7 +38,7 @@ def index():
     "uptime": "Active",
     "users": "N/A"
 }
-    return render_template("index.html", status=status_data)
+    return render_template("index.html", status=status_data, datetime=datetime)
 
 @app.route("/status", methods=["GET"])
 def get_status():
