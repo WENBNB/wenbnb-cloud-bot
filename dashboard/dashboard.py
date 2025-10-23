@@ -127,4 +127,5 @@ if __name__ == "__main__":
     # If you want the bot to POST status to dashboard, set env DASHBOARD_KEY and call /update_status from wenbot
     push_log("info", "Dashboard starting server...")
     port = int(os.getenv("PORT", 10000))
+    print(f"🚀 Dashboard running on port {port} ...")
     app.run(host="0.0.0.0", port=port)
