@@ -1,41 +1,42 @@
 # ============================================================
-# 🧠 WENBNB Neural Engine v5.5 — Core Dependencies
+# 🧠 WENBNB Neural Engine v5.5 — Render Cloud Build
 # ============================================================
 
-# Telegram & Bot Framework
+# Telegram Bot Core
 python-telegram-bot==13.15
 
-# Web Server + APIs
+# Web Server & API
 Flask==3.0.3
 gunicorn==21.2.0
 requests==2.31.0
 
-# AI + NLP Core
+# AI / Neural Engine
 openai==1.42.0
 tiktoken==0.7.0
 
-# Web & Parsing Utilities
+# Web3 / Blockchain
+web3==6.13.0
+
+# Parsing, Utils & HTML
 beautifulsoup4==4.12.3
 pytz==2024.1
 
-# Web3 & Blockchain
-web3==6.13.0
-
-# Image Generation / Meme
+# Image, Meme & Media
 Pillow==10.3.0
+imgkit==1.2.3
 
 # Cloud & Data Sync
 boto3==1.35.29
 botocore==1.35.29
 
-# Optional Visualization
-matplotlib==3.9.2
-
-# System & Logging
+# System Monitoring & Performance
 psutil==5.9.8
 tenacity==8.2.3
 urllib3==2.2.3
 
+# Optional Visualization (Dashboard)
+matplotlib==3.9.2
+
 # ============================================================
-# ✅ Optimized and Verified for Render Cloud
+# ✅ Optimized and Verified for Render Cloud (WENBNB v5.5)
 # ============================================================
