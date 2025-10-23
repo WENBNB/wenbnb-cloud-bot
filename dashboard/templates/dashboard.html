@@ -2,34 +2,40 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>🧠 WENBNB Neural Dashboard</title>
+  <title>🧠 WENBNB Neural Pulse Dashboard</title>
   <link rel="stylesheet" href="/static/style.css">
+  <script>
+    async function updateDashboard() {
+      const res = await fetch('/live_data');
+      const data = await res.json();
+      document.getElementById("emotion").textContent = data.emotion;
+      document.getElementById("activity").style.width = data.activity + "%";
+      document.getElementById("activity").setAttribute("data-level", data.activity + "%");
+
+      const logsDiv = document.getElementById("logs");
+      logsDiv.innerHTML = "";
+      data.logs.slice().reverse().forEach(log => {
+        logsDiv.innerHTML += `<p>🕒 ${log.timestamp} — ${log.event}</p>`;
+      });
+    }
+    setInterval(updateDashboard, 3000);
+    window.onload = updateDashboard;
+  </script>
 </head>
 <body>
   <div class="container">
-    <h1>🧠 WENBNB Neural Intelligence Console</h1>
+    <h1>🧠 WENBNB Neural Pulse Console</h1>
     <p>📅 Last Sync: {{ timestamp }}</p>
-    <h3>🩵 Current AI Emotion: {{ emotion }}</h3>
+    <h3 id="emotion" class="pulse">💫 Analytical</h3>
 
-    <div class="stats">
-      <p><b>AI Status:</b> Online ✅</p>
-      <p><b>Tracked Tokens:</b> {{ data.tokens }}</p>
-      <p><b>Total Users:</b> {{ data.users }}</p>
-      <p><b>System Load:</b> {{ data.load }}</p>
+    <div class="bar">
+      <div id="activity" class="level" data-level="42%"></div>
     </div>
 
-    <hr>
+    <h3>🧩 Neural Memory Logs</h3>
+    <div id="logs"></div>
 
-    <h3>🧩 Recent Neural Memory Logs</h3>
-    <div class="logs">
-      {% for entry in context_memory %}
-        <p>🕒 {{ entry.timestamp }} — {{ entry.event }}</p>
-      {% endfor %}
-    </div>
-
-    <footer>
-      🚀 Powered by <b>WENBNB Neural Engine</b> — AI Core Intelligence 24×7
-    </footer>
+    <footer>🚀 Powered by <b>WENBNB Neural Engine</b> — AI Core Intelligence 24×7</footer>
   </div>
 </body>
 </html>
