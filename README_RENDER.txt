@@ -1,55 +1,58 @@
-============================================================
-  WENBNB Neural Engine v5.5 — Render Deployment Notes
-============================================================
+========================================================
+🚀 WENBNB Neural Engine v5.5
+========================================================
+AI Core Intelligence 24×7 | Powered by WENBNB Technologies
+========================================================
 
-📦 Build Command:
-    pip install -r requirements.txt
+🧠 Overview:
+The WENBNB Neural Engine is an advanced Telegram + Web3 hybrid AI system,
+designed for next-gen token automation, meme intelligence, airdrops, 
+price tracking, and admin control — all fully modular and cloud-synced.
 
-🚀 Start Command:
-    python wenbot.py
+========================================================
+💡 Core Functions:
+========================================================
+✅ /price — Live token price tracker (BNB & any token by symbol)
+✅ /tokeninfo — Detailed token data (auto from Coingecko or chart)
+✅ /meme — Generate AI-powered meme with trending context
+✅ /airdrop — Create & manage verified airdrop campaigns
+✅ /giveaway — Task or auto-based random winner generator
+✅ /aianalyze — Token & chart AI auto-analysis
+✅ /web3connect — Connect wallet and read contract data
+✅ /help — Full AI-embedded command guide
+✅ /admin — Neural Admin Control Panel v3.8
+✅ /dashboard — Real-time analytics (CPU, Ping, Users)
+✅ /system — Performance monitor & resource usage
+✅ /memory — Emotion Context Mode v4.1 — “AI Soul Integration”
+✅ Auto-Welcome — Smart greeting for new users
+✅ AI Auto-Reply — Free-chat mode (ask anything like ChatGPT)
 
-🌐 Health Check:
-    https://<your-service>.onrender.com/ping
+========================================================
+🧩 AI + Web3 Stack:
+========================================================
+- python-telegram-bot v13.15
+- Flask v3.0.3
+- OpenAI API
+- Web3.py v6.13.0
+- AWS S3 / R2 Sync (Cloud Backup)
+- Gunicorn Render Integration
 
-🧠 Required Environment Variables:
-------------------------------------------------------------
-TELEGRAM_TOKEN       = Your Telegram Bot Token
-OPENAI_API_KEY       = Your OpenAI API Key
-DASHBOARD_URL        = https://wenbnb-dashboard.onrender.com
-DASHBOARD_KEY        = (optional secret key if dashboard protected)
-ADMIN_CHAT_ID        = Your Telegram User ID
-BSCSCAN_KEY          = Your BscScan API Key (optional)
-PORT                 = 10000
-------------------------------------------------------------
+========================================================
+⚙️ Render Deployment Commands:
+========================================================
+1️⃣ requirements.txt → Python dependencies
+2️⃣ Procfile → Web + Worker auto-start
+3️⃣ runtime.txt → Python 3.10.14 environment
+4️⃣ Dockerfile → Optimized minimal build
 
-🧩 Features Enabled in v5.5:
-------------------------------------------------------------
-🤖 /price           - Live price tracking (Binance + CoinGecko)
-💰 /tokeninfo       - Contract analytics via BscScan
-🎁 /airdropcheck    - Wallet eligibility checker
-😂 /meme            - AI-powered meme generator
-📈 /aianalyze       - Neural market insight (AI Core)
-🧬 /memory          - Emotion Context Mode v4.1 (AI Soul Integration)
-🎮 /giveaway_start  - Admin-only event start
-🔒 /giveaway_end    - Admin-only event close
-⚙️ /system          - Resource + uptime monitor
-💬 Auto-Reply       - Natural conversation AI
-🌐 Dashboard Sync   - Live logging via /update_activity
-------------------------------------------------------------
+========================================================
+🔥 Status:
+========================================================
+✅ Engine Version: v5.5
+✅ Mode: AI + Web3 Hybrid
+✅ Platform: Render Cloud
+✅ Build: Stable / Production
+✅ Author: WENBNB Neural Intelligence (AI Powered)
+========================================================
 
-🧠 Power Tag:
-------------------------------------------------------------
-🚀 Powered by WENBNB Neural Engine v5.5
-AI + Web3 Core Intelligence 24×7
-------------------------------------------------------------
-
-🪄 Developer Notes:
-- Default port: 10000 (Render auto-assigns)
-- Flask `/ping` keeps Render instance alive
-- Update Dashboard URL in `.env` for correct sync
-- Full plugin modularity (each feature in /plugins folder)
-- Optional R2/S3 integration via `r2_sync.py`
-
-📍 GitHub Repo:
-   https://github.com/<your-username>/wenbnb-neural-engine
-============================================================
+🩵 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7
