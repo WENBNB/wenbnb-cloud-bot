@@ -1,146 +1,98 @@
-# plugins/web3_connect.py
 """
-WENBNB Smart On-Chain Bridge
-Version: 3.4 — Locked & Approved
-Mode: Hybrid (AI + Web3 Gateway)
+WENBNB AI-Powered Web3 Command Center v4.5 (Hybrid)
+Integrates blockchain data, wallet validation, and token intelligence.
+Locked & Approved — Full Neural Integration.
 """
 
-from web3 import Web3
+import requests, json, time, os
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
-import os, json, requests
 
-# === CONFIG ===
-BSC_RPC = "https://bsc-dataseed1.binance.org"
-w3 = Web3(Web3.HTTPProvider(BSC_RPC))
-BRAND_FOOTER = "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7"
-TOKEN_API = "https://api.dexscreener.io/latest/dex/tokens/"
+BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7"
 
+# ====== CONFIGURATION ======
+BSCSCAN_API_KEY = os.getenv("BSCSCAN_API_KEY")
+CG_BASE = "https://api.coingecko.com/api/v3"
+BSC_BASE = "https://api.bscscan.com/api"
 
-# === CORE UTILITIES ===
+# ====== HELPERS ======
 
-def shorten(address):
-    """Shortens wallet address for cleaner UI"""
-    return f"{address[:6]}...{address[-4:]}" if len(address) > 10 else address
-
-
-def get_balance(address):
-    """Returns native BNB balance in readable format"""
+def format_usd(value):
     try:
-        balance_wei = w3.eth.get_balance(address)
-        return round(w3.from_wei(balance_wei, "ether"), 4)
-    except Exception:
-        return None
+        return f"${float(value):,.6f}"
+    except:
+        return "N/A"
 
-
-def get_token_price(token_address):
-    """Fetch token price data from DexScreener"""
+def get_token_price(token_id="wenbnb", vs_currency="usd"):
     try:
-        r = requests.get(TOKEN_API + token_address)
-        data = r.json()
-        if "pairs" in data and data["pairs"]:
-            price_usd = data["pairs"][0]["priceUsd"]
-            symbol = data["pairs"][0]["baseToken"]["symbol"]
-            return symbol, f"${float(price_usd):.4f}"
-        return None, None
-    except Exception:
-        return None, None
+        url = f"{CG_BASE}/simple/price?ids={token_id}&vs_currencies={vs_currency}"
+        data = requests.get(url).json()
+        return data[token_id][vs_currency]
+    except:
+        return "N/A"
 
+def get_wallet_balance(address):
+    try:
+        url = f"{BSC_BASE}?module=account&action=balance&address={address}&apikey={BSCSCAN_API_KEY}"
+        res = requests.get(url).json()
+        wei_balance = int(res.get("result", 0))
+        bnb_balance = wei_balance / (10**18)
+        return f"{bnb_balance:.6f} BNB"
+    except:
+        return "Invalid or unreachable address."
 
-# === COMMANDS ===
+def get_token_supply(contract_address):
+    try:
+        url = f"{BSC_BASE}?module=stats&action=tokensupply&contractaddress={contract_address}&apikey={BSCSCAN_API_KEY}"
+        res = requests.get(url).json()
+        return f"{int(res.get('result', 0)) / 1e18:,.0f} tokens"
+    except:
+        return "Error fetching supply."
 
-def connect_wallet(update: Update, context: CallbackContext):
-    """User manually links wallet"""
-    user = update.effective_user
-    args = context.args
+# ====== COMMANDS ======
 
-    if not args:
-        update.message.reply_text("🔗 Use `/connect <wallet_address>` to link your wallet.")
-        return
-
-    address = args[0]
-    if not Web3.is_address(address):
-        update.message.reply_text("⚠️ Invalid wallet address format. Please check again.")
-        return
-
-    user_file = f"user_{user.id}_wallet.json"
-    with open(user_file, "w") as f:
-        json.dump({"wallet": address}, f)
-
-    balance = get_balance(address)
-    msg = (
-        f"✅ Wallet connected successfully!\n\n"
-        f"👤 User: @{user.username}\n"
-        f"💼 Address: `{shorten(address)}`\n"
-        f"💰 Balance: {balance} BNB\n\n"
-        f"{BRAND_FOOTER}"
+def web3_panel(update: Update, context: CallbackContext):
+    text = (
+        "<b>🌐 WENBNB AI Web3 Command Center</b>\n\n"
+        "🪙 /tokenprice <id> — Get live price from CoinGecko\n"
+        "💎 /wallet <address> — Check BNB wallet balance\n"
+        "📊 /supply <contract> — Token total supply (BSC)\n"
+        "🧠 /analyze <address> — AI risk scan for wallet (coming soon)\n\n"
+        f"{BRAND_TAG}"
     )
-    update.message.reply_text(msg, parse_mode="Markdown")
+    update.message.reply_text(text, parse_mode="HTML")
 
-
-def wallet_info(update: Update, context: CallbackContext):
-    """Displays user’s linked wallet info"""
-    user = update.effective_user
-    user_file = f"user_{user.id}_wallet.json"
-
-    if not os.path.exists(user_file):
-        update.message.reply_text("⚠️ You haven’t connected any wallet yet.\nUse `/connect <address>` to link one.")
+def tokenprice(update: Update, context: CallbackContext):
+    if not context.args:
+        update.message.reply_text("💡 Usage: /tokenprice <token_id>\nExample: /tokenprice wenbnb")
         return
+    token_id = context.args[0].lower()
+    price = get_token_price(token_id)
+    text = f"💰 <b>{token_id.upper()}</b> current price:\n<b>{format_usd(price)}</b>\n\n{BRAND_TAG}"
+    update.message.reply_text(text, parse_mode="HTML")
 
-    with open(user_file, "r") as f:
-        data = json.load(f)
-
-    wallet = data.get("wallet")
-    balance = get_balance(wallet)
-    update.message.reply_text(
-        f"💳 <b>Wallet Info</b>\n"
-        f"👤 @{user.username}\n"
-        f"💼 Address: <code>{wallet}</code>\n"
-        f"💰 Balance: <b>{balance} BNB</b>\n\n"
-        f"{BRAND_FOOTER}",
-        parse_mode="HTML"
-    )
-
-
-def token_track(update: Update, context: CallbackContext):
-    """Track any token by contract"""
-    args = context.args
-    if not args:
-        update.message.reply_text("🧩 Use `/track <token_contract>` to fetch live price data.")
+def wallet_balance(update: Update, context: CallbackContext):
+    if not context.args:
+        update.message.reply_text("💡 Usage: /wallet <BSC_wallet_address>")
         return
+    address = context.args[0]
+    balance = get_wallet_balance(address)
+    text = f"👛 Wallet: <code>{address}</code>\nBalance: <b>{balance}</b>\n\n{BRAND_TAG}"
+    update.message.reply_text(text, parse_mode="HTML")
 
-    token_address = args[0]
-    symbol, price = get_token_price(token_address)
-
-    if not symbol:
-        update.message.reply_text("⚠️ Couldn’t fetch token info. Try again or check contract address.")
+def token_supply(update: Update, context: CallbackContext):
+    if not context.args:
+        update.message.reply_text("💡 Usage: /supply <contract_address>")
         return
+    contract = context.args[0]
+    supply = get_token_supply(contract)
+    text = f"📊 Token Supply for:\n<code>{contract}</code>\nTotal: <b>{supply}</b>\n\n{BRAND_TAG}"
+    update.message.reply_text(text, parse_mode="HTML")
 
-    update.message.reply_text(
-        f"💎 <b>Token Data</b>\n"
-        f"🔹 Symbol: <b>{symbol}</b>\n"
-        f"💰 Price: <b>{price}</b>\n\n"
-        f"{BRAND_FOOTER}",
-        parse_mode="HTML"
-    )
-
-
-def disconnect_wallet(update: Update, context: CallbackContext):
-    """Clears linked wallet"""
-    user = update.effective_user
-    user_file = f"user_{user.id}_wallet.json"
-
-    if os.path.exists(user_file):
-        os.remove(user_file)
-        update.message.reply_text(f"🔒 Wallet disconnected successfully.\n\n{BRAND_FOOTER}")
-    else:
-        update.message.reply_text("⚠️ No wallet found to disconnect.")
-
-
-# === REGISTRATION ===
+# ====== REGISTER HANDLERS ======
 
 def register_handlers(dp):
-    dp.add_handler(CommandHandler("connect", connect_wallet))
-    dp.add_handler(CommandHandler("wallet", wallet_info))
-    dp.add_handler(CommandHandler("track", token_track))
-    dp.add_handler(CommandHandler("disconnect", disconnect_wallet))
+    dp.add_handler(CommandHandler("web3", web3_panel))
+    dp.add_handler(CommandHandler("tokenprice", tokenprice))
+    dp.add_handler(CommandHandler("wallet", wallet_balance))
+    dp.add_handler(CommandHandler("supply", token_supply))
