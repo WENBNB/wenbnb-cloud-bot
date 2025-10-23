@@ -1,120 +1,132 @@
-# plugins/admin_panel.py
 """
-WENBNB Admin Command Manager + Analytics Dashboard v2.9
-Locked & Approved — Neural Control System
+WENBNB Neural Admin Control Panel v3.8
+Handles Broadcasts, Memory Reset, and Live Stats for Admins
+Locked & Approved — "Core Access Only"
 """
 
-import os, json, time, datetime
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import CommandHandler, CallbackQueryHandler, CallbackContext
+from telegram import Update
+from telegram.ext import CommandHandler, CallbackContext
+import json, os, time
 
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))  # Set your Telegram ID here
-DATA_FILE = "admin_stats.json"
-BRAND_FOOTER = "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7"
+ADMIN_IDS = [123456789, 987654321]  # 🔹 Replace with real admin Telegram IDs
+MEMORY_FILE = "user_memory.json"
+BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7"
 
-# === CORE DATA UTILITIES ===
+# ===== HELPER FUNCTIONS =====
 
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        return {"users": 0, "messages": 0, "tokens_tracked": 0, "ai_queries": 0}
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+def is_admin(user_id):
+    return user_id in ADMIN_IDS
 
-def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+def load_memory():
+    if os.path.exists(MEMORY_FILE):
+        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
 
-def log_event(event):
-    data = load_data()
-    data[event] = data.get(event, 0) + 1
-    save_data(data)
+def save_memory(memory):
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(memory, f, indent=4)
 
-
-# === ADMIN PANEL ===
+# ===== ADMIN COMMANDS =====
 
 def admin_panel(update: Update, context: CallbackContext):
     user = update.effective_user
-    if user.id != ADMIN_ID:
-        update.message.reply_text("⚠️ You are not authorized to access the AI Command Center.")
+    if not is_admin(user.id):
+        update.message.reply_text("🚫 Access Denied. Neural Control requires admin authority.")
         return
 
-    data = load_data()
     text = (
-        "<b>🤖 WENBNB Neural Admin Panel</b>\n\n"
-        f"👥 Users: <b>{data['users']}</b>\n"
-        f"💬 Messages: <b>{data['messages']}</b>\n"
-        f"🧠 AI Queries: <b>{data['ai_queries']}</b>\n"
-        f"💎 Tokens Tracked: <b>{data['tokens_tracked']}</b>\n"
-        f"🕒 Uptime: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-        f"{BRAND_FOOTER}"
+        f"🧠 <b>WENBNB Neural Control Panel</b>\n"
+        f"👑 Admin: {user.full_name}\n\n"
+        "Available Commands:\n"
+        "🔹 /broadcast <msg> — Send message to all users\n"
+        "🔹 /users — View active users count\n"
+        "🔹 /reset_all_memory — Full system memory wipe\n"
+        "🔹 /stats — System activity snapshot\n\n"
+        f"{BRAND_TAG}"
+    )
+    update.message.reply_text(text, parse_mode="HTML")
+
+# ===== BROADCAST =====
+
+def broadcast(update: Update, context: CallbackContext):
+    user = update.effective_user
+    if not is_admin(user.id):
+        update.message.reply_text("🚫 Unauthorized access.")
+        return
+
+    msg = " ".join(context.args)
+    if not msg:
+        update.message.reply_text("📢 Use: /broadcast <message>")
+        return
+
+    memory = load_memory()
+    total = len(memory)
+    success = 0
+
+    for user_id in memory.keys():
+        try:
+            context.bot.send_message(chat_id=int(user_id), text=f"📢 Admin Broadcast:\n\n{msg}")
+            success += 1
+            time.sleep(0.5)
+        except Exception:
+            continue
+
+    update.message.reply_text(
+        f"✅ Broadcast sent to {success}/{total} users.\n\n{BRAND_TAG}",
+        parse_mode="HTML"
     )
 
-    keyboard = [
-        [
-            InlineKeyboardButton("📊 Refresh", callback_data="admin_refresh"),
-            InlineKeyboardButton("🧹 Reset Stats", callback_data="admin_reset")
-        ],
-        [
-            InlineKeyboardButton("🛠 Broadcast Message", callback_data="admin_broadcast"),
-            InlineKeyboardButton("🔐 Exit", callback_data="admin_exit")
-        ]
-    ]
+# ===== USER STATS =====
 
-    update.message.reply_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
-
-
-def admin_callback(update: Update, context: CallbackContext):
-    query = update.callback_query
-    data = query.data
-    user = query.from_user
-
-    if user.id != ADMIN_ID:
-        query.answer("Unauthorized.", show_alert=True)
+def show_users(update: Update, context: CallbackContext):
+    if not is_admin(update.effective_user.id):
+        update.message.reply_text("🚫 You are not authorized.")
         return
 
-    if data == "admin_refresh":
-        query.answer("Refreshing...")
-        admin_panel(update, context)
-    elif data == "admin_reset":
-        save_data({"users": 0, "messages": 0, "tokens_tracked": 0, "ai_queries": 0})
-        query.edit_message_text("✅ Stats reset successfully!\n\n" + BRAND_FOOTER)
-    elif data == "admin_broadcast":
-        query.edit_message_text("🛠 Send me a message to broadcast to all users.\n(This feature is coming soon!)")
-    elif data == "admin_exit":
-        query.edit_message_text("🔒 Admin panel closed.\n\n" + BRAND_FOOTER)
+    memory = load_memory()
+    total_users = len(memory)
+    update.message.reply_text(f"👥 Total active users: <b>{total_users}</b>", parse_mode="HTML")
 
+# ===== FULL MEMORY RESET =====
 
-# === USER ACTIVITY TRACKERS ===
+def reset_all_memory(update: Update, context: CallbackContext):
+    if not is_admin(update.effective_user.id):
+        update.message.reply_text("🚫 Access Denied.")
+        return
 
-def track_user_message(update: Update, context: CallbackContext):
-    """Tracks total users & messages automatically."""
-    user = update.effective_user
-    data = load_data()
+    if os.path.exists(MEMORY_FILE):
+        os.remove(MEMORY_FILE)
+        update.message.reply_text("🧹 All user memory wiped.\nFresh neural state activated ⚙️")
+    else:
+        update.message.reply_text("No memory file found.")
 
-    data["messages"] += 1
-    if "user_ids" not in data:
-        data["user_ids"] = []
-    if user.id not in data["user_ids"]:
-        data["user_ids"].append(user.id)
-        data["users"] = len(data["user_ids"])
+# ===== SYSTEM STATS =====
 
-    save_data(data)
+def system_stats(update: Update, context: CallbackContext):
+    if not is_admin(update.effective_user.id):
+        update.message.reply_text("🚫 Restricted.")
+        return
 
+    memory = load_memory()
+    users = len(memory)
+    uptime = time.strftime("%Y-%m-%d %H:%M:%S")
 
-def track_ai_query():
-    data = load_data()
-    data["ai_queries"] += 1
-    save_data(data)
+    text = (
+        f"<b>📊 WENBNB Neural Engine — System Status</b>\n\n"
+        f"👥 Users Stored: {users}\n"
+        f"🕒 Uptime Snapshot: {uptime}\n"
+        f"💾 Memory File: {MEMORY_FILE}\n"
+        f"⚙️ Status: Stable\n\n"
+        f"{BRAND_TAG}"
+    )
+    update.message.reply_text(text, parse_mode="HTML")
 
-
-def track_token_usage():
-    data = load_data()
-    data["tokens_tracked"] += 1
-    save_data(data)
-
-
-# === REGISTRATION ===
+# ===== REGISTER HANDLERS =====
 
 def register_handlers(dp):
     dp.add_handler(CommandHandler("admin", admin_panel))
-    dp.add_handler(CallbackQueryHandler(admin_callback, pattern="admin_"))
+    dp.add_handler(CommandHandler("broadcast", broadcast))
+    dp.add_handler(CommandHandler("users", show_users))
+    dp.add_handler(CommandHandler("reset_all_memory", reset_all_memory))
+    dp.add_handler(CommandHandler("stats", system_stats))
