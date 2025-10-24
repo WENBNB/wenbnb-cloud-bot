@@ -1,85 +1,63 @@
-"""
-🎭 WENBNB Meme Engine v8.5.6 — Emotion Sync Hybrid Mode
-• AI caption generator + organic hashtags
-• Reacts to both /meme command and user photo uploads
-• Includes startup "Meme Reactor Online" intro
-"""
+from telegram import ParseMode
+from telegram.ext import CommandHandler
+import random, html
 
-import os, random, requests
-from telegram import Update
-from telegram.ext import CommandHandler, MessageHandler, Filters, CallbackContext
+# === WENBNB Meme Vision v8.6 ===
+BRAND = "💫 Powered by <b>WENBNB Meme Engine</b> — Emotion Synced 24×7 ⚡"
 
-AI_API = os.getenv("OPENAI_API_KEY", "")
-BRAND_TAG = "💫 Powered by WENBNB Meme Engine — Emotion Synced 24×7 ⚡"
+# --- Meme templates ---
+TEMPLATES = [
+    "😂 “When {topic} pumps harder than my motivation on Monday 🚀💎”",
+    "🤣 “When {topic} dumps and I start refreshing charts like Netflix 📉🍿”",
+    "😎 “When {topic} mooning turns into my new personality 😏🌙”",
+    "🤖 “AI told me to buy {topic}... now I'm emotionally attached 💘🤯”",
+    "🔥 “When {topic} is pumping but my coffee’s still cold ☕📈”",
+    "🚀 “When {topic} hits ATH and I act like I planned it all along 💼📊”",
+    "💰 “My wallet after {topic}: emotional damage = 0, gains = 100 % 💎”",
+]
 
-# Track if intro has been shown
-intro_shown = False
+HASHTAGS = [
+    "#CryptoLife", "#WENBNB", "#MemeDrop", "#DeFiMood", "#HODL",
+    "#BullVibes", "#AiEnergy", "#StayBased", "#MemeMode", "#CryptoFeels"
+]
 
-# === AI caption generator ===
-def ai_caption(topic: str):
-    prompt = (
-        f"Write a short viral crypto meme caption about {topic}. "
-        "Keep it witty, playful, relatable. Add emojis where it feels natural."
-    )
+def meme_cmd(update, context):
+    """Cinematic text-only meme illusion"""
     try:
-        r = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {AI_API}"},
-            json={
-                "model": "gpt-3.5-turbo",
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 60,
-            },
-            timeout=15,
+        context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+
+        # --- user input / default topic ---
+        topic = "crypto"
+        if context.args:
+            topic = " ".join(context.args).capitalize()
+
+        # --- pretend to render ---
+        update.message.reply_text(
+            f"🔥 Meme Reactor Online\n🧠 Syncing humor levels...\n💫 Generating viral scene for <b>{html.escape(topic)}</b> ...",
+            parse_mode=ParseMode.HTML
         )
-        data = r.json()
-        return data["choices"][0]["message"]["content"].strip()
-    except Exception:
-        return random.choice([
-            "When the market dips right after you ape in 😭📉",
-            "That moment when gas fees > your bag size ⛽😂",
-            "Still holding like it’s a yoga pose 💎🧘‍♂️",
-            "When Bitcoin sneezes and my altcoins faint 💀📊",
-        ])
 
-# === Hashtag generator ===
-def random_hashtags():
-    tags = [
-        "#WENBNB", "#MemeDrop", "#CryptoFeels", "#StayBased", "#HODL",
-        "#BullVibes", "#DeFiMood", "#AiEnergy", "#WenLambo", "#MemeMode"
-    ]
-    return " ".join(random.sample(tags, 4))
+        # --- select dynamic caption ---
+        caption = random.choice(TEMPLATES).format(topic=html.escape(topic))
+        tags = " ".join(random.sample(HASHTAGS, 4))
+        emotion_line = "🧠 Meme Lab says: laughter = bullish sentiment 😎"
 
-# === /meme Command ===
-def meme_cmd(update: Update, context: CallbackContext):
-    global intro_shown
-    msg = update.message
-    topic = "crypto" if not context.args else " ".join(context.args)
+        msg = (
+            f"{caption}\n"
+            f"{tags}\n\n"
+            f"{emotion_line}\n"
+            f"{BRAND}"
+        )
 
-    if not intro_shown:
-        msg.reply_text("🔥 Meme Reactor Online\n🎭 Syncing humor levels...\n💫 Ready to generate viral moments.")
-        intro_shown = True
+        update.message.reply_text(msg, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
-    caption = ai_caption(topic)
-    hashtags = random_hashtags()
-    reply = (
-        f"😂 “{caption}”\n{hashtags}\n\n"
-        f"🧠 Meme Lab says: laughter = bullish sentiment 😎\n{BRAND_TAG}"
-    )
-    msg.reply_text(reply, parse_mode="HTML")
+    except Exception as e:
+        print("Error in meme_cmd:", e)
+        update.message.reply_text(
+            "⚙️ Neural Meme Reactor cooling down — try again soon 😅",
+            parse_mode=ParseMode.HTML
+        )
 
-# === Photo reaction ===
-def meme_photo(update: Update, context: CallbackContext):
-    caption = ai_caption("crypto memes")
-    hashtags = random_hashtags()
-    reply = (
-        f"🎨 “{caption}”\n{hashtags}\n\n"
-        f"⚡ Visual mode active — syncing meme vibes 🤙🏻\n{BRAND_TAG}"
-    )
-    update.message.reply_text(reply, parse_mode="HTML")
-
-# === Register ===
 def register(dispatcher, core=None):
     dispatcher.add_handler(CommandHandler("meme", meme_cmd))
-    dispatcher.add_handler(MessageHandler(Filters.photo, meme_photo))
-    print("✅ Loaded plugin: plugins.meme_ai (v8.5.6 Emotion Sync Hybrid Mode)")
+    print("✅ Loaded plugin: plugins.meme_ai (v8.6 Meme Vision Mode)")
