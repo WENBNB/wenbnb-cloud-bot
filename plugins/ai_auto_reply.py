@@ -1,9 +1,10 @@
 """
-AI Auto-Reply + Emotion Sync — WENBNB Neural Engine v8.0.4
-Upgrades:
-- Adds visible emotional resonance line (live AI emotion feedback)
-- Keeps Emotion Sync continuity from v8.1
-- Stable JSON parsing + brand footer rotation
+AI Auto-Reply + Emotion Sync — WENBNB Neural Engine v8.0.5
+Fixes & Enhancements:
+- Natural emotion emoji blending
+- Smart fallback mood detection
+- Random emoji placement (start or end)
+- Seamless Emotion Sync integration
 """
 
 import os, json, random, requests
@@ -52,7 +53,7 @@ def ai_auto_reply(update: Update, context: CallbackContext):
 
     # === Build Prompt ===
     system_prompt = (
-        f"You are WENBNB AI — an emotionally intelligent crypto companion powered by Neural Engine v8.0.4. "
+        f"You are WENBNB AI — an emotionally intelligent crypto companion powered by Neural Engine v8.0.5. "
         f"Reply warmly, naturally, and with emotional depth like a real human friend. "
         f"User: {user_name}. Current AI mood: {ai_mood}. "
         f"\n\n{emotion_context}"
@@ -78,8 +79,7 @@ def ai_auto_reply(update: Update, context: CallbackContext):
 
         if response.status_code == 200:
             data = response.json()
-
-            # ✅ Flexible JSON parsing (proxy or direct)
+            # ✅ Handle both OpenAI direct & proxy response formats
             if isinstance(data, dict) and "choices" in data and len(data["choices"]) > 0:
                 reply = data["choices"][0].get("message", {}).get("content", "").strip()
             elif isinstance(data, list) and len(data) > 0:
@@ -87,14 +87,40 @@ def ai_auto_reply(update: Update, context: CallbackContext):
             else:
                 reply = "⚠️ Neural Engine: Empty or malformed response."
 
-            # 🧠 Add Emotion Line visibly before AI reply
-            emotion_line = f"*{emotion_context}*"
-            reply = f"{emotion_line}\n\n{reply}"
+            # 🩶 Emotion emoji extraction
+            emotion_emoji = ""
+            if "→" in emotion_context:
+                emotion_emoji = emotion_context.split("→")[-1].strip().split(" ")[0]
 
-            # 💎 Footer rotation (random brand signature)
+            # 💫 Fallback emotion detection (if Emotion Sync fails)
+            if not emotion_emoji:
+                msg_lower = message.lower()
+                if any(w in msg_lower for w in ["sad", "lost", "bad", "cry", "down"]):
+                    emotion_emoji = "😢"
+                elif any(w in msg_lower for w in ["happy", "great", "good", "love", "excited"]):
+                    emotion_emoji = "😊"
+                elif any(w in msg_lower for w in ["hope", "soon", "believe", "try"]):
+                    emotion_emoji = "✨"
+                elif any(w in msg_lower for w in ["angry", "mad", "hate"]):
+                    emotion_emoji = "😠"
+                elif any(w in msg_lower for w in ["win", "gain", "rich", "profit", "pump"]):
+                    emotion_emoji = "🚀"
+                elif any(w in msg_lower for w in ["tired", "bored", "wait"]):
+                    emotion_emoji = "😌"
+                else:
+                    emotion_emoji = random.choice(["😎", "🤖", "💫", "🔥", "🩵"])
+
+            # 🧠 Dynamic emoji placement (start or end randomly)
+            if not reply.endswith(emotion_emoji) and emotion_emoji not in reply:
+                if random.choice([True, False]):
+                    reply = f"{emotion_emoji} {reply}"
+                else:
+                    reply = f"{reply.strip()} {emotion_emoji}"
+
+            # 💎 Footer rotation
             brand_signatures = [
                 "🚀 Powered by WENBNB Neural Engine — AI Core Market Intelligence 24×7 ⚡",
-                "💫 Powered by WENBNB Neural Engine — Emotional Sync Mode v8.0.4 🧠",
+                "💫 WENBNB Neural Engine — Emotion Sync Mode v8.0.5 🧠",
                 "🤖 WENBNB AI Core — Blending Crypto Insight & Human Emotion 💎",
                 "🔥 WENBNB Neural Intelligence — Real-Time Crypto Mind & Emotion Engine 🧬",
                 "🌙 WENBNB Neural Engine — Smarter. Softer. Sentient. 💋"
@@ -103,7 +129,7 @@ def ai_auto_reply(update: Update, context: CallbackContext):
 
             update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
 
-            # 🧠 Save memory (last 10 messages)
+            # 🧠 Save memory (last 10 exchanges)
             history.append({"msg": message, "reply": reply, "time": datetime.now().isoformat()})
             memory[str(user.id)] = history[-10:]
             save_memory(memory)
