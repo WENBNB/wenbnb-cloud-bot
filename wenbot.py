@@ -129,16 +129,18 @@ def try_import(module_name: str):
 # expected plugin names (put your code in plugins/)
 plugins = {
     "price": try_import("plugins.price_tracker"),
+    "price_alt": try_import("plugins.price"),
     "tokeninfo": try_import("plugins.tokeninfo"),
-    "airdrop": try_import("plugins.airdrop_checker"),
+    "airdrop": try_import("plugins.airdrop_check"),
     "meme": try_import("plugins.meme_ai"),
     "ai": try_import("plugins.ai_auto_reply"),
     "aianalyze": try_import("plugins.aianalyze"),
     "memory": try_import("plugins.memory_ai"),
     "admin": try_import("plugins.admin_panel"),
     "system": try_import("plugins.system_monitor"),
-    "web3": try_import("plugins.web3_connector"),
-    "menu": try_import("plugins.menu")      # ⬅️ add this
+    "web3": try_import("plugins.web3_connect"),
+    "giveaway": try_import("plugins.giveaway_ai"),
+    "emotion": try_import("plugins.emotion_ai")
 }
 
 # -------------------------
@@ -360,5 +362,6 @@ def main():
 # bot only starts when script executed directly (worker: python wenbot.py)
 if __name__ == "__main__":
     main()
+
 
 
