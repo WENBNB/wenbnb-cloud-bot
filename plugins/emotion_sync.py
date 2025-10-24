@@ -1,7 +1,7 @@
 """
-Emotion Sync Engine v8.0.1 — WENBNB Neural Continuity Core
-Enhances emotional persistence across sessions for the Neural Engine.
-Provides smooth tone transitions and memory self-healing logic.
+Emotion Sync Engine v8.1 — WENBNB Neural Continuity Core (Emotive Upgrade)
+Enhances emotional persistence + blends mixed emotional tones dynamically.
+Provides smoother transitions, long-term affect memory, and mood realism.
 """
 
 import json, os, random, time
@@ -29,26 +29,53 @@ def save_emotion_context(data):
 
 # === Emotion Drift Algorithm ===
 def _drift_emotion(score):
-    drift = random.choice([-1, 0, 1])
-    new_score = max(min(score + drift, 6), -6)
+    """Add a gentle emotional drift each interaction"""
+    drift = random.choice([-2, -1, 0, 1, 2])
+    new_score = max(min(score + drift, 8), -8)
     return new_score
+
+# === Multi-Emotion Fusion ===
+def _fuse_emotions(primary, secondary):
+    """Blend two emotional tones together for realism"""
+    combos = {
+        ("happy", "excited"): "🤩 ecstatic",
+        ("sad", "tired"): "😔 drained",
+        ("angry", "confident"): "😤 determined",
+        ("calm", "hopeful"): "🙂 serene & hopeful",
+        ("neutral", "curious"): "🤖 inquisitive",
+        ("confident", "playful"): "😏 charming",
+        ("energetic", "chaotic"): "🔥 impulsive",
+        ("tired", "peaceful"): "😌 reflective"
+    }
+    return combos.get((primary, secondary), f"{primary} + {secondary}")
 
 # === Emotion Tone Mapping ===
 def _map_emotion(score):
     mapping = {
-        -6: "💔 deeply sad",
-        -4: "😞 low",
-        -2: "😌 calm",
-         0: "🤖 neutral",
-         2: "😏 confident",
-         4: "🔥 energetic",
-         6: "🤩 euphoric"
+        -8: ("devastated", "exhausted"),
+        -6: ("sad", "tired"),
+        -4: ("calm", "hopeful"),
+        -2: ("neutral", "curious"),
+         0: ("neutral", "balanced"),
+         2: ("confident", "playful"),
+         4: ("energetic", "chaotic"),
+         6: ("happy", "excited"),
+         8: ("ecstatic", "blissful")
     }
-    return mapping.get(score, "🤖 balanced")
+    primary, secondary = mapping.get(score, ("neutral", "balanced"))
+    fusion = _fuse_emotions(primary, secondary)
+    icons = {
+        "sad": "😢", "tired": "😞", "calm": "😌", "neutral": "🤖",
+        "confident": "😏", "playful": "😉", "energetic": "🔥",
+        "happy": "😊", "excited": "🤩", "ecstatic": "💫",
+        "chaotic": "⚡", "blissful": "🌙", "devastated": "💔"
+    }
+    icon = icons.get(primary, "🤖")
+    return f"{icon} {fusion}"
 
 # === Sync Process ===
 def sync_emotion(user_id, message):
-    """Link user’s emotional continuity across sessions."""
+    """Maintain emotional continuity across sessions"""
     memory = load_emotion_context()
     user_data = memory.get(str(user_id), {})
 
@@ -65,11 +92,10 @@ def sync_emotion(user_id, message):
 
     memory[str(user_id)] = user_data
     save_emotion_context(memory)
-
     return emotion
 
-# === Exported for AI Core ===
+# === Export for AI Core ===
 def get_emotion_prefix(user_id, user_message):
-    """Return live tone hint for the AI system prompt"""
+    """Return live tone hint for AI system prompt"""
     emotion = sync_emotion(user_id, user_message)
-    return f"🧠 Emotional continuity engaged → AI mood aligned: {emotion}."
+    return f"🧠 Emotional Sync: AI emotional resonance aligned → {emotion}."
