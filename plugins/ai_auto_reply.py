@@ -1,9 +1,9 @@
 """
-AI Auto-Reply + Emotion Sync — WENBNB Neural Engine v8.0.3
-Fixes:
-- Corrected API JSON parsing for OpenAI proxy
-- Restored natural emotional replies
-- Enhanced error handling and brand rotation
+AI Auto-Reply + Emotion Sync — WENBNB Neural Engine v8.0.4
+Upgrades:
+- Adds visible emotional resonance line (live AI emotion feedback)
+- Keeps Emotion Sync continuity from v8.1
+- Stable JSON parsing + brand footer rotation
 """
 
 import os, json, random, requests
@@ -52,7 +52,7 @@ def ai_auto_reply(update: Update, context: CallbackContext):
 
     # === Build Prompt ===
     system_prompt = (
-        f"You are WENBNB AI — an emotionally intelligent crypto companion powered by Neural Engine v8.0.3. "
+        f"You are WENBNB AI — an emotionally intelligent crypto companion powered by Neural Engine v8.0.4. "
         f"Reply warmly, naturally, and with emotional depth like a real human friend. "
         f"User: {user_name}. Current AI mood: {ai_mood}. "
         f"\n\n{emotion_context}"
@@ -78,7 +78,8 @@ def ai_auto_reply(update: Update, context: CallbackContext):
 
         if response.status_code == 200:
             data = response.json()
-            # ✅ Fixed: Handle both proxy + direct OpenAI response formats
+
+            # ✅ Flexible JSON parsing (proxy or direct)
             if isinstance(data, dict) and "choices" in data and len(data["choices"]) > 0:
                 reply = data["choices"][0].get("message", {}).get("content", "").strip()
             elif isinstance(data, list) and len(data) > 0:
@@ -86,10 +87,14 @@ def ai_auto_reply(update: Update, context: CallbackContext):
             else:
                 reply = "⚠️ Neural Engine: Empty or malformed response."
 
-            # 💎 Footer rotation
+            # 🧠 Add Emotion Line visibly before AI reply
+            emotion_line = f"*{emotion_context}*"
+            reply = f"{emotion_line}\n\n{reply}"
+
+            # 💎 Footer rotation (random brand signature)
             brand_signatures = [
                 "🚀 Powered by WENBNB Neural Engine — AI Core Market Intelligence 24×7 ⚡",
-                "💫 Powered by WENBNB Neural Engine — Emotional Sync Mode v8.0.3 🧠",
+                "💫 Powered by WENBNB Neural Engine — Emotional Sync Mode v8.0.4 🧠",
                 "🤖 WENBNB AI Core — Blending Crypto Insight & Human Emotion 💎",
                 "🔥 WENBNB Neural Intelligence — Real-Time Crypto Mind & Emotion Engine 🧬",
                 "🌙 WENBNB Neural Engine — Smarter. Softer. Sentient. 💋"
@@ -98,7 +103,7 @@ def ai_auto_reply(update: Update, context: CallbackContext):
 
             update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
 
-            # Save memory (last 10 messages)
+            # 🧠 Save memory (last 10 messages)
             history.append({"msg": message, "reply": reply, "time": datetime.now().isoformat()})
             memory[str(user.id)] = history[-10:]
             save_memory(memory)
