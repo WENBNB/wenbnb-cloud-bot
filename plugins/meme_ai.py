@@ -1,25 +1,25 @@
 """
-🎭 WENBNB Meme Engine v8.5.5 — Emotion Sync Text Mode
-• Generates AI-based meme captions with human tone + organic hashtags
-• Fully compatible with WENBNB Neural Engine v8.0.5 and wenbot.py
-• Safe: no image font dependencies or rendering errors
+🎭 WENBNB Meme Engine v8.5.6 — Emotion Sync Hybrid Mode
+• AI caption generator + organic hashtags
+• Reacts to both /meme command and user photo uploads
+• Includes startup "Meme Reactor Online" intro
 """
 
 import os, random, requests
-from telegram import Update, InputFile
+from telegram import Update
 from telegram.ext import CommandHandler, MessageHandler, Filters, CallbackContext
 
-# === CONFIG ===
 AI_API = os.getenv("OPENAI_API_KEY", "")
 BRAND_TAG = "💫 Powered by WENBNB Meme Engine — Emotion Synced 24×7 ⚡"
 
-# === CORE: AI Caption Generator ===
+# Track if intro has been shown
+intro_shown = False
+
+# === AI caption generator ===
 def ai_caption(topic: str):
-    """Generate short, witty meme-style captions."""
     prompt = (
         f"Write a short viral crypto meme caption about {topic}. "
-        "Tone: funny, human, casual, slightly sarcastic, Gen Z internet style. "
-        "Include emojis where natural, max 1 line."
+        "Keep it witty, playful, relatable. Add emojis where it feels natural."
     )
     try:
         r = requests.post(
@@ -35,49 +35,46 @@ def ai_caption(topic: str):
         data = r.json()
         return data["choices"][0]["message"]["content"].strip()
     except Exception:
-        fallback = [
-            "When the chart looks bullish… but your wallet says otherwise 😭📉",
-            "That awkward moment when gas fees > your balance ⛽😂",
-            "When you said ‘HODL’ but your emotions didn’t 😅💎",
-            "Just another day pretending I understand on-chain metrics 🤡📊",
-            "When Bitcoin sneezes and your altcoins catch pneumonia 😭💀"
-        ]
-        return random.choice(fallback)
+        return random.choice([
+            "When the market dips right after you ape in 😭📉",
+            "That moment when gas fees > your bag size ⛽😂",
+            "Still holding like it’s a yoga pose 💎🧘‍♂️",
+            "When Bitcoin sneezes and my altcoins faint 💀📊",
+        ])
 
-# === AUTO HASHTAGS ===
+# === Hashtag generator ===
 def random_hashtags():
     tags = [
-        "#WENBNB", "#MemeDrop", "#CryptoFeels", "#StayBased", "#DeFiMood",
-        "#HODL", "#BullVibes", "#WenLambo", "#MemecoinLife", "#AiEnergy"
+        "#WENBNB", "#MemeDrop", "#CryptoFeels", "#StayBased", "#HODL",
+        "#BullVibes", "#DeFiMood", "#AiEnergy", "#WenLambo", "#MemeMode"
     ]
-    return " ".join(random.sample(tags, k=4))
+    return " ".join(random.sample(tags, 4))
 
 # === /meme Command ===
 def meme_cmd(update: Update, context: CallbackContext):
+    global intro_shown
     msg = update.message
     topic = "crypto" if not context.args else " ".join(context.args)
+
+    if not intro_shown:
+        msg.reply_text("🔥 Meme Reactor Online\n🎭 Syncing humor levels...\n💫 Ready to generate viral moments.")
+        intro_shown = True
+
     caption = ai_caption(topic)
     hashtags = random_hashtags()
-
     reply = (
-        f"😂 “{caption}”\n"
-        f"{hashtags}\n\n"
-        f"🧠 Meme Lab says: laughter = bullish sentiment 😎\n"
-        f"{BRAND_TAG}"
+        f"😂 “{caption}”\n{hashtags}\n\n"
+        f"🧠 Meme Lab says: laughter = bullish sentiment 😎\n{BRAND_TAG}"
     )
-
     msg.reply_text(reply, parse_mode="HTML")
 
-# === Photo Handler (No rendering mode) ===
+# === Photo reaction ===
 def meme_photo(update: Update, context: CallbackContext):
-    caption = ai_caption("crypto markets and trading emotions")
+    caption = ai_caption("crypto memes")
     hashtags = random_hashtags()
-
     reply = (
-        f"🎨 “{caption}”\n"
-        f"{hashtags}\n\n"
-        f"⚡ Visual mode active — meme energy syncing live 🤙🏻\n"
-        f"{BRAND_TAG}"
+        f"🎨 “{caption}”\n{hashtags}\n\n"
+        f"⚡ Visual mode active — syncing meme vibes 🤙🏻\n{BRAND_TAG}"
     )
     update.message.reply_text(reply, parse_mode="HTML")
 
@@ -85,4 +82,4 @@ def meme_photo(update: Update, context: CallbackContext):
 def register(dispatcher, core=None):
     dispatcher.add_handler(CommandHandler("meme", meme_cmd))
     dispatcher.add_handler(MessageHandler(Filters.photo, meme_photo))
-    print("✅ Loaded plugin: plugins.meme_ai (v8.5.5 Emotion Sync Text Mode)")
+    print("✅ Loaded plugin: plugins.meme_ai (v8.5.6 Emotion Sync Hybrid Mode)")
