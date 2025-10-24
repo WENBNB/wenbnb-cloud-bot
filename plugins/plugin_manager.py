@@ -76,7 +76,9 @@ def reload_plugins(update: Update, context: CallbackContext):
         update.message.reply_text("🚫 Only admin can reload modules.")
         return
 
-    from main import dp
+    # ✅ Correct import for your setup (was: from main import dp)
+    from wenbot import dp
+
     ACTIVE_PLUGINS.clear()
     text = "🔄 <b>Reloading all plugins...</b>\n"
     loaded, failed = load_all_plugins(dp)
