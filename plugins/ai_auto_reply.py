@@ -81,28 +81,28 @@ def ai_auto_reply(update: Update, context: CallbackContext):
     if response.status_code == 200:
         data = response.json()
         if "choices" in data and len(data["choices"]) > 0:
-        reply = data["choices"][0]["message"]["content"].strip()
+            reply = data["choices"][0]["message"]["content"].strip()
+        else:
+            reply = "⚠️ AI Core returned an unexpected response format."
+
+        # 💫 Dynamic Brand Footer Rotation
+        brand_signatures = [
+            "🚀 Powered by WENBNB Neural Engine — AI Core Market Intelligence 24×7 ⚡",
+            "💫 Powered by WENBNB Neural Engine — Emotional Sync Mode v8.0.1 🧠",
+            "🤖 WENBNB AI Core — Blending Crypto Insight & Human Emotion 💎",
+            "🔥 WENBNB Neural Intelligence — Real-Time Crypto Mind & Emotion Engine 🧬",
+            "🌙 WENBNB Neural Engine — Smarter. Softer. Sentient. 💋"
+        ]
+        reply += f"\n\n{random.choice(brand_signatures)}"
+
+        update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
+
+        # 🧠 Save chat history
+        history.append({"msg": message, "reply": reply, "time": datetime.now().isoformat()})
+        memory[str(user.id)] = history[-10:]
+        save_memory(memory)
     else:
-        reply = "⚠️ AI Core returned an unexpected response format."
-
-    # 💫 Dynamic Brand Footer Rotation
-    brand_signatures = [
-        "🚀 Powered by WENBNB Neural Engine — AI Core Market Intelligence 24×7 ⚡",
-        "💫 Powered by WENBNB Neural Engine — Emotional Sync Mode v8.0.1 🧠",
-        "🤖 WENBNB AI Core — Blending Crypto Insight & Human Emotion 💎",
-        "🔥 WENBNB Neural Intelligence — Real-Time Crypto Mind & Emotion Engine 🧬",
-        "🌙 WENBNB Neural Engine — Smarter. Softer. Sentient. 💋"
-    ]
-    reply += f"\n\n{random.choice(brand_signatures)}"
-
-    update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
-
-    # 🧠 Save chat history
-    history.append({"msg": message, "reply": reply, "time": datetime.now().isoformat()})
-    memory[str(user.id)] = history[-10:]
-    save_memory(memory)
-else:
-    update.message.reply_text("⚙️ Neural Engine syncing... please retry soon.")
+        update.message.reply_text("⚙️ Neural Engine syncing... please retry soon.")
 
 except Exception as e:
     update.message.reply_text(f"⚠️ AI Core Exception: {str(e)}")
