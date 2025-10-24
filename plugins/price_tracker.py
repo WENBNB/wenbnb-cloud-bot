@@ -1,8 +1,8 @@
 from telegram.ext import CommandHandler
-import requests, html, random
+import requests, html, random, math
 
 # === Branding ===
-BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — AI Core Market Intelligence 24×7 ⚡"
+BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — Neural Market Intelligence v8.1 ⚡"
 DEXSCREENER_SEARCH = "https://api.dexscreener.io/latest/dex/search?q={q}"
 COINGECKO_SIMPLE = "https://api.coingecko.com/api/v3/simple/price?ids={id}&vs_currencies=usd"
 BINANCE_BNB = "https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT"
@@ -17,6 +17,27 @@ def short_float(x):
             return f"{v:.8f}"
     except Exception:
         return str(x)
+
+def detect_chain(dex_id: str) -> str:
+    dex_id = (dex_id or "").lower()
+    if "pancake" in dex_id: return "BSC"
+    if "uniswap" in dex_id: return "Ethereum"
+    if "base" in dex_id: return "Base"
+    if "arbitrum" in dex_id: return "Arbitrum"
+    return "Unknown"
+
+def neural_market_rank(liquidity_usd: float, volume24_usd: float) -> str:
+    try:
+        L = max(1.0, float(liquidity_usd))
+        V = max(1.0, float(volume24_usd))
+        score = (math.log10(L) * 0.6 + math.log10(V) * 0.4) * 10
+        if score >= 85: return "A+"
+        elif score >= 70: return "A"
+        elif score >= 55: return "B"
+        elif score >= 40: return "C"
+        else: return "D"
+    except Exception:
+        return "N/A"
 
 # === /price Command ===
 def price_cmd(update, context):
@@ -40,10 +61,11 @@ def price_cmd(update, context):
         except Exception:
             bnb_price = 0
 
-        # --- Initialize token metadata ---
+        # --- Initialize placeholders ---
         token_name, token_symbol, token_price, dex_source = token, "", None, "CoinGecko"
+        chain, liquidity, volume24, nmr = "Unknown", 0, 0, "N/A"
 
-        # --- Fetch token price from CoinGecko ---
+        # --- Try CoinGecko first ---
         try:
             cg_url = COINGECKO_SIMPLE.format(id=token.lower())
             cg_data = requests.get(cg_url, timeout=10).json()
@@ -51,8 +73,8 @@ def price_cmd(update, context):
         except Exception:
             token_price = None
 
-        # --- DexScreener fallback & name extraction ---
-        if not token_price:
+        # --- DexScreener fallback if no CoinGecko data ---
+        if not token_price or token_price == "N/A":
             try:
                 dex_data = requests.get(DEXSCREENER_SEARCH.format(q=token), timeout=10).json()
                 pairs = dex_data.get("pairs", [])
@@ -60,33 +82,38 @@ def price_cmd(update, context):
                     pair = pairs[0]
                     base = pair.get("baseToken", {})
                     token_name = base.get("name") or base.get("symbol") or token
-                    token_symbol = base.get("symbol") or ""
+                    token_symbol = base.get("symbol") or token
                     token_price = pair.get("priceUsd", "N/A")
                     dex_source = pair.get("dexId", "Unknown DEX").capitalize()
-                else:
-                    token_price = "N/A"
-                    dex_source = "Not Found"
+                    chain = detect_chain(dex_source)
+                    liquidity = pair.get("liquidity", {}).get("usd", 0)
+                    volume24 = pair.get("volume", {}).get("h24", 0)
+                    nmr = neural_market_rank(liquidity, volume24)
             except Exception:
                 token_price, dex_source = "N/A", "Not Found"
 
-        # --- Market sentiment / AI insight ---
+        # --- Neural Insight selection ---
         insights = [
-            f"is showing <b>steady momentum</b> 🌙",
-            f"looks <b>bullish</b> today 💎",
-            f"appears <b>volatile</b> — stay alert ⚡",
-            f"is <b>cooling off</b> a bit 🪶",
-            f"might see <b>short-term gains</b> 🔥"
+            f"is showing <b>strong momentum</b> 💎",
+            f"is <b>cooling off</b> slightly 🪶",
+            f"looks <b>volatile</b> — monitor closely ⚡",
+            f"is <b>heating up</b> on {chain} 🔥",
+            f"shows <b>smart money movement</b> signals 🧠"
         ]
         insight = random.choice(insights)
 
-        # --- Build formatted message ---
+        # --- Build message ---
         msg = (
             f"💹 <b>Live Market Update</b>\n\n"
-            f"💎 <b>{html.escape(token_name)} ({html.escape(token_symbol or token)})</b>: "
-            f"${short_float(token_price)}\n"
+            f"💎 <b>{html.escape(token_name)} ({html.escape(token_symbol or token)})</b>\n"
+            f"🌐 <b>Chain:</b> {chain}\n"
+            f"💰 <b>Price:</b> ${short_float(token_price)}\n"
+            f"💧 <b>Liquidity:</b> ${short_float(liquidity)}\n"
+            f"📊 <b>24h Volume:</b> ${short_float(volume24)}\n"
+            f"🏅 <b>Neural Market Rank:</b> {nmr}\n"
             f"🔥 <b>BNB:</b> ${short_float(bnb_price)}\n"
-            f"📊 <i>Data Source:</i> {dex_source}\n\n"
-            f"🧠 Neural Insight: <b>{token_name}</b> {insight}\n\n"
+            f"📈 <i>Data Source:</i> {dex_source}\n\n"
+            f"🧠 Insight: <b>{token_name}</b> {insight}\n\n"
             f"{BRAND_FOOTER}"
         )
 
@@ -102,4 +129,4 @@ def price_cmd(update, context):
 # === Register ===
 def register(dispatcher, core=None):
     dispatcher.add_handler(CommandHandler("price", price_cmd))
-    print("✅ Loaded plugin: plugins.price_tracker (v8.0.6-Stable+ Name Resolver Patch)")
+    print("✅ Loaded plugin: plugins.price_tracker (v8.1 Neural Market Rank Edition)")
