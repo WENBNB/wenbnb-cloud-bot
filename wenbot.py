@@ -41,22 +41,19 @@ logger.info(f"WENBNB Neural Engine {ENGINE_VERSION} starting...")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 BSCSCAN_API_KEY = os.getenv("BSCSCAN_API_KEY")
-OWNER_ID = os.getenv("OWNER_ID")           # string or number
-ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID") # string or number
+OWNER_ID = os.getenv("OWNER_ID")
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
 WEN_TOKEN_ADDRESS = os.getenv("WEN_TOKEN_ADDRESS")
 DASHBOARD_URL = os.getenv("DASHBOARD_URL")
 DASHBOARD_KEY = os.getenv("DASHBOARD_KEY", "")
-RENDER_APP_URL = os.getenv("RENDER_APP_URL", "")  # used by keep-alive
+RENDER_APP_URL = os.getenv("RENDER_APP_URL", "")
 PORT = int(os.getenv("PORT", "10000"))
 DB_FILE = os.getenv("DB_FILE", "memory_data.db")
 
-# Basic validation
 if not TELEGRAM_TOKEN:
     logger.error("TELEGRAM_TOKEN not set. Exiting.")
-    # If running under gunicorn, don't exit (app is for dashboard). But for worker run we exit.
     if __name__ == "__main__":
         raise SystemExit("Missing TELEGRAM_TOKEN")
-    # else continue so Flask app still serves /ping
 
 # -------------------------
 # Flask App (for /ping)
@@ -76,10 +73,6 @@ def ping():
 # Dashboard event helper
 # -------------------------
 def send_dashboard_event(event_text: str, source: str = "bot"):
-    """
-    Best-effort send to configured dashboard endpoint.
-    Non-blocking intention: short timeout and ignore failures.
-    """
     if not DASHBOARD_URL:
         return False
     try:
@@ -126,7 +119,6 @@ def try_import(module_name: str):
         logger.warning(f"Plugin load failed ({module_name}): {e}")
         return None
 
-# expected plugin names (put your code in plugins/)
 plugins = {
     "price": try_import("plugins.price_tracker"),
     "price_alt": try_import("plugins.price"),
@@ -162,13 +154,14 @@ def is_admin(user_id: int) -> bool:
     except:
         return False
 
-# safe_call decorator logs exceptions and notifies user
+# -------------------------
+# safe_call decorator
+# -------------------------
 def safe_call(fn):
     def wrapper(update: Update, context: CallbackContext):
         try:
             logger.debug(f"Handling {fn.__name__} from {update.effective_user.id}")
             res = fn(update, context)
-            # send dashboard event
             try:
                 user = update.effective_user.username or str(update.effective_user.id)
                 send_dashboard_event(f"{fn.__name__} used by {user}", source="bot")
@@ -244,11 +237,27 @@ def tokeninfo_cmd(update: Update, context: CallbackContext):
         return plugins["tokeninfo"].tokeninfo_cmd(update, context)
     update.message.reply_text("🔍 Token info plugin missing.")
 
+# ✅ Smart Airdrop Plugin Bridge
 @safe_call
 def airdrop_cmd(update: Update, context: CallbackContext):
-    if plugins["airdrop"] and hasattr(plugins["airdrop"], "airdrop_cmd"):
-        return plugins["airdrop"].airdrop_cmd(update, context)
-    update.message.reply_text("🎁 Airdrop plugin missing.")
+    """
+    Smart Airdrop Plugin Bridge
+    • Supports both legacy airdrop_cmd() and new airdropcheck_cmd()
+    • Ensures graceful fallback instead of plugin missing
+    """
+    plugin = plugins.get("airdrop")
+
+    if not plugin:
+        update.message.reply_text("🎁 Airdrop plugin missing (not loaded).")
+        return
+
+    if hasattr(plugin, "airdropcheck_cmd"):
+        return plugin.airdropcheck_cmd(update, context)
+
+    if hasattr(plugin, "airdrop_cmd"):
+        return plugin.airdrop_cmd(update, context)
+
+    update.message.reply_text("🎁 Airdrop plugin found, but no valid handler defined.")
 
 @safe_call
 def meme_cmd(update: Update, context: CallbackContext):
@@ -294,10 +303,8 @@ def giveaway_end_cmd(update: Update, context: CallbackContext):
 # AI-auto-reply for general text messages
 @safe_call
 def ai_auto_reply(update: Update, context: CallbackContext):
-    # If we have AI plugin, delegate
     if plugins["ai"] and hasattr(plugins["ai"], "ai_auto_reply"):
         return plugins["ai"].ai_auto_reply(update, context)
-    # fallback: simple context-aware echo with brand
     incoming = (update.message.text or "").strip()
     if not incoming:
         return
@@ -308,12 +315,10 @@ def ai_auto_reply(update: Update, context: CallbackContext):
 # Startup / Runner
 # -------------------------
 def _start_bot():
-    """Initialize and run the telegram bot polling loop. Called in __main__ worker mode."""
     logger.info("Initializing Telegram Updater...")
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
 
-    # Register handlers
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("help", help_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
@@ -326,12 +331,11 @@ def _start_bot():
     dp.add_handler(CommandHandler("giveaway_end", giveaway_end_cmd))
     dp.add_handler(CommandHandler("system", system_cmd))
 
-    # catch-all AI text handler
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply))
 
-    # Start polling
     updater.start_polling()
     logger.info("✅ Telegram bot polling started.")
+    logger.info("✅ WENBNB Airdrop Intelligence module ready (Hybrid Compatibility Mode)")
     send_dashboard_event("Bot polling started", source="system")
     updater.idle()
 
@@ -340,16 +344,10 @@ def _start_bot():
 # -------------------------
 def main():
     logger.info("WENBNB Neural Engine main() starting...")
-    # Start keep-alive thread (if configured)
     start_keep_alive()
-
-    # Optionally notify dashboard that startup happened
     send_dashboard_event("WENBNB Bot startup", source="system")
 
-    # On normal run, we start the bot polling loop.
-    # If this module is imported by gunicorn (to run Flask app), __main__ won't run.
     if __name__ == "__main__":
-        # run bot in main thread (worker process)
         try:
             _start_bot()
         except KeyboardInterrupt:
@@ -358,11 +356,5 @@ def main():
             logger.exception(f"Fatal error in bot: {e}")
             raise
 
-# allow gunicorn to serve flask app variable named 'app'
-# bot only starts when script executed directly (worker: python wenbot.py)
 if __name__ == "__main__":
     main()
-
-
-
-
