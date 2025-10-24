@@ -1,7 +1,7 @@
 """
 AI Meme Generator — WENBNB Bot Plugin
-Version: 8.5 (Visual Mode)
-Mode: Hybrid (Command + Image AI Caption)
+Version: 8.5.2 (Visual Fix)
+Mode: Hybrid (AI Caption + Image Generation)
 """
 
 import os, requests, random, io, re
@@ -11,21 +11,20 @@ from telegram.ext import CommandHandler, MessageHandler, Filters, CallbackContex
 
 # === CONFIG ===
 AI_API = os.getenv("OPENAI_API_KEY", "")
-BRAND_FOOTER = "😂 Powered by WENBNB Neural Engine — Meme Intelligence v8.5 ⚡"
+BRAND_FOOTER = "😂 Powered by WENBNB Neural Engine — Meme Intelligence v8.5.2 ⚡"
 
 # --- Font Configuration ---
-from PIL import ImageFont
 try:
     FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     ImageFont.truetype(FONT_PATH, 20)
 except OSError:
-    FONT_PATH = None  # fallback to default font if missing
+    FONT_PATH = None  # fallback to default font
 
 
 # === UTILITIES ===
 def ai_caption_idea(topic: str):
     """Generate funny or viral caption idea using AI"""
-    prompt = f"Create a short, witty, meme-style caption about {topic}. Tone: funny, viral, crypto, casual."
+    prompt = f"Create a short, witty, meme-style caption about {topic}. Tone: funny, crypto, casual."
     try:
         r = requests.post(
             "https://api.openai.com/v1/chat/completions",
@@ -53,26 +52,38 @@ def ai_caption_idea(topic: str):
 
 
 def ai_generate_image(prompt: str):
-    """Generate meme image using DALL·E via OpenAI API"""
+    """Generate meme image using DALL·E-3 with fallback support"""
     try:
         r = requests.post(
             "https://api.openai.com/v1/images/generations",
             headers={"Authorization": f"Bearer {AI_API}", "Content-Type": "application/json"},
-            json={"model": "gpt-image-1", "prompt": prompt, "size": "512x512"},
-            timeout=40,
+            json={
+                "model": "dall-e-3",
+                "prompt": f"{prompt}, funny meme style, crypto humor, HD vibrant colors",
+                "size": "512x512",
+                "n": 1
+            },
+            timeout=45,
         )
         data = r.json()
-        if "data" in data and len(data["data"]) > 0:
+        print("AI Image API response:", data)
+
+        if "data" in data and data["data"]:
             image_url = data["data"][0]["url"]
-            image_bytes = requests.get(image_url).content
+            image_bytes = requests.get(image_url, timeout=20).content
             return image_bytes
+
+        # Fallback image if DALL·E fails
+        fallback_url = "https://i.imgur.com/8KZy3zN.jpg"
+        return requests.get(fallback_url).content
+
     except Exception as e:
         print("Image generation error:", e)
-    return None
+        return requests.get("https://i.imgur.com/8KZy3zN.jpg").content
 
 
 def add_caption(image_bytes: bytes, caption: str):
-    """Overlay caption text on an image with outline for visibility."""
+    """Overlay caption text on image with white + outline text."""
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     draw = ImageDraw.Draw(img)
 
@@ -80,24 +91,22 @@ def add_caption(image_bytes: bytes, caption: str):
     font_size = max(24, int(img.width / 18))
     font = ImageFont.truetype(FONT_PATH, font_size) if FONT_PATH else ImageFont.load_default()
 
-    # Wrap text if too long
-    lines = []
-    words = caption.split()
-    line = ""
-    for word in words:
+    # Word wrapping
+    lines, line = [], ""
+    for word in caption.split():
         if draw.textlength(line + " " + word, font=font) < img.width * 0.9:
             line += " " + word
         else:
             lines.append(line.strip())
             line = word
     lines.append(line.strip())
-
     text = "\n".join(lines)
+
     text_w, text_h = draw.multiline_textsize(text, font=font, spacing=5)
     x = (img.width - text_w) / 2
     y = img.height - text_h - 40
 
-    # Draw outline + fill
+    # Shadow/outline
     for dx in (-2, 2):
         for dy in (-2, 2):
             draw.multiline_text((x + dx, y + dy), text, font=font, fill="black", spacing=5)
@@ -111,16 +120,14 @@ def add_caption(image_bytes: bytes, caption: str):
 
 # === COMMAND HANDLER ===
 def meme_cmd(update: Update, context: CallbackContext):
-    """ /meme command — AI caption + image generation """
+    """ /meme command — AI caption + optional image generation """
     msg = update.message
     try:
         topic = " ".join(context.args) if context.args else "crypto"
         msg.reply_text(f"🎨 Creating your meme scene for: {topic} ...")
 
         caption = ai_caption_idea(topic)
-
-        # 🧠 Generate image via DALL·E
-        image_bytes = ai_generate_image(f"{topic}, crypto, meme style, funny")
+        image_bytes = ai_generate_image(f"{topic}, crypto meme")
 
         if image_bytes:
             meme_image = add_caption(image_bytes, caption)
@@ -142,10 +149,8 @@ def meme_with_photo(update: Update, context: CallbackContext):
         photo = update.message.photo[-1]
         file = photo.get_file()
         image_bytes = requests.get(file.file_path).content
-
         caption = ai_caption_idea("crypto trading or market moves")
         meme_image = add_caption(image_bytes, caption)
-
         update.message.reply_photo(
             photo=InputFile(meme_image, filename="meme.jpg"),
             caption=f"{caption}\n\n{BRAND_FOOTER}",
