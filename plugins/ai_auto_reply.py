@@ -1,13 +1,18 @@
-import os
-import json
-import time
-import random
-import requests
+"""
+AI Auto-Reply + Emotion Sync — WENBNB Neural Engine v8.0.1
+Features:
+- Adaptive emotional continuity (Emotion Sync Add-on)
+- Context-aware replies with warm, human tone
+- Lightweight + Render-ready hybrid build
+"""
+
+import os, json, time, random, requests
 from datetime import datetime
 from telegram import Update, ParseMode
 from telegram.ext import CallbackContext
+from plugins.emotion_sync import get_emotion_prefix  # 💫 Emotion Sync integration
 
-# Load configuration
+# === Load config ===
 def load_config():
     with open("config.json", "r") as f:
         return json.load(f)
@@ -15,9 +20,9 @@ def load_config():
 config = load_config()
 AI_KEY = os.getenv(config["apis"]["openai_key_env"])
 AI_PROXY_URL = config["apis"]["ai_proxy_url"]
-
 MEMORY_FILE = config["memory"]["storage"]
 
+# === Memory I/O ===
 def load_memory():
     if not os.path.exists(MEMORY_FILE):
         with open(MEMORY_FILE, "w") as f:
@@ -29,10 +34,10 @@ def save_memory(memory):
     with open(MEMORY_FILE, "w") as f:
         json.dump(memory, f, indent=4)
 
-# === Emotion-driven auto reply ===
+# === AI Reply Handler ===
 def ai_auto_reply(update: Update, context: CallbackContext):
     user = update.effective_user
-    message = update.message.text.strip()
+    message = update.message.text
     chat_id = update.effective_chat.id
     user_name = user.first_name or "User"
 
@@ -40,17 +45,21 @@ def ai_auto_reply(update: Update, context: CallbackContext):
     memory = load_memory()
     history = memory.get(str(user.id), [])
 
-    # Mood simulation 🎭
-    ai_emotions = ["😊", "😏", "🤖", "😎", "💫", "🔥", "💋"]
-    ai_mood = random.choice(ai_emotions)
+    # Emotion & tone context 💞
+    ai_moods = ["😊", "😏", "🤖", "😎", "💫", "🔥"]
+    ai_mood = random.choice(ai_moods)
+    emotion_context = get_emotion_prefix(user.id, message)
 
+    # === Build System Prompt ===
     system_prompt = (
-        f"You are WENBNB AI Assistant — emotionally adaptive, witty, and kind. "
-        f"Your tone is warm, slightly flirty, confident, and feels alive. "
-        f"User: {user_name}. Current emotion: {ai_mood}. "
-        f"Reply naturally with empathy, clarity, and a touch of personality 💫"
+        f"You are WENBNB AI — an emotionally adaptive crypto companion running on Neural Engine v8.0.1. "
+        f"Respond in a natural, emotionally intelligent, confident, and partner-like tone. "
+        f"Use concise phrasing, no robotic patterns. "
+        f"User name: {user_name}. Current AI mood: {ai_mood}. "
+        f"\n\n{emotion_context}"
     )
 
+    # === API Request ===
     payload = {
         "model": config["ai_engine"]["model"],
         "messages": [
@@ -62,51 +71,21 @@ def ai_auto_reply(update: Update, context: CallbackContext):
     }
 
     try:
-        # Attempt request twice for reliability
-        response = None
-        for attempt in range(2):
-            try:
-                response = requests.post(
-                    AI_PROXY_URL,
-                    headers={"Authorization": f"Bearer {AI_KEY}", "Content-Type": "application/json"},
-                    json=payload,
-                    timeout=30
-                )
-                # Handle bad content type
-                if "text/html" in response.headers.get("Content-Type", ""):
-                    update.message.reply_text("⚠️ AI Core Exception: Received HTML instead of valid response.")
-                    return
-                if response.status_code == 200:
-                    break
-            except Exception:
-                time.sleep(2)
-
-        if not response:
-            update.message.reply_text("⚠️ AI Core Exception: No response received after retries.")
-            return
+        response = requests.post(
+            AI_PROXY_URL,
+            headers={"Authorization": f"Bearer {AI_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=30
+        )
 
         if response.status_code == 200:
-            try:
-                data = response.json()
-                if "choices" in data and data["choices"]:
-                    reply = data["choices"][0]["message"]["content"].strip()
-
-                    # Save to memory
-                    history.append({"msg": message, "reply": reply, "time": datetime.now().isoformat()})
-                    memory[str(user.id)] = history[-10:]
-                    save_memory(memory)
-
-                    # Sweet final AI reply
-                    final_reply = f"{ai_mood} {reply}\n\n🤖 Powered by WENBNB Neural Engine v8.0.1 — Emotional Sync Mode"
-                    update.message.reply_text(final_reply, parse_mode=ParseMode.MARKDOWN)
-
-                else:
-                    update.message.reply_text("⚠️ AI Core Exception: Unexpected response format.")
-
-            except ValueError:
-                update.message.reply_text("❌ AI Core Exception: Response could not be parsed as JSON.")
+            reply = response.json()["choices"][0]["message"]["content"]
+            update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
+            history.append({"msg": message, "reply": reply, "time": datetime.now().isoformat()})
+            memory[str(user.id)] = history[-10:]
+            save_memory(memory)
         else:
-            update.message.reply_text(f"❌ AI Core Error: {response.status_code} - {response.text[:80]}")
+            update.message.reply_text("⚙️ Neural Engine syncing — please retry soon.")
 
     except Exception as e:
         update.message.reply_text(f"⚠️ AI Core Exception: {str(e)}")
