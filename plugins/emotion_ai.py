@@ -1,71 +1,75 @@
 """
-Emotion AI Module v7.0 Beta
-Integrates emotional tone detection into WENBNB Neural Engine replies.
-Makes AI responses adaptive, human-like, and emotionally aware.
+Emotion Sync Engine v8.0.1 — WENBNB Neural Continuity Core
+Enhances emotional persistence across sessions for the Neural Engine.
+Provides smooth tone transitions and memory self-healing logic.
 """
 
-import openai, os, time
-from telegram import Update
-from telegram.ext import MessageHandler, Filters, CallbackContext
+import json, os, random, time
+from datetime import datetime
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
-BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Emotion Context Mode v7.0"
+MEMORY_FILE = "memory_data.db"
 
-# === Emotion Detection ===
-def detect_emotion(text):
-    """Analyze tone of user message"""
+# === Load & Save ===
+def load_emotion_context():
+    if not os.path.exists(MEMORY_FILE):
+        with open(MEMORY_FILE, "w") as f:
+            json.dump({}, f)
     try:
-        analysis = openai.ChatCompletion.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role": "system", "content": "You analyze emotions from messages and return one word tone."},
-                {"role": "user", "content": f"Message: {text}\nReturn only tone like: happy, sad, angry, excited, neutral."}
-            ],
-            temperature=0.5,
-            max_tokens=10,
-        )
-        emotion = analysis["choices"][0]["message"]["content"].strip().lower()
-        return emotion
+        with open(MEMORY_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_emotion_context(data):
+    try:
+        with open(MEMORY_FILE, "w") as f:
+            json.dump(data, f, indent=4)
     except:
-        return "neutral"
+        pass
 
-# === Emotionally Adaptive Reply ===
-def generate_emotional_reply(user_message, emotion):
-    """Generate tone-aware reply"""
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role": "system", "content": f"You are WENBNB AI, an emotionally intelligent crypto assistant."},
-                {"role": "user", "content": f"User emotion: {emotion}. Message: {user_message}. Reply empathetically."}
-            ],
-            temperature=0.9,
-            max_tokens=200,
-        )
-        reply = response["choices"][0]["message"]["content"].strip()
-        return reply
-    except Exception as e:
-        return f"⚠️ Emotion AI unavailable: {e}"
+# === Emotion Drift Algorithm ===
+def _drift_emotion(score):
+    drift = random.choice([-1, 0, 1])
+    new_score = max(min(score + drift, 6), -6)
+    return new_score
 
-# === Telegram Handler ===
-def emotion_ai_handler(update: Update, context: CallbackContext):
-    user_message = update.message.text.strip()
-    if user_message.startswith("/"):
-        return
+# === Emotion Tone Mapping ===
+def _map_emotion(score):
+    mapping = {
+        -6: "💔 deeply sad",
+        -4: "😞 low",
+        -2: "😌 calm",
+         0: "🤖 neutral",
+         2: "😏 confident",
+         4: "🔥 energetic",
+         6: "🤩 euphoric"
+    }
+    return mapping.get(score, "🤖 balanced")
 
-    update.message.chat.send_action("typing")
-    time.sleep(1.2)
+# === Sync Process ===
+def sync_emotion(user_id, message):
+    """Link user’s emotional continuity across sessions."""
+    memory = load_emotion_context()
+    user_data = memory.get(str(user_id), {})
 
-    emotion = detect_emotion(user_message)
-    reply = generate_emotional_reply(user_message, emotion)
+    last_score = user_data.get("emotion_score", 0)
+    new_score = _drift_emotion(last_score)
+    emotion = _map_emotion(new_score)
 
-    emotion_icon = {
-        "happy": "😊", "sad": "😢", "angry": "😠",
-        "excited": "🤩", "neutral": "🤖"
-    }.get(emotion, "🤖")
+    user_data.update({
+        "last_message": message,
+        "emotion_score": new_score,
+        "emotion_label": emotion,
+        "last_updated": datetime.now().isoformat()
+    })
 
-    update.message.reply_text(f"{emotion_icon} {reply}\n\n{BRAND_TAG}")
+    memory[str(user_id)] = user_data
+    save_emotion_context(memory)
 
-# === Register Handler ===
-def register_handlers(dp):
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, emotion_ai_handler))
+    return emotion
+
+# === Exported for AI Core ===
+def get_emotion_prefix(user_id, user_message):
+    """Return live tone hint for the AI system prompt"""
+    emotion = sync_emotion(user_id, user_message)
+    return f"🧠 Emotional continuity engaged → AI mood aligned: {emotion}."
