@@ -82,7 +82,18 @@ def ai_auto_reply(update: Update, context: CallbackContext):
             reply = response.json()["choices"][0]["message"]["content"]
 
             # 💫 Add your custom brand signature here
-            reply += "\n\n🚀 Powered by WENBNB Neural Engine — AI Core Market Intelligence 24×7 ⚡"
+            import random
+
+            # 💫 Dynamic Brand Footer Rotation
+            brand_signatures = [
+                "🚀 Powered by WENBNB Neural Engine — AI Core Market Intelligence 24×7 ⚡",
+                "💫 Powered by WENBNB Neural Engine — Emotional Sync Mode v8.0.1 🧠",
+                "🤖 WENBNB AI Core — Blending Crypto Insight & Human Emotion 💎",
+                "🔥 WENBNB Neural Intelligence — Real-Time Crypto Mind & Emotion Engine 🧬",
+                "🌙 WENBNB Neural Engine — Smarter. Softer. Sentient. 💋"
+            ]
+
+            reply += f"\n\n{random.choice(brand_signatures)}"
 
             update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
 
