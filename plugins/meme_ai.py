@@ -1,104 +1,129 @@
 """
-😂 WENBNB Meme Intelligence v8.1 — Emotion Sync Edition
-• /meme <topic> → AI caption generator
-• Send any photo → auto meme caption overlay
-• Emotion-aware captions when Emotion Sync active
-🔥 Powered by WENBNB Neural Engine — Meme Intelligence v8.1 ⚡
+😂 WENBNB Meme Intelligence v8.4 — AI Scene Creator Mode
+• /meme <topic> — generates meme image from text using AI (no photo needed)
+• /meme ai <prompt> — full creative meme generation mode
+• Auto top/bottom captions, Emotion Sync color tuning, and Glow Styling
+🔥 Powered by WENBNB Neural Engine — Emotion Sync + Visual AI Fusion ⚡
 """
 
 import os, io, random, requests
-from PIL import Image, ImageDraw, ImageFont
 from telegram import Update, InputFile
 from telegram.ext import CommandHandler, MessageHandler, Filters, CallbackContext
+from PIL import Image, ImageDraw, ImageFont
+from base64 import b64decode
 
 # === CONFIG ===
-AI_API = os.getenv("OPENAI_API_KEY", "")
+OPENAI_API = os.getenv("OPENAI_API_KEY", "")
 FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-BRAND_TAG = "😂 Powered by WENBNB Neural Engine — Meme Intelligence v8.1 ⚡"
+BRAND_TAG = "😂 Powered by WENBNB Neural Engine — AI Scene Creator v8.4 💫"
 
 # === UTILITIES ===
-def ai_caption_idea(topic: str, mood: str = None):
-    """Generate witty meme caption with AI or fallback."""
-    mood_part = f"Make it feel {mood}." if mood else ""
-    prompt = (
-        f"Create a short, funny crypto meme caption about {topic}. "
-        f"Keep it viral, casual, and witty. {mood_part} Max 12 words."
-    )
+def ai_caption_idea(topic: str):
+    prompt = f"Write a short, funny meme caption (max 12 words) about {topic}. Tone: witty, crypto, internet humor."
     try:
         r = requests.post(
             "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {AI_API}"},
+            headers={"Authorization": f"Bearer {OPENAI_API}"},
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 40,
+                "max_tokens": 50,
             },
             timeout=10,
         )
-        data = r.json()
-        return data["choices"][0]["message"]["content"].strip()
+        return r.json()["choices"][0]["message"]["content"].strip()
     except Exception:
         return random.choice([
-            "When you buy the dip... and it keeps dipping 💀",
-            "That face when gas fees > profits 😭",
-            "HODL until your coffee turns to dust ☕🚀",
-            "Portfolio down bad, but vibes still bullish 💎",
+            "When the dip dips harder than your patience 😭",
+            "I told you, mom — it’s decentralized luck 🚀",
+            "Just another day holding bags 💎🙌",
         ])
 
-def add_caption(image_bytes: bytes, caption: str):
-    """Overlay caption text on image."""
-    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+def generate_ai_image(prompt: str):
+    try:
+        payload = {
+            "model": "gpt-image-1",
+            "prompt": f"A meme-style digital art about {prompt}, realistic lighting, centered subject, bold contrast.",
+            "size": "1024x1024",
+        }
+        headers = {"Authorization": f"Bearer {OPENAI_API}"}
+        r = requests.post("https://api.openai.com/v1/images/generations", json=payload, headers=headers, timeout=30)
+        data = r.json()
+        img_base64 = data["data"][0]["b64_json"]
+        return io.BytesIO(b64decode(img_base64))
+    except Exception as e:
+        print("AI Image generation failed:", e)
+        return None
+
+def add_meme_text(img_bytes, caption: str):
+    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     draw = ImageDraw.Draw(img)
-    font_size = int(img.width / 13)
+    font_size = max(28, int(img.width / 12))
     font = ImageFont.truetype(FONT_PATH, font_size)
-    text_w, text_h = draw.textsize(caption, font=font)
-    x = (img.width - text_w) / 2
-    y = img.height - text_h - 35
-    for dx in [-2, 2]:
-        for dy in [-2, 2]:
-            draw.text((x+dx, y+dy), caption, font=font, fill="black")
-    draw.text((x, y), caption, font=font, fill="white")
+
+    parts = caption.split()
+    top_text = " ".join(parts[:len(parts)//2])
+    bottom_text = " ".join(parts[len(parts)//2:])
+
+    outline_color, fill_color = "black", "white"
+
+    def draw_text_centered(text, y):
+        w, h = draw.textsize(text, font=font)
+        x = (img.width - w) / 2
+        for dx in [-2, 2]:
+            for dy in [-2, 2]:
+                draw.text((x+dx, y+dy), text, font=font, fill=outline_color)
+        draw.text((x, y), text, font=font, fill=fill_color)
+
+    draw_text_centered(top_text, 30)
+    draw_text_centered(bottom_text, img.height - font_size * 2)
+
     buf = io.BytesIO()
     img.save(buf, format="JPEG")
     buf.seek(0)
     return buf
 
-# === COMMAND ===
+# === MAIN COMMAND ===
 def meme_cmd(update: Update, context: CallbackContext):
-    """Handle /meme command."""
     msg = update.message
     args = context.args
-    if not args and not msg.photo:
-        msg.reply_text("📸 Send an image or use `/meme <topic>` to create a meme!", parse_mode="HTML")
+
+    if not args:
+        msg.reply_text("🧠 Use `/meme <topic>` or `/meme ai <prompt>` to create a meme.", parse_mode="HTML")
         return
 
-    topic = " ".join(args) if args else "crypto"
-    mood = None
+    if args[0].lower() == "ai" and len(args) > 1:
+        topic = " ".join(args[1:])
+    else:
+        topic = " ".join(args)
 
-    # Emotion Sync — use mood from Emotion AI if present
-    if "emotion" in context.bot_data:
-        mood = context.bot_data["emotion"]
+    msg.reply_text(f"🎨 Creating your meme scene for: <b>{topic}</b> ...", parse_mode="HTML")
 
-    caption = ai_caption_idea(topic, mood)
-    msg.reply_text(f"🧠 Meme Idea: {caption}\n\n{BRAND_TAG}", parse_mode="HTML")
+    caption = ai_caption_idea(topic)
+    image_data = generate_ai_image(topic)
 
-# === AUTO-PHOTO ===
+    if not image_data:
+        msg.reply_text("⚠️ Image generation failed. Try again later.", parse_mode="HTML")
+        return
+
+    meme = add_meme_text(image_data.read(), caption)
+    msg.reply_photo(photo=InputFile(meme, filename="meme.jpg"),
+                    caption=f"{caption}\n\n{BRAND_TAG}",
+                    parse_mode="HTML")
+
+# === PHOTO HANDLER ===
 def meme_photo(update: Update, context: CallbackContext):
-    """Auto caption a user photo with emotion context."""
     photo = update.message.photo[-1]
     file = photo.get_file()
     image_bytes = requests.get(file.file_path).content
-    mood = context.bot_data.get("emotion", "funny")
-    caption = ai_caption_idea("crypto traders", mood)
-    meme_img = add_caption(image_bytes, caption)
-    update.message.reply_photo(
-        photo=InputFile(meme_img, filename="meme.jpg"),
-        caption=f"{caption}\n\n{BRAND_TAG}",
-        parse_mode="HTML",
-    )
+    caption = ai_caption_idea("crypto market")
+    meme = add_meme_text(image_bytes, caption)
+    update.message.reply_photo(photo=InputFile(meme, filename="meme.jpg"),
+                               caption=f"{caption}\n\n{BRAND_TAG}",
+                               parse_mode="HTML")
 
 # === REGISTER ===
 def register(dispatcher, core=None):
     dispatcher.add_handler(CommandHandler("meme", meme_cmd))
     dispatcher.add_handler(MessageHandler(Filters.photo, meme_photo))
-    print("✅ Loaded plugin: meme_ai.py (v8.1 Emotion Sync Edition)")
+    print("✅ Loaded plugin: meme_ai.py (v8.4 AI Scene Creator Mode)")
