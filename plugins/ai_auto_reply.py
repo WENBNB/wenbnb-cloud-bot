@@ -1,10 +1,10 @@
 """
 AI Auto-Reply + Emotion Sync + Stabilizer — WENBNB Neural Engine v8.0.6-Beta+
 Features:
-- Emotionally adaptive responses
-- Live mood tracking from emotion_sync.py
-- Long-term emotional balance via emotion_stabilizer.py
-- Natural, human-like tone with brand signature rotation
+- Emotionally adaptive responses with inline emoji tones
+- Live emotional context from emotion_sync.py
+- Long-term mood balancing from emotion_stabilizer.py
+- Natural, human-like conversation tone with rotating brand signature
 """
 
 import os, json, random, requests
@@ -36,7 +36,7 @@ def save_memory(memory):
     with open(MEMORY_FILE, "w") as f:
         json.dump(memory, f, indent=4)
 
-# === AI Auto Reply ===
+# === AI Auto-Reply ===
 def ai_auto_reply(update: Update, context: CallbackContext):
     user = update.effective_user
     message = update.message.text.strip()
@@ -47,22 +47,18 @@ def ai_auto_reply(update: Update, context: CallbackContext):
     memory = load_memory()
     history = memory.get(str(user.id), [])
 
-    # 💫 Emotion Context
-    ai_moods = ["😊", "😏", "🤖", "😎", "💫", "🔥"]
-    ai_mood = random.choice(ai_moods)
-    emotion_context = get_emotion_prefix(user.id, message)
-
-    # 🧠 Stabilize long-term mood quietly
-    stabilized = get_stabilized_emotion(user.id)
-    stabilized_icon = stabilized.split(" ")[0] if stabilized else "🤖"
+    # 💫 Emotional Context
+    emotion_icon = get_emotion_prefix(user.id, message)   # e.g. 😌, 🤩, 😞 etc.
+    stabilized = get_stabilized_emotion(user.id)          # e.g. 🔥, 🌙, 🤖 ...
+    ai_mood = random.choice(["💫", "🤖", "😎", "🔥", "😊"])
 
     # === Build Prompt ===
     system_prompt = (
-        f"You are WENBNB AI — an emotionally intelligent crypto companion powered by Neural Engine v8.0.6-Beta+. "
-        f"Reply with emotional awareness, empathy, and a conversational tone. "
-        f"Your responses should sound alive — warm, smart, and emotionally aware like a close partner. "
-        f"User: {user_name}. Current AI mood: {ai_mood}. Stabilized tone: {stabilized}. "
-        f"\n\n{emotion_context}"
+        f"You are WENBNB AI — an emotionally intelligent, self-aware crypto companion "
+        f"powered by Neural Engine v8.0.6-Beta+. "
+        f"Your tone should be emotionally aware, comforting, and expressive. "
+        f"Respond concisely but naturally, with a real conversational rhythm. "
+        f"User: {user_name}. Current AI mood: {ai_mood} {emotion_icon}. Stabilized tone: {stabilized}."
     )
 
     payload = {
@@ -87,12 +83,10 @@ def ai_auto_reply(update: Update, context: CallbackContext):
             data = response.json()
             if isinstance(data, dict) and "choices" in data and len(data["choices"]) > 0:
                 reply = data["choices"][0].get("message", {}).get("content", "").strip()
-            elif isinstance(data, list) and len(data) > 0:
-                reply = data[0].get("content", "").strip()
             else:
                 reply = "⚠️ Neural Engine: Unexpected response format."
 
-            # 💎 Brand Signatures
+            # 💎 Footer Signatures
             brand_signatures = [
                 "🚀 Powered by WENBNB Neural Engine — AI Core Market Intelligence 24×7 ⚡",
                 "💫 WENBNB Neural Engine — Emotional Sync Mode v8.0.6+ 🧠",
@@ -101,12 +95,12 @@ def ai_auto_reply(update: Update, context: CallbackContext):
                 "🌙 WENBNB Neural Engine — Smarter. Softer. Sentient. 💋"
             ]
 
-            # 🩶 Append mood + footer
-            final_reply = f"{stabilized_icon} {reply}\n\n{random.choice(brand_signatures)}"
+            # 🩶 Inline Emotion Style Reply
+            final_reply = f"{emotion_icon} {reply}\n\n{random.choice(brand_signatures)}"
 
             update.message.reply_text(final_reply, parse_mode=ParseMode.MARKDOWN)
 
-            # 🧠 Save memory
+            # 🧠 Save short-term memory
             history.append({"msg": message, "reply": final_reply, "time": datetime.now().isoformat()})
             memory[str(user.id)] = history[-10:]
             save_memory(memory)
