@@ -1,10 +1,10 @@
 """
-WENBNB Plugin Manager v4.1 — Dynamic Neural Module Loader
-Auto-loads all plugin modules, tracks health, and provides admin control via /modules
+WENBNB Plugin Manager v4.2 — Dynamic Neural Module Loader (Neural Sync Ready)
+Auto-loads all plugin modules, clears import cache on reload, and provides /modules + /reload control.
 🚀 Powered by WENBNB Neural Engine — Modular Intelligence Framework 24×7
 """
 
-import importlib, os, traceback
+import importlib, os, sys, traceback
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
@@ -21,30 +21,38 @@ def load_all_plugins(dispatcher):
     for file in os.listdir(PLUGIN_DIR):
         if file.endswith(".py") and not file.startswith("__"):
             module_name = file[:-3]
-            try:
-                module = importlib.import_module(f"{PLUGIN_DIR}.{module_name}")
+            module_path = f"{PLUGIN_DIR}.{module_name}"
 
-                # 🔥 Dual compatibility — supports both register_handlers() and register()
-                if hasattr(module, "register_handlers"):
-                    module.register_handlers(dispatcher)
-                    ACTIVE_PLUGINS[module_name] = "✅ Active"
-                elif hasattr(module, "register"):
+            try:
+                # Force reimport (clear from cache before load)
+                if module_path in sys.modules:
+                    del sys.modules[module_path]
+
+                module = importlib.import_module(module_path)
+
+                # 🔥 Dual compatibility — supports register() or register_handlers()
+                if hasattr(module, "register"):
                     module.register(dispatcher)
+                    ACTIVE_PLUGINS[module_name] = "✅ Active"
+                elif hasattr(module, "register_handlers"):
+                    module.register_handlers(dispatcher)
                     ACTIVE_PLUGINS[module_name] = "✅ Active"
                 else:
                     ACTIVE_PLUGINS[module_name] = "⚠️ No Handler Found"
-                    print(f"[WENBNB Loader] {module_name}: No register() function detected.")
+                    print(f"[WENBNB Loader] {module_name}: No register() or register_handlers() found.")
 
                 loaded.append(module_name)
+                print(f"[WENBNB Loader] ✅ Loaded plugin: {module_name}")
 
             except Exception as e:
                 ACTIVE_PLUGINS[module_name] = f"❌ Error: {e}"
                 failed.append((module_name, str(e)))
                 print(f"[WENBNB Loader Error] {module_name}: {e}")
 
-    print(f"[WENBNB Neural Loader] ✅ Loaded Modules: {loaded}")
+    print(f"[WENBNB Neural Loader] ✅ Loaded Plugins: {loaded}")
     if failed:
-        print(f"[WENBNB Neural Loader] ❌ Failed Modules: {failed}")
+        print(f"[WENBNB Neural Loader] ❌ Failed: {failed}")
+
     return loaded, failed
 
 
@@ -73,7 +81,6 @@ def reload_plugins(update: Update, context: CallbackContext):
     text = "🔄 <b>Reloading all plugins...</b>\n"
     loaded, failed = load_all_plugins(dp)
     text += f"✅ Loaded: {len(loaded)} | ❌ Failed: {len(failed)}\n\n{BRAND_TAG}"
-
     update.message.reply_text(text, parse_mode="HTML")
 
 
