@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ============================================================
-#  WENBNB Neural Engine v5.0 — Full Hybrid Build (Final)
-#  - AI Neural Core + Web3 + Dashboard + Keep-Alive
+#  WENBNB Neural Engine v5.1 — Full Hybrid Build (Final)
+#  - AI Neural Core + Web3 + Meme Intelligence + Keep-Alive
 # ============================================================
 import os
 import sys
@@ -21,7 +21,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 # -------------------------
 # Logging / Branding Setup
 # -------------------------
-ENGINE_VERSION = "v5.0"
+ENGINE_VERSION = "v5.1"
 CORE_VERSION = "v3.0"
 BRAND_SIGNATURE = os.getenv("BRAND_SIGNATURE",
                             "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7")
@@ -36,7 +36,7 @@ logger = logging.getLogger("WENBNB")
 logger.info(f"WENBNB Neural Engine {ENGINE_VERSION} starting...")
 
 # -------------------------
-# Environment (required)
+# Environment Variables
 # -------------------------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -51,12 +51,11 @@ PORT = int(os.getenv("PORT", "10000"))
 DB_FILE = os.getenv("DB_FILE", "memory_data.db")
 
 if not TELEGRAM_TOKEN:
-    logger.error("TELEGRAM_TOKEN not set. Exiting.")
-    if __name__ == "__main__":
-        raise SystemExit("Missing TELEGRAM_TOKEN")
+    logger.error("❌ TELEGRAM_TOKEN not set. Exiting.")
+    raise SystemExit("Missing TELEGRAM_TOKEN")
 
 # -------------------------
-# Flask App (for /ping)
+# Flask App (for keep-alive ping)
 # -------------------------
 app = Flask(__name__)
 
@@ -70,7 +69,7 @@ def ping():
     })
 
 # -------------------------
-# Dashboard event helper
+# Dashboard Event Helper
 # -------------------------
 def send_dashboard_event(event_text: str, source: str = "bot"):
     if not DASHBOARD_URL:
@@ -88,10 +87,10 @@ def send_dashboard_event(event_text: str, source: str = "bot"):
         return False
 
 # -------------------------
-# Keep-alive (background)
+# Keep-Alive Background Thread
 # -------------------------
 def _keep_alive_loop(ping_url: str, interval: int = 600):
-    logger.info(f"Keep-alive thread started, pinging: {ping_url} every {interval}s")
+    logger.info(f"Keep-alive thread started, pinging {ping_url} every {interval}s")
     while True:
         try:
             r = requests.get(ping_url, timeout=8)
@@ -108,15 +107,15 @@ def start_keep_alive():
     t.start()
 
 # -------------------------
-# Plugin loader (modular)
+# Plugin Loader (Modular)
 # -------------------------
 def try_import(module_name: str):
     try:
         mod = __import__(module_name, fromlist=["*"])
-        logger.info(f"Loaded plugin: {module_name}")
+        logger.info(f"✅ Loaded plugin: {module_name}")
         return mod
     except Exception as e:
-        logger.warning(f"Plugin load failed ({module_name}): {e}")
+        logger.error(f"❌ Plugin load failed ({module_name}): {e}", exc_info=True)
         return None
 
 plugins = {
@@ -134,6 +133,10 @@ plugins = {
     "giveaway": try_import("plugins.giveaway_ai"),
     "emotion": try_import("plugins.emotion_ai")
 }
+
+# Quick sanity check
+if not plugins["meme"]:
+    logger.warning("⚠️ Meme plugin failed to load! Please check plugins/meme_ai.py path or syntax.")
 
 # -------------------------
 # Utilities
@@ -155,7 +158,7 @@ def is_admin(user_id: int) -> bool:
         return False
 
 # -------------------------
-# safe_call decorator
+# Safe Call Decorator
 # -------------------------
 def safe_call(fn):
     def wrapper(update: Update, context: CallbackContext):
@@ -201,18 +204,15 @@ def start_cmd(update: Update, context: CallbackContext):
 def help_cmd(update: Update, context: CallbackContext):
     text = (
         "🧠 <b>WENBNB Bot — Command Center</b>\n\n"
-        "💰 /price — Check WENBNB or other token price\n"
-        "🔍 /tokeninfo — Token analytics & supply\n"
-        "🎁 /airdropcheck <wallet> — Verify airdrop eligibility\n"
-        "😂 /meme — AI meme generator\n"
+        "💰 /price — Token price\n"
+        "🔍 /tokeninfo — Token analytics\n"
+        "🎁 /airdropcheck <wallet>\n"
+        "😂 /meme — Meme generator\n"
         "📈 /aianalyze — AI market insight\n"
-        "🎮 /giveaway_start | /giveaway_end — Admin only\n"
-        "⚙️ /system — System monitor\n"
-        "🧩 /about — About this bot\n\n"
+        "⚙️ /system — System monitor\n\n"
         f"{BRAND_SIGNATURE}"
     )
     update.message.reply_text(text, parse_mode=ParseMode.HTML)
-    send_dashboard_event("Help requested", source="bot")
 
 @safe_call
 def about_cmd(update: Update, context: CallbackContext):
@@ -222,14 +222,19 @@ def about_cmd(update: Update, context: CallbackContext):
         f"{BRAND_SIGNATURE}"
     )
     update.message.reply_text(text, parse_mode=ParseMode.HTML)
-    send_dashboard_event("About requested", source="bot")
 
-# plugin delegations
+# Plugin bridges
+@safe_call
+def meme_cmd(update: Update, context: CallbackContext):
+    if plugins["meme"] and hasattr(plugins["meme"], "meme_cmd"):
+        return plugins["meme"].meme_cmd(update, context)
+    update.message.reply_text("😂 Meme generator plugin missing or failed to load.")
+
 @safe_call
 def price_cmd(update: Update, context: CallbackContext):
     if plugins["price"] and hasattr(plugins["price"], "price_cmd"):
         return plugins["price"].price_cmd(update, context)
-    update.message.reply_text("💰 Price plugin missing or failed to load.")
+    update.message.reply_text("💰 Price plugin missing.")
 
 @safe_call
 def tokeninfo_cmd(update: Update, context: CallbackContext):
@@ -237,33 +242,17 @@ def tokeninfo_cmd(update: Update, context: CallbackContext):
         return plugins["tokeninfo"].tokeninfo_cmd(update, context)
     update.message.reply_text("🔍 Token info plugin missing.")
 
-# ✅ Smart Airdrop Plugin Bridge
 @safe_call
 def airdrop_cmd(update: Update, context: CallbackContext):
-    """
-    Smart Airdrop Plugin Bridge
-    • Supports both legacy airdrop_cmd() and new airdropcheck_cmd()
-    • Ensures graceful fallback instead of plugin missing
-    """
     plugin = plugins.get("airdrop")
-
     if not plugin:
-        update.message.reply_text("🎁 Airdrop plugin missing (not loaded).")
+        update.message.reply_text("🎁 Airdrop plugin missing.")
         return
-
     if hasattr(plugin, "airdropcheck_cmd"):
         return plugin.airdropcheck_cmd(update, context)
-
     if hasattr(plugin, "airdrop_cmd"):
         return plugin.airdrop_cmd(update, context)
-
     update.message.reply_text("🎁 Airdrop plugin found, but no valid handler defined.")
-
-@safe_call
-def meme_cmd(update: Update, context: CallbackContext):
-    if plugins["meme"] and hasattr(plugins["meme"], "meme_cmd"):
-        return plugins["meme"].meme_cmd(update, context)
-    update.message.reply_text("😂 Meme generator plugin missing.")
 
 @safe_call
 def aianalyze_cmd(update: Update, context: CallbackContext):
@@ -276,40 +265,6 @@ def system_cmd(update: Update, context: CallbackContext):
     if plugins["system"] and hasattr(plugins["system"], "system_status"):
         return plugins["system"].system_status(update, context)
     update.message.reply_text("⚙️ System monitor unavailable.")
-
-# Admin / giveaway
-@safe_call
-def giveaway_start_cmd(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    if not is_owner(user_id) and not is_admin(user_id):
-        update.message.reply_text("❌ Admin only.")
-        return
-    if plugins["admin"] and hasattr(plugins["admin"], "giveaway_start"):
-        send_dashboard_event("Giveaway started (admin)", source="admin")
-        return plugins["admin"].giveaway_start(update, context)
-    update.message.reply_text("❌ Giveaway admin plugin missing.")
-
-@safe_call
-def giveaway_end_cmd(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    if not is_owner(user_id) and not is_admin(user_id):
-        update.message.reply_text("❌ Admin only.")
-        return
-    if plugins["admin"] and hasattr(plugins["admin"], "giveaway_end"):
-        send_dashboard_event("Giveaway ended (admin)", source="admin")
-        return plugins["admin"].giveaway_end(update, context)
-    update.message.reply_text("❌ Giveaway admin plugin missing.")
-
-# AI-auto-reply for general text messages
-@safe_call
-def ai_auto_reply(update: Update, context: CallbackContext):
-    if plugins["ai"] and hasattr(plugins["ai"], "ai_auto_reply"):
-        return plugins["ai"].ai_auto_reply(update, context)
-    incoming = (update.message.text or "").strip()
-    if not incoming:
-        return
-    reply = f"💬 You said: {incoming}\n\n{BRAND_SIGNATURE}"
-    update.message.reply_text(reply)
 
 # -------------------------
 # Startup / Runner
@@ -327,20 +282,17 @@ def _start_bot():
     dp.add_handler(CommandHandler("airdropcheck", airdrop_cmd))
     dp.add_handler(CommandHandler("meme", meme_cmd))
     dp.add_handler(CommandHandler("aianalyze", aianalyze_cmd))
-    dp.add_handler(CommandHandler("giveaway_start", giveaway_start_cmd))
-    dp.add_handler(CommandHandler("giveaway_end", giveaway_end_cmd))
     dp.add_handler(CommandHandler("system", system_cmd))
-
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, 
+                                  plugins["ai"].ai_auto_reply if plugins["ai"] else None))
 
     updater.start_polling()
     logger.info("✅ Telegram bot polling started.")
-    logger.info("✅ WENBNB Airdrop Intelligence module ready (Hybrid Compatibility Mode)")
     send_dashboard_event("Bot polling started", source="system")
     updater.idle()
 
 # -------------------------
-# Entry point
+# Entry Point
 # -------------------------
 def main():
     logger.info("WENBNB Neural Engine main() starting...")
@@ -351,7 +303,7 @@ def main():
         try:
             _start_bot()
         except KeyboardInterrupt:
-            logger.info("KeyboardInterrupt caught - shutting down.")
+            logger.info("KeyboardInterrupt caught — shutting down.")
         except Exception as e:
             logger.exception(f"Fatal error in bot: {e}")
             raise
