@@ -1,9 +1,9 @@
 """
-🎁 WENBNB Airdrop Intelligence v4.1 — Dual-Mode + Airdrop Probability
-• Wallet Mode -> Deterministic eligibility simulation + better scoring
+🎁 WENBNB Airdrop Intelligence v4.2 — Smart Hybrid Mode
+• Auto-detects token vs wallet using DexScreener
+• Wallet Mode -> Deterministic eligibility simulation + Neural Score
 • Token Mode  -> DEX liquidity + 24h volume + simulated airdrop probability
-• Ready for future hooks (Debank/Zapper/etc.) via commented placeholders
-🔥 Powered by WENBNB Neural Engine — Airdrop Intelligence v4.1 💫
+🔥 Powered by WENBNB Neural Engine — Airdrop Intelligence v4.2 (Smart Hybrid Mode)
 """
 
 import os
@@ -13,15 +13,15 @@ import random
 import requests
 from telegram.ext import CommandHandler
 
-BRAND_TAG = "🎁 Powered by WENBNB Neural Engine — Airdrop Intelligence v4.1 💫"
+BRAND_TAG = "🎁 Powered by WENBNB Neural Engine — Airdrop Intelligence v4.2 (Smart Hybrid Mode) 💫"
 DEX_SEARCH = "https://api.dexscreener.io/latest/dex/search?q={q}"
 
 
 # -------------------------
 # Helpers
 # -------------------------
-def is_wallet_address(text: str) -> bool:
-    """True when text looks like an EVM wallet address (0x + 40 hex chars)"""
+def looks_like_evm_address(text: str) -> bool:
+    """Return True for canonical 0x + 40 hex characters"""
     return bool(re.match(r"^0x[a-fA-F0-9]{40}$", text.strip()))
 
 
@@ -30,31 +30,73 @@ def clamp(x, a=0.0, b=100.0):
 
 
 # -------------------------
-# Wallet Mode (improved deterministic simulation)
+# DexScreener probe
 # -------------------------
-def simulate_wallet_eligibility(wallet: str) -> str:
+def probe_dexscreener(query: str, timeout=8):
     """
-    Deterministic simulation seeded by the wallet string.
-    Produces repeatable results for the same wallet while
-    giving realistic variation across addresses.
+    Query DexScreener for the given query string (contract or symbol).
+    Returns parsed JSON or None on failure.
+    """
+    try:
+        r = requests.get(DEX_SEARCH.format(q=query), timeout=timeout)
+        data = r.json()
+        return data
+    except Exception:
+        return None
+
+
+def found_token_on_dex(query: str):
+    """
+    Returns first pair dict if DexScreener finds the token; otherwise None.
+    This function determines whether we treat input as token-mode.
+    """
+    data = probe_dexscreener(query)
+    if not data:
+        return None
+    pairs = data.get("pairs", [])
+    if not pairs:
+        return None
+    return pairs[0]  # return best match
+
+
+# -------------------------
+# Wallet Mode (deterministic scoring)
+# -------------------------
+def deterministic_wallet_score(wallet: str):
+    """
+    Deterministic scoring seeded from the wallet address.
+    Produces stable Neural Score 0..100 for the same wallet.
     """
     key = wallet.lower()
-    # deterministic seed based on wallet characters
-    seed = sum((ord(c) * (i + 1)) for i, c in enumerate(key[-10:])) % (2**32)
-    rnd = random.Random(seed)
+    # seed derived from wallet characters (stable)
+    seed_val = sum((ord(c) * (i + 1)) for i, c in enumerate(key[-12:])) & 0xFFFFFFFF
+    rnd = random.Random(seed_val)
 
-    # features derived from wallet hex (quick synthetic signals)
-    hex_tail = key[-8:]
-    numeric_tail = int(hex_tail, 16)
-    wallet_age_score = (numeric_tail % 100) / 100.0  # 0..0.99
-    activity_score = (sum(ord(c) for c in key[-6:]) % 100) / 100.0
-    protocol_count = 3 + (numeric_tail % 10)  # 3..12
+    # synthetic features
+    tail = key[-8:]
+    try:
+        tail_num = int(tail, 16)
+    except Exception:
+        tail_num = sum(ord(c) for c in tail)
 
-    # base chance influenced by synthetic features
-    base = (wallet_age_score * 0.35 + activity_score * 0.45 + (protocol_count / 12.0) * 0.20) * 100
-    # small random jitter but deterministic
-    jitter = rnd.uniform(-7, 7)
-    score = clamp(base + jitter, 0, 100)
+    # wallet "age" like feature from hex tail (0..1)
+    age_feat = (tail_num % 1000) / 1000.0
+    # activity feature from last chars
+    activity_feat = ((sum(ord(c) for c in key[-6:]) % 100) / 100.0)
+    # small deterministic jitter
+    jitter = (rnd.random() - 0.5) * 14  # -7 .. +7
+
+    base_score = (age_feat * 0.3 + activity_feat * 0.5 + 0.2) * 100
+    score = clamp(base_score + jitter, 0, 100)
+
+    # estimate protocol count (deterministic)
+    protocol_count = 2 + (tail_num % 11)  # 2..12
+
+    return int(score), protocol_count, rnd
+
+
+def simulate_wallet_eligibility(wallet: str) -> str:
+    score, protocol_count, rnd = deterministic_wallet_score(wallet)
 
     if score >= 80:
         eligibility = "✅ Eligible"
@@ -70,6 +112,7 @@ def simulate_wallet_eligibility(wallet: str) -> str:
         "High transaction count in Base / Arbitrum ecosystems.",
         "New wallet with moderate activity.",
         "Wallet connected to verified NFT or reward protocols.",
+        "Frequent small interactions — appears like bot aggregator.",
     ]
     insight = rnd.choice(insights)
 
@@ -77,7 +120,7 @@ def simulate_wallet_eligibility(wallet: str) -> str:
         f"💎 <b>Wallet Scan Report</b>\n"
         f"🔷 Wallet: <code>{wallet[:8]}...{wallet[-6:]}</code>\n"
         f"{eligibility} for upcoming airdrops.\n"
-        f"🧠 Neural Score: {int(score)}/100\n"
+        f"🧠 Neural Score: {score}/100\n"
         f"🔗 DeFi Protocols Detected (est.): {protocol_count}\n"
         f"✨ Neural Insight: {insight}\n\n"
         f"{BRAND_TAG}"
@@ -86,88 +129,55 @@ def simulate_wallet_eligibility(wallet: str) -> str:
 
 
 # -------------------------
-# Token Mode (DEX + Probability)
+# Token Mode (DEX + probability)
 # -------------------------
 def estimate_airdrop_probability(liquidity_usd: float, volume24_usd: float, pair_age_days: float = 0.0) -> float:
-    """
-    Heuristic probability model:
-      - higher liquidity and recent volume increase probability.
-      - newer pairs with spikey volume get slight boost.
-    Returns percent 0..100
-    """
-    # protect against zero
     L = max(1.0, float(liquidity_usd))
     V = max(1.0, float(volume24_usd))
-
-    # log-normalize
-    l_score = math.log10(L)  # e.g., liquidity $1k -> 3
+    l_score = math.log10(L)
     v_score = math.log10(V)
-
-    # normalize roughly into 0-100
-    # weights tuned: liquidity more important than pure 24h volume
     raw = (l_score * 0.6 + v_score * 0.35 + max(0, (30 - pair_age_days)) * 0.05)
-    # map raw (roughly 0..10+) to 0..100
     prob = clamp((raw / 6.0) * 100, 0, 100)
-
-    # small volatility boost if volume/lq ratio high
     ratio = V / L
     if ratio > 0.05:
         prob += clamp((ratio * 100) * 0.3, 0, 15)
-
     return clamp(prob, 0, 100)
 
 
-def token_airdrop_info(contract_address: str) -> str:
-    """
-    Query DexScreener for pair info and compute a simulated airdrop probability.
-    """
-    try:
-        r = requests.get(DEX_SEARCH.format(q=contract_address), timeout=10)
-        data = r.json()
-        pairs = data.get("pairs", [])
-        if not pairs:
-            return f"⚠️ <b>Token Ecosystem Snapshot</b>\nToken not found on DEX. Try a valid contract.\n\n{BRAND_TAG}"
+def token_airdrop_info_from_pair(pair: dict) -> str:
+    token_name = pair.get("baseToken", {}).get("name", "Unknown Token")
+    token_symbol = pair.get("baseToken", {}).get("symbol", "")
+    dex = pair.get("dexId", "DEX").capitalize()
+    liquidity = pair.get("liquidity", {}).get("usd", 0) or 0
+    volume24 = pair.get("volume", {}).get("h24", 0) or 0
+    price = pair.get("priceUsd", "N/A")
+    # Pair age not available reliably from DexScreener -> leave 0
+    pair_age_days = 0.0
 
-        # pick the best pair (first)
-        pair = pairs[0]
-        token_name = pair.get("baseToken", {}).get("name", "Unknown Token")
-        token_symbol = pair.get("baseToken", {}).get("symbol", "")
-        dex = pair.get("dexId", "DEX").capitalize()
-        liquidity = pair.get("liquidity", {}).get("usd", 0) or 0
-        volume24 = pair.get("volume", {}).get("h24", 0) or 0
-        price = pair.get("priceUsd", "N/A")
-        # no reliable pair age from dexscreener api; leave as 0 for now
-        pair_age_days = 0.0
+    prob = estimate_airdrop_probability(liquidity, volume24, pair_age_days)
 
-        # simulated probability
-        prob = estimate_airdrop_probability(liquidity, volume24, pair_age_days)
+    if prob > 75:
+        mood = "🔥 High likelihood — active dev / community signals."
+    elif prob > 45:
+        mood = "⚡ Moderate likelihood — keep monitoring."
+    else:
+        mood = "🌙 Low likelihood — token appears low-activity."
 
-        # human-friendly mood
-        if prob > 75:
-            mood = "🔥 High likelihood — active dev / community signals."
-        elif prob > 45:
-            mood = "⚡ Moderate likelihood — keep monitoring."
-        else:
-            mood = "🌙 Low likelihood — token appears low-activity."
-
-        result = (
-            f"💠 <b>Token Ecosystem Snapshot</b>\n"
-            f"🔷 {token_name} ({token_symbol}) — <i>{dex}</i>\n"
-            f"💰 Price: ${price}\n"
-            f"💧 Liquidity: ${liquidity:,.2f}\n"
-            f"📊 24h Volume: ${volume24:,.2f}\n"
-            f"🎯 Airdrop Probability (sim): <b>{prob:.0f}%</b>\n"
-            f"🧠 Neural Insight: {mood}\n\n"
-            f"{BRAND_TAG}"
-        )
-        return result
-
-    except Exception as e:
-        return f"⚠️ Error fetching token data: {e}\n\n{BRAND_TAG}"
+    result = (
+        f"💠 <b>Token Airdrop Potential</b>\n"
+        f"🔷 {token_name} ({token_symbol}) — <i>{dex}</i>\n"
+        f"💰 Price: ${price}\n"
+        f"💧 Liquidity: ${liquidity:,.2f}\n"
+        f"📊 24h Volume: ${volume24:,.2f}\n"
+        f"🎯 Airdrop Probability (sim): <b>{prob:.0f}%</b>\n"
+        f"🧠 Neural Insight: {mood}\n\n"
+        f"{BRAND_TAG}"
+    )
+    return result
 
 
 # -------------------------
-# Command handler
+# Command handler (smart detection)
 # -------------------------
 def airdrop_cmd(update, context):
     try:
@@ -185,10 +195,34 @@ def airdrop_cmd(update, context):
             return
 
         query = args[0].strip()
-        if is_wallet_address(query):
-            reply = simulate_wallet_eligibility(query)
+
+        # Primary decision:
+        # 1) If query looks like an EVM address, probe DexScreener.
+        # 2) If DexScreener finds a pair, act as token mode.
+        # 3) Otherwise, act as wallet mode.
+        pair = None
+        if looks_like_evm_address(query):
+            pair = found_token_on_dex(query)
+
+        # If not an EVM address, still probe DexScreener (symbol/name)
+        if pair is None:
+            pair = found_token_on_dex(query)
+
+        if pair:
+            reply = token_airdrop_info_from_pair(pair)
         else:
-            reply = token_airdrop_info(query)
+            # treat as wallet (even if it isn't 0x-formatted — still works)
+            # if user input isn't a 0x wallet, show guidance
+            if not looks_like_evm_address(query):
+                # user likely typed a symbol or text which Dex didn't find
+                update.message.reply_text(
+                    "⚠️ Could not detect a token on DEX and input is not a valid wallet address.\n"
+                    "If you intended a wallet, provide a full 0x address. If you meant a token, try the contract address.",
+                    parse_mode="HTML"
+                )
+                return
+
+            reply = simulate_wallet_eligibility(query)
 
         update.message.reply_text(reply, parse_mode="HTML", disable_web_page_preview=True)
 
@@ -197,8 +231,8 @@ def airdrop_cmd(update, context):
 
 
 # -------------------------
-# Plugin register
+# Register plugin
 # -------------------------
 def register(dispatcher):
     dispatcher.add_handler(CommandHandler("airdropcheck", airdrop_cmd))
-    print("🎁 Loaded plugin: airdrop_check.py (Dual-Mode Airdrop Intelligence v4.1)")
+    print("🎁 Loaded plugin: airdrop_check.py (Smart Hybrid v4.2)")
