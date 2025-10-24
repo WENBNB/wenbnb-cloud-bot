@@ -80,7 +80,13 @@ def ai_auto_reply(update: Update, context: CallbackContext):
 
         if response.status_code == 200:
             reply = response.json()["choices"][0]["message"]["content"]
+
+            # 💫 Add your custom brand signature here
+            reply += "\n\n🚀 Powered by WENBNB Neural Engine — AI Core Market Intelligence 24×7 ⚡"
+
             update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
+
+            # 🧠 Save chat history
             history.append({"msg": message, "reply": reply, "time": datetime.now().isoformat()})
             memory[str(user.id)] = history[-10:]
             save_memory(memory)
