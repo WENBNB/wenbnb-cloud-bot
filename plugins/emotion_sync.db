@@ -1,14 +1,16 @@
 """
-Emotion Sync Engine v8.0.7+ — WENBNB Neural Continuity Core
-Now featuring:
-- Multi-emoji emotion clusters for expressive tone
-- Subtle drift for emotional realism
+Emotion Sync Engine v8.0.7-Stable — WENBNB Neural Continuity Core
+──────────────────────────────────────────────────────────────────
+Purpose:
+- Tracks short-term emotional drift per user
+- Returns expressive emoji clusters
+- Writes to its own local store: emotion_sync.db
 """
 
 import json, os, random
 from datetime import datetime
 
-MEMORY_FILE = "memory_data.db"
+MEMORY_FILE = "emotion_sync.db"
 
 # === File I/O ===
 def load_emotion_context():
@@ -18,21 +20,20 @@ def load_emotion_context():
     try:
         with open(MEMORY_FILE, "r") as f:
             return json.load(f)
-    except:
+    except Exception:
         return {}
 
 def save_emotion_context(data):
     try:
         with open(MEMORY_FILE, "w") as f:
             json.dump(data, f, indent=4)
-    except:
+    except Exception:
         pass
 
 # === Emotion Drift ===
 def _drift_emotion(score):
     drift = random.choice([-1, 0, 1])
-    new_score = max(min(score + drift, 6), -6)
-    return new_score
+    return max(min(score + drift, 6), -6)
 
 # === Emotion Cluster Mapping ===
 def _map_emotion(score):
@@ -62,6 +63,7 @@ def sync_emotion(user_id, message):
         "last_emojis": emojis,
         "last_updated": datetime.now().isoformat()
     })
+
     memory[str(user_id)] = user_data
     save_emotion_context(memory)
     return emojis
@@ -69,5 +71,7 @@ def sync_emotion(user_id, message):
 # === AI Core Hook ===
 def get_emotion_prefix(user_id, user_message):
     """Inline emoji emotion enhancer"""
-    emojis = sync_emotion(user_id, user_message)
-    return f"{emojis}"
+    try:
+        return sync_emotion(user_id, user_message)
+    except Exception:
+        return "🤖"
