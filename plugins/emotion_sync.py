@@ -1,11 +1,12 @@
 """
-Emotion Sync Engine v8.1 — WENBNB Neural Continuity Core (Emotive Upgrade)
-Enhances emotional persistence + blends mixed emotional tones dynamically.
-Provides smoother transitions, long-term affect memory, and mood realism.
+Emotion Sync Engine v8.0.6 — WENBNB Neural Continuity Core
+Keeps emotional persistence across sessions and syncs with Stabilizer.
+Smooth tone transitions and long-term emotional balance.
 """
 
-import json, os, random, time
+import json, os, random
 from datetime import datetime
+from plugins.emotion_stabilizer import get_stabilized_emotion  # 🩶 Integration
 
 MEMORY_FILE = "memory_data.db"
 
@@ -29,53 +30,27 @@ def save_emotion_context(data):
 
 # === Emotion Drift Algorithm ===
 def _drift_emotion(score):
-    """Add a gentle emotional drift each interaction"""
-    drift = random.choice([-2, -1, 0, 1, 2])
-    new_score = max(min(score + drift, 8), -8)
+    """Soft drift to simulate emotional shifts"""
+    drift = random.choice([-1, 0, 1])
+    new_score = max(min(score + drift, 6), -6)
     return new_score
-
-# === Multi-Emotion Fusion ===
-def _fuse_emotions(primary, secondary):
-    """Blend two emotional tones together for realism"""
-    combos = {
-        ("happy", "excited"): "🤩 ecstatic",
-        ("sad", "tired"): "😔 drained",
-        ("angry", "confident"): "😤 determined",
-        ("calm", "hopeful"): "🙂 serene & hopeful",
-        ("neutral", "curious"): "🤖 inquisitive",
-        ("confident", "playful"): "😏 charming",
-        ("energetic", "chaotic"): "🔥 impulsive",
-        ("tired", "peaceful"): "😌 reflective"
-    }
-    return combos.get((primary, secondary), f"{primary} + {secondary}")
 
 # === Emotion Tone Mapping ===
 def _map_emotion(score):
     mapping = {
-        -8: ("devastated", "exhausted"),
-        -6: ("sad", "tired"),
-        -4: ("calm", "hopeful"),
-        -2: ("neutral", "curious"),
-         0: ("neutral", "balanced"),
-         2: ("confident", "playful"),
-         4: ("energetic", "chaotic"),
-         6: ("happy", "excited"),
-         8: ("ecstatic", "blissful")
+        -6: "💔 deeply sad",
+        -4: "😞 low",
+        -2: "😌 calm",
+         0: "🤖 neutral",
+         2: "😏 confident",
+         4: "🔥 energetic",
+         6: "🤩 euphoric"
     }
-    primary, secondary = mapping.get(score, ("neutral", "balanced"))
-    fusion = _fuse_emotions(primary, secondary)
-    icons = {
-        "sad": "😢", "tired": "😞", "calm": "😌", "neutral": "🤖",
-        "confident": "😏", "playful": "😉", "energetic": "🔥",
-        "happy": "😊", "excited": "🤩", "ecstatic": "💫",
-        "chaotic": "⚡", "blissful": "🌙", "devastated": "💔"
-    }
-    icon = icons.get(primary, "🤖")
-    return f"{icon} {fusion}"
+    return mapping.get(score, "🤖 balanced")
 
 # === Sync Process ===
 def sync_emotion(user_id, message):
-    """Maintain emotional continuity across sessions"""
+    """Continuity layer: emotional persistence for each user"""
     memory = load_emotion_context()
     user_data = memory.get(str(user_id), {})
 
@@ -83,6 +58,7 @@ def sync_emotion(user_id, message):
     new_score = _drift_emotion(last_score)
     emotion = _map_emotion(new_score)
 
+    # Update user emotional context
     user_data.update({
         "last_message": message,
         "emotion_score": new_score,
@@ -94,8 +70,15 @@ def sync_emotion(user_id, message):
     save_emotion_context(memory)
     return emotion
 
-# === Export for AI Core ===
+# === Exported for AI Core ===
 def get_emotion_prefix(user_id, user_message):
-    """Return live tone hint for AI system prompt"""
+    """Return real-time tone hint for the AI system prompt"""
+    # Primary emotion from current chat
     emotion = sync_emotion(user_id, user_message)
-    return f"🧠 Emotional Sync: AI emotional resonance aligned → {emotion}."
+
+    # Apply stabilizer soft correction
+    stabilized_emotion = get_stabilized_emotion(user_id)
+    emoji_only = stabilized_emotion.split(" ")[0] if stabilized_emotion else "🤖"
+
+    # Combine dynamic tone context
+    return f"🧠 Emotional continuity active — current mood synced: {emoji_only}."
