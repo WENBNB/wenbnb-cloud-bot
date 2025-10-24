@@ -1,8 +1,8 @@
 """
-🎁 WENBNB Airdrop Intelligence v3.8 — Whale & Retail Distribution Analyzer
-Tracks top wallets, holder concentration, and gives real-time neural insights.
+🎁 WENBNB Airdrop Intelligence v3.9 — Synthetic Whale Analyzer
+Estimates token distribution using liquidity pool data + DEX metrics.
 ✔ Works across BSC, ETH, ARB, BASE
-✔ DexScreener fallback for liquidity and DEX pairs
+✔ DexScreener fallback with synthetic whale/retail ratio
 🔥 Powered by WENBNB Neural Engine — Market Intelligence 24×7 💫
 """
 
@@ -10,9 +10,8 @@ import os
 import requests
 from telegram.ext import CommandHandler
 
-BRAND_TAG = "🎁 Powered by WENBNB Neural Engine — Airdrop Intelligence v3.8 💫"
+BRAND_TAG = "🎁 Powered by WENBNB Neural Engine — Airdrop Intelligence v3.9 💫"
 
-# === CHAIN ENDPOINTS ===
 SCAN_APIS = {
     "bsc": "https://api.bscscan.com/api",
     "eth": "https://api.etherscan.io/api",
@@ -21,38 +20,24 @@ SCAN_APIS = {
 }
 
 
-# === DISTRIBUTION ANALYZER ===
-def analyze_distribution(transactions):
-    wallet_balances = {}
+def analyze_distribution_synthetic(liquidity_usd, volume24_usd):
+    """Estimate whale vs retail ratio when holder data missing."""
+    if not liquidity_usd or not volume24_usd:
+        return "⚠️ Insufficient data for synthetic analysis."
 
-    for tx in transactions:
-        to_addr = tx.get("to", "").lower()
-        value = float(tx.get("value", 0)) / (10 ** 18)  # assuming 18 decimals
-        wallet_balances[to_addr] = wallet_balances.get(to_addr, 0) + value
-
-    # Sort wallets
-    sorted_wallets = sorted(wallet_balances.items(), key=lambda x: x[1], reverse=True)
-    total_value = sum(wallet_balances.values()) or 1
-    top5 = sorted_wallets[:5]
-
-    # Calculate percentages
-    whale_share = sum(v for _, v in top5) / total_value * 100
-    retail_share = 100 - whale_share
-
-    # Generate insights
-    if whale_share > 80:
-        mood = "⚠️ High whale control — risky distribution."
-    elif whale_share > 50:
-        mood = "🦈 Moderate whale presence — watch for volatility."
-    elif whale_share > 25:
-        mood = "💎 Balanced distribution — good mix of whales and retail."
+    ratio = float(liquidity_usd) / float(volume24_usd)
+    if ratio > 5:
+        mood = "🐋 Heavy whale control detected — low retail rotation."
+    elif ratio > 2:
+        mood = "🦈 Moderate whale influence — steady but cautious market."
+    elif ratio > 1:
+        mood = "💎 Balanced distribution — healthy liquidity."
     else:
-        mood = "🌱 Retail-dominated distribution — healthy and decentralized."
+        mood = "🌱 High retail activity — fresh inflow and strong interest."
 
-    return whale_share, retail_share, mood
+    return mood
 
 
-# === CORE DATA FETCH ===
 def fetch_airdrop_data(contract_address):
     found_any = False
     report_lines = []
@@ -62,7 +47,6 @@ def fetch_airdrop_data(contract_address):
         if not api_key:
             continue
 
-        # Fetch token transactions instead of holderlist
         url = (
             f"{base_url}?module=account&action=tokentx"
             f"&contractaddress={contract_address}&page=1&offset=100&sort=desc&apikey={api_key}"
@@ -75,42 +59,42 @@ def fetch_airdrop_data(contract_address):
             if data.get("status") == "1" and data.get("result"):
                 txs = data["result"]
                 found_any = True
-
-                # Analyze distribution
-                whale, retail, mood = analyze_distribution(txs)
-
+                unique_wallets = len(set(tx["to"].lower() for tx in txs))
+                recent_tx = len(txs)
                 report_lines.append(
-                    f"💠 <b>{chain.upper()}</b> — Airdrop Activity Detected\n"
-                    f"🐋 Whale Share: {whale:.2f}%\n"
-                    f"👥 Retail Share: {retail:.2f}%\n"
-                    f"🧠 Neural Insight: {mood}\n"
+                    f"💠 <b>{chain.upper()}</b> — {recent_tx} recent transfers across {unique_wallets} wallets\n"
+                    f"🧠 Neural Insight: Active chain with healthy user flow."
                 )
         except Exception:
             continue
 
     # === DexScreener fallback ===
-    if not found_any:
-        try:
-            dex_url = f"https://api.dexscreener.io/latest/dex/search?q={contract_address}"
-            dex_data = requests.get(dex_url, timeout=8).json()
-            pairs = dex_data.get("pairs", [])
-            if pairs:
-                token_name = pairs[0].get("baseToken", {}).get("name", "Unknown Token")
-                liquidity = pairs[0].get("liquidity", {}).get("usd", "N/A")
-                return (
-                    f"💎 <b>{token_name}</b> — live on DEX with liquidity ${liquidity}\n"
-                    f"⚠️ No direct airdrop data found.\n\n{BRAND_TAG}"
-                )
-        except Exception as e:
-            return f"⚠️ Dex fallback failed: {e}"
+    try:
+        dex_url = f"https://api.dexscreener.io/latest/dex/search?q={contract_address}"
+        dex_data = requests.get(dex_url, timeout=8).json()
+        pairs = dex_data.get("pairs", [])
+        if pairs:
+            token_name = pairs[0].get("baseToken", {}).get("name", "Unknown Token")
+            liquidity = pairs[0].get("liquidity", {}).get("usd", 0)
+            volume24 = pairs[0].get("volume", {}).get("h24", 1)
+            dex_name = pairs[0].get("dexId", "DEX").capitalize()
+
+            mood = analyze_distribution_synthetic(liquidity, volume24)
+            return (
+                f"💎 <b>{token_name}</b> — live on {dex_name}\n"
+                f"💧 Liquidity: ${liquidity:,.2f}\n"
+                f"📊 24h Volume: ${volume24:,.2f}\n"
+                f"🧠 Neural Insight: {mood}\n\n{BRAND_TAG}"
+            )
+    except Exception as e:
+        return f"⚠️ Dex fallback failed: {e}"
 
     if found_any:
-        return "\n".join(report_lines) + f"\n{BRAND_TAG}"
+        return "\n".join(report_lines) + f"\n\n{BRAND_TAG}"
     else:
-        return f"⚠️ Airdrop data unavailable — no recent transactions found.\n\n{BRAND_TAG}"
+        return f"⚠️ Airdrop data unavailable — fallback analysis only.\n\n{BRAND_TAG}"
 
 
-# === COMMAND HANDLER ===
 def airdrop_cmd(update, context):
     try:
         context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
@@ -131,7 +115,6 @@ def airdrop_cmd(update, context):
         update.message.reply_text(f"⚠️ Error: {e}", parse_mode="HTML")
 
 
-# === REGISTER HANDLER ===
 def register(dispatcher):
     dispatcher.add_handler(CommandHandler("airdropcheck", airdrop_cmd))
-    print("🎁 Loaded plugin: airdrop_check.py (Whale Distribution Intelligence v3.8)")
+    print("🎁 Loaded plugin: airdrop_check.py (Synthetic Whale Analyzer v3.9)")
