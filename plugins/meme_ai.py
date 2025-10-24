@@ -1,7 +1,7 @@
 """
 AI Meme Generator — WENBNB Bot Plugin
-Version: 8.4.3 (Stable+FontSafe)
-Mode: Hybrid (Command + Passive Caption AI)
+Version: 8.5 (Visual Mode)
+Mode: Hybrid (Command + Image AI Caption)
 """
 
 import os, requests, random, io, re
@@ -11,14 +11,15 @@ from telegram.ext import CommandHandler, MessageHandler, Filters, CallbackContex
 
 # === CONFIG ===
 AI_API = os.getenv("OPENAI_API_KEY", "")
-BRAND_FOOTER = "😂 Powered by WENBNB Neural Engine — Meme Intelligence v8.1 ⚡"
+BRAND_FOOTER = "😂 Powered by WENBNB Neural Engine — Meme Intelligence v8.5 ⚡"
 
 # --- Font Configuration ---
+from PIL import ImageFont
 try:
     FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     ImageFont.truetype(FONT_PATH, 20)
 except OSError:
-    FONT_PATH = None  # fallback to default font if system font missing
+    FONT_PATH = None  # fallback to default font if missing
 
 
 # === UTILITIES ===
@@ -32,7 +33,7 @@ def ai_caption_idea(topic: str):
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 50,
+                "max_tokens": 60,
             },
             timeout=25,
         )
@@ -49,6 +50,25 @@ def ai_caption_idea(topic: str):
             "Trading vibes: win some, learn some 💸",
             "When BNB pumps and your ex texts back 👀",
         ])
+
+
+def ai_generate_image(prompt: str):
+    """Generate meme image using DALL·E via OpenAI API"""
+    try:
+        r = requests.post(
+            "https://api.openai.com/v1/images/generations",
+            headers={"Authorization": f"Bearer {AI_API}", "Content-Type": "application/json"},
+            json={"model": "gpt-image-1", "prompt": prompt, "size": "512x512"},
+            timeout=40,
+        )
+        data = r.json()
+        if "data" in data and len(data["data"]) > 0:
+            image_url = data["data"][0]["url"]
+            image_bytes = requests.get(image_url).content
+            return image_bytes
+    except Exception as e:
+        print("Image generation error:", e)
+    return None
 
 
 def add_caption(image_bytes: bytes, caption: str):
@@ -91,14 +111,25 @@ def add_caption(image_bytes: bytes, caption: str):
 
 # === COMMAND HANDLER ===
 def meme_cmd(update: Update, context: CallbackContext):
-    """ /meme command — AI caption + meme creation """
+    """ /meme command — AI caption + image generation """
     msg = update.message
     try:
         topic = " ".join(context.args) if context.args else "crypto"
         msg.reply_text(f"🎨 Creating your meme scene for: {topic} ...")
 
         caption = ai_caption_idea(topic)
-        msg.reply_text(f"🧠 Meme Idea: {caption}\n\n{BRAND_FOOTER}")
+
+        # 🧠 Generate image via DALL·E
+        image_bytes = ai_generate_image(f"{topic}, crypto, meme style, funny")
+
+        if image_bytes:
+            meme_image = add_caption(image_bytes, caption)
+            msg.reply_photo(
+                photo=InputFile(meme_image, filename="meme.jpg"),
+                caption=f"🧠 Meme Idea: {caption}\n\n{BRAND_FOOTER}",
+            )
+        else:
+            msg.reply_text(f"🧠 Meme Idea: {caption}\n\n{BRAND_FOOTER}")
 
     except Exception as e:
         msg.reply_text(f"⚠️ Internal meme error: {e}")
