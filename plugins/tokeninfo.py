@@ -2,10 +2,12 @@ from telegram.ext import CommandHandler
 from telegram import Update
 import requests, html, os
 
-BRAND_FOOTER = "🚀 Powered by <b>WENBNB Neural Engine</b> — AI Core Intelligence 24×7 ⚡"
+# === Branding ===
+BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — AI Core Intelligence 24×7 ⚡"
 DEXSCREENER_SEARCH = "https://api.dexscreener.io/latest/dex/search?q={q}"
 COINGECKO_SIMPLE = "https://api.coingecko.com/api/v3/simple/price"
 
+# === Utils ===
 def short_float(x):
     try:
         v = float(x)
@@ -16,19 +18,21 @@ def short_float(x):
     except Exception:
         return str(x)
 
+# === /tokeninfo Command ===
 def tokeninfo_cmd(update: Update, context):
     chat_id = update.effective_chat.id
     args = context.args
+    context.bot.send_chat_action(chat_id=chat_id, action="typing")
 
+    # 🧠 Default fallback: if no token specified, use WENBNB
     if not args:
+        query = "wenbnb"
         update.message.reply_text(
-            "🧠 Usage: /tokeninfo <symbol|contract>\nExample: /tokeninfo wenbnb",
+            "💡 No token specified — showing default token <b>WENBNB</b> data.",
             parse_mode="HTML"
         )
-        return
-
-    query = args[0].strip()
-    context.bot.send_chat_action(chat_id=chat_id, action="typing")
+    else:
+        query = args[0].strip()
 
     try:
         # --- Detect if it's a contract address ---
@@ -54,7 +58,7 @@ def tokeninfo_cmd(update: Update, context):
 
         if not result:
             update.message.reply_text(
-                f"❌ Could not find token on DexScreener for '{html.escape(query)}'.\n"
+                f"❌ Could not find token on DexScreener for '<b>{html.escape(query)}</b>'.\n"
                 f"Try using the contract address or another symbol.",
                 parse_mode="HTML"
             )
@@ -98,10 +102,10 @@ def tokeninfo_cmd(update: Update, context):
         if pair_url:
             lines.append(f"🌐 <a href=\"{pair_url}\">View Pair on DexScreener</a>")
 
-        # Add AI-style close
+        # 💬 Insight block
         lines.append("")
         lines.append(
-            f"🤖 Smart insight: {token_symbol or token_name} is trending on <b>{dex}</b> — stay alert, {update.effective_user.first_name}! 🚀"
+            f"🧠 Smart Insight: <b>{token_symbol or token_name}</b> is trending on <b>{dex}</b> — stay alert, {update.effective_user.first_name}! 🚀"
         )
         lines.append("")
         lines.append(BRAND_FOOTER)
@@ -111,8 +115,12 @@ def tokeninfo_cmd(update: Update, context):
 
     except Exception as e:
         print("Error in tokeninfo_cmd:", e)
-        update.message.reply_text(f"⚠️ Internal error. Please try again later.", parse_mode="HTML")
+        update.message.reply_text(
+            "⚙️ Neural Engine temporarily syncing... please retry soon.",
+            parse_mode="HTML"
+        )
 
+# === Register Command ===
 def register(dispatcher, core=None):
     dispatcher.add_handler(CommandHandler("tokeninfo", tokeninfo_cmd))
-    print("✅ Loaded plugin: plugins.tokeninfo")
+    print("✅ Loaded plugin: plugins.tokeninfo (v8.0.6-Stable+)")
