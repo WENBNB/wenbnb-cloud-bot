@@ -1,9 +1,9 @@
 from telegram.ext import CommandHandler
 from telegram import Update
-import requests, html, os
+import requests, html, os, math
 
 # === Branding ===
-BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — AI Core Intelligence 24×7 ⚡"
+BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — Neural Token Intelligence v8.1 ⚡"
 DEXSCREENER_SEARCH = "https://api.dexscreener.io/latest/dex/search?q={q}"
 COINGECKO_SIMPLE = "https://api.coingecko.com/api/v3/simple/price"
 
@@ -17,6 +17,29 @@ def short_float(x):
             return f"{v:.8f}"
     except Exception:
         return str(x)
+
+def detect_chain(dex_id: str) -> str:
+    dex_id = (dex_id or "").lower()
+    if "pancake" in dex_id: return "BSC"
+    if "uniswap" in dex_id: return "Ethereum"
+    if "base" in dex_id: return "Base"
+    if "arbitrum" in dex_id: return "Arbitrum"
+    if "solana" in dex_id: return "Solana"
+    return "Unknown"
+
+def neural_token_rank(liquidity_usd: float, volume24_usd: float) -> str:
+    """AI-like token score based on liquidity & volume."""
+    try:
+        L = max(1.0, float(liquidity_usd))
+        V = max(1.0, float(volume24_usd))
+        score = (math.log10(L) * 0.6 + math.log10(V) * 0.4) * 10
+        if score >= 85: return "A+"
+        elif score >= 70: return "A"
+        elif score >= 55: return "B"
+        elif score >= 40: return "C"
+        else: return "D"
+    except Exception:
+        return "N/A"
 
 # === /tokeninfo Command ===
 def tokeninfo_cmd(update: Update, context):
@@ -36,7 +59,6 @@ def tokeninfo_cmd(update: Update, context):
 
     try:
         # --- Detect if it's a contract address ---
-        contract = query if query.startswith("0x") else None
         r = requests.get(DEXSCREENER_SEARCH.format(q=query), timeout=10)
         data = r.json()
         pairs = data.get("pairs", [])
@@ -44,13 +66,12 @@ def tokeninfo_cmd(update: Update, context):
 
         if pairs:
             qlow = query.lower()
-            # Try to find best match
             for p in pairs:
                 base = p.get("baseToken", {})
                 sym = (base.get("symbol") or "").lower()
                 name = (base.get("name") or "").lower()
-                addr = base.get("address") or ""
-                if qlow in [sym, name, addr.lower()]:
+                addr = (base.get("address") or "").lower()
+                if qlow in [sym, name, addr]:
                     result = p
                     break
             if not result:
@@ -68,13 +89,17 @@ def tokeninfo_cmd(update: Update, context):
         base = result.get("baseToken", {})
         pair_name = result.get("pairName", "N/A")
         price_usd = result.get("priceUsd", "N/A")
-        dex = result.get("dexId", "Dex").capitalize()
-        liquidity = result.get("liquidity", {}).get("usd", "N/A")
-        volume24 = result.get("volume", {}).get("h24", "N/A")
+        dex = result.get("dexId", "DEX").capitalize()
+        liquidity = result.get("liquidity", {}).get("usd", 0)
+        volume24 = result.get("volume", {}).get("h24", 0)
         pair_url = result.get("url") or ""
         token_name = base.get("name") or base.get("symbol") or "Unknown"
         token_symbol = base.get("symbol") or ""
         token_address = base.get("address") or ""
+
+        # --- Detect chain & Neural Rank ---
+        chain = detect_chain(dex)
+        rank = neural_token_rank(liquidity, volume24)
 
         # --- Try CoinGecko fallback ---
         cg_price = None
@@ -88,25 +113,24 @@ def tokeninfo_cmd(update: Update, context):
             pass
 
         # --- Build formatted message ---
-        lines = []
-        lines.append(f"💎 <b>{html.escape(token_name)} ({html.escape(token_symbol)})</b>")
+        lines = [
+            f"💎 <b>{html.escape(token_name)} ({html.escape(token_symbol)})</b>",
+            f"🌐 <b>Chain:</b> {chain}",
+            f"🏦 <b>DEX:</b> {dex}",
+        ]
         if token_address:
             lines.append(f"🔗 <b>Contract:</b> <code>{token_address}</code>")
-        lines.append(f"💰 <b>Price:</b> ${short_float(price_usd)} ({dex})")
+        lines.append(f"💰 <b>Price:</b> ${short_float(price_usd)}")
         if cg_price:
             lines.append(f"💱 <b>CoinGecko:</b> ${short_float(cg_price)}")
-        if liquidity != "N/A":
-            lines.append(f"💧 <b>Liquidity:</b> ${short_float(liquidity)}")
-        if volume24 != "N/A":
-            lines.append(f"📊 <b>24h Volume:</b> ${short_float(volume24)}")
+        lines.append(f"💧 <b>Liquidity:</b> ${short_float(liquidity)}")
+        lines.append(f"📊 <b>24h Volume:</b> ${short_float(volume24)}")
+        lines.append(f"🏅 <b>Neural Token Rank:</b> {rank}")
+
         if pair_url:
             lines.append(f"🌐 <a href=\"{pair_url}\">View Pair on DexScreener</a>")
-
-        # 💬 Insight block
         lines.append("")
-        lines.append(
-            f"🧠 Smart Insight: <b>{token_symbol or token_name}</b> is trending on <b>{dex}</b> — stay alert, {update.effective_user.first_name}! 🚀"
-        )
+        lines.append(f"🧠 Insight: {token_symbol or token_name} active on {chain} — monitored by Neural Intelligence ⚙️")
         lines.append("")
         lines.append(BRAND_FOOTER)
 
@@ -123,4 +147,4 @@ def tokeninfo_cmd(update: Update, context):
 # === Register Command ===
 def register(dispatcher, core=None):
     dispatcher.add_handler(CommandHandler("tokeninfo", tokeninfo_cmd))
-    print("✅ Loaded plugin: plugins.tokeninfo (v8.0.6-Stable+)")
+    print("✅ Loaded plugin: plugins.tokeninfo (v8.1 Neural Rank Edition)")
