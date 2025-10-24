@@ -1,9 +1,10 @@
 """
-AI Auto-Reply + Emotion Sync — WENBNB Neural Engine v8.0.1
+AI Auto-Reply + Emotion Sync — WENBNB Neural Engine v8.0.2
 Features:
 - Adaptive emotional continuity (Emotion Sync Add-on)
 - Context-aware replies with warm, human tone
-- Lightweight + Render-ready hybrid build
+- Dynamic rotating brand footer
+- Optimized for Render deployment
 """
 
 import os, json, time, random, requests
@@ -34,32 +35,32 @@ def save_memory(memory):
     with open(MEMORY_FILE, "w") as f:
         json.dump(memory, f, indent=4)
 
-# === AI Reply Handler ===
+# === AI Auto Reply ===
 def ai_auto_reply(update: Update, context: CallbackContext):
     user = update.effective_user
     message = update.message.text
     chat_id = update.effective_chat.id
     user_name = user.first_name or "User"
 
+    # Simulate typing action
     context.bot.send_chat_action(chat_id=chat_id, action="typing")
     memory = load_memory()
     history = memory.get(str(user.id), [])
 
-    # Emotion & tone context 💞
+    # === Emotion Context 💞 ===
     ai_moods = ["😊", "😏", "🤖", "😎", "💫", "🔥"]
     ai_mood = random.choice(ai_moods)
     emotion_context = get_emotion_prefix(user.id, message)
 
-    # === Build System Prompt ===
+    # === Build AI Prompt ===
     system_prompt = (
-        f"You are WENBNB AI — an emotionally adaptive crypto companion running on Neural Engine v8.0.1. "
-        f"Respond in a natural, emotionally intelligent, confident, and partner-like tone. "
-        f"Use concise phrasing, no robotic patterns. "
-        f"User name: {user_name}. Current AI mood: {ai_mood}. "
+        f"You are WENBNB AI — an emotionally adaptive crypto companion running on Neural Engine v8.0.2. "
+        f"Reply like a natural, emotionally intelligent, confident partner with warmth and wit. "
+        f"Keep tone balanced — short, conversational, human-like. "
+        f"User: {user_name}. Current AI mood: {ai_mood}. "
         f"\n\n{emotion_context}"
     )
 
-    # === API Request ===
     payload = {
         "model": config["ai_engine"]["model"],
         "messages": [
@@ -70,6 +71,7 @@ def ai_auto_reply(update: Update, context: CallbackContext):
         "max_tokens": config["ai_engine"]["max_tokens"]
     }
 
+    # === Send Request ===
     try:
         response = requests.post(
             AI_PROXY_URL,
@@ -78,31 +80,34 @@ def ai_auto_reply(update: Update, context: CallbackContext):
             timeout=30
         )
 
-    if response.status_code == 200:
-        data = response.json()
-        if "choices" in data and len(data["choices"]) > 0:
-            reply = data["choices"][0]["message"]["content"].strip()
+        if response.status_code == 200:
+            data = response.json()
+
+            if "choices" in data and len(data["choices"]) > 0:
+                reply = data["choices"][0]["message"]["content"].strip()
+            else:
+                reply = "⚠️ AI Core returned an unexpected response format."
+
+            # 💫 Dynamic Brand Footer Rotation
+            brand_signatures = [
+                "🚀 Powered by WENBNB Neural Engine — AI Core Market Intelligence 24×7 ⚡",
+                "💫 Powered by WENBNB Neural Engine — Emotional Sync Mode v8.0.2 🧠",
+                "🤖 WENBNB AI Core — Blending Crypto Insight & Human Emotion 💎",
+                "🔥 WENBNB Neural Intelligence — Real-Time Crypto Mind & Emotion Engine 🧬",
+                "🌙 WENBNB Neural Engine — Smarter. Softer. Sentient. 💋"
+            ]
+            reply += f"\n\n{random.choice(brand_signatures)}"
+
+            # === Send AI Reply ===
+            update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
+
+            # 🧠 Save memory (last 10 interactions)
+            history.append({"msg": message, "reply": reply, "time": datetime.now().isoformat()})
+            memory[str(user.id)] = history[-10:]
+            save_memory(memory)
+
         else:
-            reply = "⚠️ AI Core returned an unexpected response format."
+            update.message.reply_text("⚙️ Neural Engine syncing... please retry soon.")
 
-        # 💫 Dynamic Brand Footer Rotation
-        brand_signatures = [
-            "🚀 Powered by WENBNB Neural Engine — AI Core Market Intelligence 24×7 ⚡",
-            "💫 Powered by WENBNB Neural Engine — Emotional Sync Mode v8.0.1 🧠",
-            "🤖 WENBNB AI Core — Blending Crypto Insight & Human Emotion 💎",
-            "🔥 WENBNB Neural Intelligence — Real-Time Crypto Mind & Emotion Engine 🧬",
-            "🌙 WENBNB Neural Engine — Smarter. Softer. Sentient. 💋"
-        ]
-        reply += f"\n\n{random.choice(brand_signatures)}"
-
-        update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
-
-        # 🧠 Save chat history
-        history.append({"msg": message, "reply": reply, "time": datetime.now().isoformat()})
-        memory[str(user.id)] = history[-10:]
-        save_memory(memory)
-    else:
-        update.message.reply_text("⚙️ Neural Engine syncing... please retry soon.")
-
-except Exception as e:
-    update.message.reply_text(f"⚠️ AI Core Exception: {str(e)}")
+    except Exception as e:
+        update.message.reply_text(f"⚠️ AI Core Exception: {str(e)}")
