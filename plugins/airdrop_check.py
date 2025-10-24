@@ -8,14 +8,11 @@ import os
 import requests
 from telegram.ext import CommandHandler
 
-# === CONFIG ===
 BRAND_TAG = "🎁 Powered by WENBNB Neural Engine — Airdrop Intelligence Module 💫"
 
 
 def check_airdrop_status(contract_address):
-    """Fetch token airdrop or holder summary via BscScan"""
     bscscan_api = os.getenv("BSCSCAN_API_KEY")
-
     if not bscscan_api:
         return "❌ BscScan API key not configured."
 
@@ -33,26 +30,18 @@ def check_airdrop_status(contract_address):
             return f"✅ Airdrop Active — {holders} holders detected.\n\n{BRAND_TAG}"
         else:
             return f"⚠️ Unable to fetch airdrop data: {data.get('message', 'Unknown error')}"
-
     except Exception as e:
         return f"⚠️ Error fetching data: {e}"
 
 
 def airdrop_cmd(update, context):
-    """Triggered by /airdropcheck"""
     try:
         context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-
         args = context.args
-        if args:
-            token_address = args[0]
-        else:
-            token_address = os.getenv("WEN_TOKEN_ADDRESS")
 
+        token_address = args[0] if args else os.getenv("WEN_TOKEN_ADDRESS")
         if not token_address:
-            update.message.reply_text(
-                "⚠️ No token specified and default WENBNB address not configured."
-            )
+            update.message.reply_text("⚠️ No token specified and default WENBNB address not configured.")
             return
 
         result = check_airdrop_status(token_address)
@@ -62,7 +51,7 @@ def airdrop_cmd(update, context):
         update.message.reply_text(f"⚠️ Error: {str(e)}", parse_mode="HTML")
 
 
-# === Register Handler (for Plugin Loader) ===
-def register_handlers(dispatcher):
+# === Register Handler for Plugin Manager ===
+def register(dispatcher):
     dispatcher.add_handler(CommandHandler("airdropcheck", airdrop_cmd))
     print("🎁 Loaded plugin: airdrop_check.py (Airdrop Intelligence Module)")
