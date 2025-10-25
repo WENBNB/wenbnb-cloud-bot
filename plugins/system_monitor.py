@@ -1,22 +1,18 @@
 """
-WENBNB System Monitor v8.4-Pro — Neural Heartbeat + Auto-Heal Guardian
-──────────────────────────────────────────────────────────────────────
-Purpose:
-• Real-time system health metrics (CPU, RAM, uptime, API)
-• Intelligent plugin auto-recovery with unified logging
-• Sends heartbeat updates to dashboard (if configured)
-• Emotion-aware notifications (soft alert mode)
-
-💫 Powered by WENBNB Neural Engine — Resilience Framework 24×7
+WENBNB System Monitor v8.4-Pro — Auto-Healing + Reboot Awareness
+────────────────────────────────────────────────────────────────
+Ensures uptime, API health, and plugin recovery 24×7
+Now enhanced with Last Reboot tracking + Emotion Sync integration.
+🚀 Powered by WENBNB Neural Engine — Resilience Framework 24×7 ⚡
 """
 
-import os, time, threading, requests, traceback, platform, psutil, importlib
+import time, threading, requests, traceback, platform, psutil, importlib, os, json
 from datetime import datetime
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
 # === CONFIG ===
-ADMIN_IDS = [5698007588]  # Replace with your admin ID
+ADMIN_IDS = [5698007588]  # Replace with your Telegram ID
 PLUGIN_DIR = "plugins"
 BOT_START_TIME = datetime.now()
 CHECK_INTERVAL = 120  # seconds
@@ -30,67 +26,39 @@ SYSTEM_STATUS = {
     "autoheal": "✅ Active"
 }
 
-FAILED_PLUGINS = {}
+ACTIVE_PLUGINS = {}
 STOP_FLAG = False
-DASHBOARD_URL = os.getenv("DASHBOARD_URL", "")
 
 
-# === LOGGING ===
-def log(msg: str):
-    ts = time.strftime("%H:%M:%S")
-    print(f"[WENBNB | SystemMonitor | {ts}] {msg}")
-
-
-# === DASHBOARD SYNC ===
-def send_dashboard_ping(event: str, data=None):
-    if not DASHBOARD_URL:
-        return
-    try:
-        payload = {"event": event, "time": int(time.time()), "data": data or {}}
-        requests.post(DASHBOARD_URL.rstrip("/") + "/update_activity", json=payload, timeout=5)
-    except Exception:
-        pass
-
-
-# === AUTO-HEAL CORE ===
+# === AUTO-HEALING CORE ===
 def auto_heal_plugins(dispatcher):
     while not STOP_FLAG:
         try:
             for file in os.listdir(PLUGIN_DIR):
-                if not file.endswith(".py") or file.startswith("__"):
-                    continue
-
-                module_name = file[:-3]
-                if module_name in FAILED_PLUGINS:
-                    try:
-                        module_path = f"{PLUGIN_DIR}.{module_name}"
-                        if module_path in sys.modules:
-                            del sys.modules[module_path]
-                        module = importlib.import_module(module_path)
-
-                        if hasattr(module, "register_handlers"):
-                            module.register_handlers(dispatcher)
-                        elif hasattr(module, "register"):
-                            module.register(dispatcher)
-
-                        del FAILED_PLUGINS[module_name]
-                        log(f"💚 Auto-recovered plugin: {module_name}")
-                        for admin_id in ADMIN_IDS:
-                            dispatcher.bot.send_message(
-                                admin_id,
-                                f"🛠️ <b>Auto-Healed:</b> {module_name}",
-                                parse_mode="HTML"
-                            )
-                        send_dashboard_ping("plugin_recovered", {"plugin": module_name})
-                    except Exception as e:
-                        log(f"⚠️ Auto-heal retry failed for {module_name}: {e}")
+                if file.endswith(".py") and not file.startswith("__"):
+                    module_name = file[:-3]
+                    if module_name not in ACTIVE_PLUGINS or ACTIVE_PLUGINS[module_name] == "❌ Error":
+                        try:
+                            module = importlib.import_module(f"{PLUGIN_DIR}.{module_name}")
+                            if hasattr(module, "register_handlers"):
+                                module.register_handlers(dispatcher)
+                                ACTIVE_PLUGINS[module_name] = "✅ Recovered"
+                                print(f"[AutoHeal] Recovered {module_name}")
+                                for admin_id in ADMIN_IDS:
+                                    dispatcher.bot.send_message(
+                                        admin_id,
+                                        f"🛠️ Auto-Healed Plugin: <b>{module_name}</b>",
+                                        parse_mode="HTML"
+                                    )
+                        except Exception as e:
+                            print(f"[AutoHeal] Failed to reload {module_name}: {e}")
             time.sleep(300)
         except Exception as e:
-            log(f"[AutoHeal Error] {e}")
+            print(f"[AutoHeal Thread Error] {e}")
             time.sleep(300)
 
 
-# === SYSTEM HEARTBEAT MONITOR ===
+# === SYSTEM MONITOR ===
 def monitor_system(dispatcher):
     global SYSTEM_STATUS
     while not STOP_FLAG:
@@ -101,7 +69,7 @@ def monitor_system(dispatcher):
             hours, remainder = divmod(int(uptime_seconds), 3600)
             minutes, _ = divmod(remainder, 60)
 
-            # API heartbeat
+            # API heartbeat check
             try:
                 res = requests.get("https://api.binance.com/api/v3/time", timeout=5)
                 api_status = "✅ OK" if res.status_code == 200 else "⚠️ Slow"
@@ -115,40 +83,51 @@ def monitor_system(dispatcher):
                 "api": api_status
             })
 
+            # Notify admin if API fails
             if api_status == "❌ Down":
                 for admin_id in ADMIN_IDS:
                     dispatcher.bot.send_message(
                         admin_id,
-                        "⚠️ <b>Binance API appears DOWN!</b>\nSwitching to Watch Mode 🌙",
+                        "⚠️ <b>Binance API is DOWN!</b>\nSystem entering Watch Mode.",
                         parse_mode="HTML"
                     )
-                send_dashboard_ping("api_down")
-
-            send_dashboard_ping("heartbeat", SYSTEM_STATUS)
 
         except Exception as e:
-            log(f"[SystemMonitor Error] {traceback.format_exc()}")
+            print(f"[SystemMonitor Error] {traceback.format_exc()}")
         time.sleep(CHECK_INTERVAL)
 
 
-# === START THREADS ===
+# === START MONITOR THREAD ===
 def start_monitor(dispatcher):
     threading.Thread(target=monitor_system, args=(dispatcher,), daemon=True).start()
     threading.Thread(target=auto_heal_plugins, args=(dispatcher,), daemon=True).start()
-    log("🧠 System Monitor threads started (Heartbeat + Auto-Heal).")
+    print("🧠 WENBNB System Monitor & Auto-Heal threads initialized.")
 
 
-# === STATUS COMMAND ===
-def system_status(update: Update, context: CallbackContext):
+# === STATUS COMMAND (Upgraded v8.4-Pro) ===
+def status_command(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if user_id not in ADMIN_IDS:
         update.message.reply_text("🚫 Only admin can check system status.")
         return
 
     s = SYSTEM_STATUS
+
+    # 🕒 Try to read last reboot info
+    reboot_file = "data/last_reboot.json"
+    last_reboot = "N/A"
+    try:
+        if os.path.exists(reboot_file):
+            with open(reboot_file, "r") as f:
+                info = json.load(f)
+                last_reboot = info.get("timestamp", "Unknown")
+    except Exception as e:
+        print(f"[Status] Failed to read last reboot time: {e}")
+
     text = (
         f"🧩 <b>WENBNB System Monitor v8.4-Pro</b>\n\n"
         f"🕒 Uptime: <b>{s['uptime']}</b>\n"
+        f"🔁 Last Reboot: <b>{last_reboot}</b>\n"
         f"💻 CPU Usage: <b>{s['cpu']}%</b>\n"
         f"📈 RAM Usage: <b>{s['ram']}%</b>\n"
         f"🌐 API Health: {s['api']}\n"
@@ -159,8 +138,7 @@ def system_status(update: Update, context: CallbackContext):
     update.message.reply_text(text, parse_mode="HTML")
 
 
-# === REGISTER ===
+# === REGISTER HANDLERS ===
 def register_handlers(dp):
-    dp.add_handler(CommandHandler("system", system_status))
+    dp.add_handler(CommandHandler("status", status_command))
     start_monitor(dp)
-    log("💫 System Monitor registered successfully.")
