@@ -1,46 +1,49 @@
-# plugins/aianalyze.py
 """
-WENBNB Auto-Context Reply System v8.2
-Mode: Neural Conversational Core — “Think. Feel. Respond.”
+WENBNB Neural Analyzer v8.3-Pro — Emotional Realism Mode
+──────────────────────────────────────────────────────────────
+• Reads tone, emotion drift, and user context
+• Feeds mood from emotion_sync + emotion_stabilizer
+• Responds like a human — warm, emotional, aware
+• Adds expressive hashtags and vibe reflection
 """
 
 import os, requests, json, time, random
 from telegram import Update
-from telegram.ext import CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import CommandHandler, CallbackContext
+from plugins.emotion_sync import get_emotion_prefix
+from plugins.emotion_stabilizer import get_stabilized_emotion
 
 AI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-BRAND_FOOTER = "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7"
-
-# --- MEMORY BRIDGE ---
+BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Emotional Intelligence 24×7"
 MEMORY_FILE = "memory_data.json"
 
+# === MEMORY HELPER ===
 def get_recent_memory(user_id):
     if not os.path.exists(MEMORY_FILE):
+        return None
+    try:
+        with open(MEMORY_FILE, "r") as f:
+            data = json.load(f)
+        u = data.get("users", {}).get(str(user_id))
+        if not u:
+            return None
+        return u.get("last_message"), u.get("last_emotion")
+    except Exception:
         return None, None
-    with open(MEMORY_FILE, "r") as f:
-        data = json.load(f)
-    user_data = data.get("users", {}).get(str(user_id))
-    if not user_data:
-        return None, None
-    return user_data.get("last_message"), user_data.get("last_emotion")
 
 
-# --- AI CORE ENGINE ---
-
-def ai_chat_response(prompt: str, context_memory=None, emotion=None):
-    """Generate intelligent, context-aware AI reply using OpenAI"""
+# === OPENAI WRAPPER ===
+def ai_chat_response(prompt: str, emotion_label=None, emoji_prefix=None):
+    """Generates emotionally adaptive AI response"""
     try:
         base_prompt = (
-            "You are WENBNB AI — a witty, emotionally tuned crypto assistant. "
-            "Analyze or reply naturally depending on the user's tone. "
-            "If the query looks like a market topic, provide an insight. "
-            "If it feels casual, respond conversationally with personality. "
+            "You are WENBNB AI — a friendly, emotionally intelligent crypto assistant. "
+            "Keep responses conversational, natural, and slightly playful. "
+            "You are aware of user's emotional tone: "
+            f"{emotion_label or 'neutral'}. "
+            "Use expressive language when needed and close with 1–2 relevant hashtags."
         )
-        if emotion:
-            base_prompt += f"The user seems to be feeling {emotion}. Respond accordingly. "
-
-        base_prompt += "End your message warmly without repetition."
-        full_prompt = base_prompt + "\n\nUser: " + prompt
+        full_prompt = f"{emoji_prefix or ''} {base_prompt}\n\nUser: {prompt}"
 
         r = requests.post(
             "https://api.openai.com/v1/chat/completions",
@@ -49,75 +52,57 @@ def ai_chat_response(prompt: str, context_memory=None, emotion=None):
                 "model": "gpt-4o-mini",
                 "messages": [{"role": "user", "content": full_prompt}],
                 "max_tokens": 180,
-                "temperature": 0.8,
+                "temperature": 0.9,
             },
-            timeout=20
+            timeout=25,
         )
 
         data = r.json()
-
-        # --- Enhanced error handling ---
-        if "error" in data:
-            msg = data["error"].get("message", "Unknown issue")
-            return f"⚙️ AI Analyzer Offline: {msg}"
-
-        if "choices" in data and data["choices"]:
-            return data["choices"][0]["message"]["content"].strip()
-
-        return random.choice([
-            "⚡ Neural interference detected... recalibrating soon.",
-            "💫 I felt that, but my circuits need a breather. Try again shortly."
-        ])
-
+        if "choices" in data:
+            text = data["choices"][0]["message"]["content"].strip()
+            return text
+        else:
+            return random.choice([
+                "Neural static detected... re-syncing soon 💫",
+                "Hmm, lost the vibe — give me a sec to recalibrate ⚡"
+            ])
     except Exception as e:
-        return f"⚠️ AI Core Error: {e}"
+        return f"⚠️ Neural Error: {e}"
 
 
-# --- /AIANALYZE COMMAND ---
-
+# === MAIN /AIANALYZE ===
 def aianalyze_cmd(update: Update, context: CallbackContext):
-    """Manual AI Analysis Command — /aianalyze <text>"""
     user = update.effective_user
+    user_id = user.id
     query = " ".join(context.args)
-
     if not query:
-        update.message.reply_text("🧠 Use `/aianalyze <your text>` to let AI process it.", parse_mode="HTML")
+        update.message.reply_text("🧠 Use `/aianalyze <your text>` to let me process it emotionally.")
         return
 
-    update.message.chat.send_action(action="typing")
-
-    last_msg, emotion = get_recent_memory(user.id)
-    context_memory = last_msg or "User started fresh chat."
-
-    try:
-        response = ai_chat_response(query, context_memory, emotion)
-        update.message.reply_text(f"{response}\n\n{BRAND_FOOTER}", parse_mode="HTML")
-    except Exception as e:
-        update.message.reply_text(f"⚠️ AI Analysis failed: {e}\n\n{BRAND_FOOTER}", parse_mode="HTML")
-
-
-# --- AUTO CONTEXT MODE ---
-
-def auto_ai_chat(update: Update, context: CallbackContext):
-    """Respond automatically to user messages (AI Auto Mode)"""
-    user = update.effective_user
-    msg = update.message.text
-
-    if msg.startswith("/"):
-        return  # Skip commands
-
+    # Typing effect
     context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     time.sleep(1.2)
 
-    last_msg, emotion = get_recent_memory(user.id)
-    context_memory = last_msg or "User started conversation."
+    # Sync short-term emotion
+    emoji_prefix = get_emotion_prefix(user_id, query)
 
-    response = ai_chat_response(msg, context_memory, emotion)
-    update.message.reply_text(response, parse_mode="HTML")
+    # Stabilize longer-term tone
+    emotion_label = get_stabilized_emotion(user_id, query)
+
+    # AI response
+    response = ai_chat_response(query, emotion_label, emoji_prefix)
+
+    # Build final message
+    msg = (
+        f"{emoji_prefix} <b>Neural Insight:</b>\n{response}\n\n"
+        f"💫 <i>Current Mood:</i> {emotion_label}\n\n"
+        f"{BRAND_TAG}"
+    )
+
+    update.message.reply_text(msg, parse_mode="HTML")
 
 
-# --- REGISTRATION ---
-
+# === REGISTER ===
 def register_handlers(dp):
     dp.add_handler(CommandHandler("aianalyze", aianalyze_cmd))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, auto_ai_chat))
+    print("✅ Loaded plugin: aianalyze.py (v8.3-Pro — Emotional Realism Mode)")
