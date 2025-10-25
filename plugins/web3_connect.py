@@ -1,8 +1,9 @@
 """
-WENBNB Web3 Connect v5.8.2-ProPulse+ UIx
+WENBNB Web3 Connect v5.8.3-ProPulse+ [StableEdge]
 ────────────────────────────────────────────
-Visual overhaul + data reliability fix
-💫 Powered by WENBNB Neural Engine — Web3 Intelligence 24×7 ⚡
+🔥 Stable Telegram design (no parse errors)
+⚡ Wallet + Supply API improved (auto-retry)
+🧠 Polished "coming soon" analyze panel
 """
 
 import requests, os, time
@@ -13,10 +14,9 @@ from telegram.ext import CommandHandler, CallbackContext
 BSCSCAN_API_KEY = os.getenv("BSCSCAN_API_KEY", "")
 BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Web3 Intelligence 24×7 ⚡"
 
-# === CORE LINKS ===
 BSC_BASE = "https://api.bscscan.com/api"
-DEX_URL = "https://api.dexscreener.com/latest/dex/tokens/{contract}"
 CG_URL = "https://api.coingecko.com/api/v3/simple/price?ids={tid}&vs_currencies=usd"
+DEX_URL = "https://api.dexscreener.com/latest/dex/tokens/{contract}"
 
 ALIASES = {
     "bnb": ("binancecoin", "0xb8c77482e45f1f44de1745f52c74426c631bdd52"),
@@ -28,34 +28,36 @@ ALIASES = {
     "wenbnb": ("wenbnb", "0x4507cef57c46789ef8d1a19ea45f4216bae2b528"),
 }
 
-# === TOKEN PRICE ENGINE ===
-def get_token_price(token: str):
-    token = token.lower()
+# === RETRY HANDLER ===
+def safe_get(url, retries=2, timeout=6):
+    for _ in range(retries):
+        try:
+            r = requests.get(url, timeout=timeout)
+            if r.status_code == 200:
+                return r.json()
+        except Exception:
+            time.sleep(0.5)
+    return {}
+
+# === TOKEN PRICE ===
+def get_token_price(token):
+    token = token.lower().strip()
     if token not in ALIASES:
         return f"❓ Unknown token `{token}` — try BTC, BNB, ETH, FLOKI, TOKENFI."
 
     cg_id, contract = ALIASES[token]
+    # Try CoinGecko
+    data = safe_get(CG_URL.format(tid=cg_id))
+    if cg_id in data:
+        price = data[cg_id]["usd"]
+        return f"💰 {token.upper()} price: ${price:,.6f}\n🕒 Source: CoinGecko"
 
-    # 1️⃣ Try CoinGecko
-    try:
-        r = requests.get(CG_URL.format(tid=cg_id), timeout=6)
-        d = r.json()
-        if cg_id in d:
-            p = d[cg_id]["usd"]
-            return f"💰 {token.upper()} price: ${p:,.6f}\n🕒 Source: CoinGecko"
-    except Exception:
-        pass
-
-    # 2️⃣ Try DexScreener fallback
-    try:
-        r = requests.get(DEX_URL.format(contract=contract), timeout=6)
-        d = r.json()
-        if "pairs" in d and d["pairs"]:
-            p = d["pairs"][0].get("priceUsd")
-            if p:
-                return f"💰 {token.upper()} price: ${float(p):,.6f}\n🕒 Source: DexScreener"
-    except Exception:
-        pass
+    # Dex fallback
+    data = safe_get(DEX_URL.format(contract=contract))
+    if "pairs" in data and data["pairs"]:
+        p = data["pairs"][0].get("priceUsd")
+        if p:
+            return f"💰 {token.upper()} price: ${float(p):,.6f}\n🕒 Source: DexScreener"
 
     return f"⚠️ Could not fetch {token.upper()} price."
 
@@ -63,10 +65,10 @@ def get_token_price(token: str):
 def get_wallet_balance(address):
     try:
         url = f"{BSC_BASE}?module=account&action=balance&address={address.lower()}&apikey={BSCSCAN_API_KEY}"
-        res = requests.get(url, timeout=6).json()
-        if res.get("status") != "1":
+        res = safe_get(url)
+        if not res or res.get("status") != "1":
             return "❌ Invalid or inactive address."
-        balance = int(res["result"]) / 1e18
+        balance = int(res.get("result", "0")) / 1e18
         return f"{balance:.6f} BNB"
     except Exception:
         return "❌ Network/API timeout."
@@ -75,24 +77,22 @@ def get_wallet_balance(address):
 def get_token_supply(contract):
     try:
         url = f"{BSC_BASE}?module=stats&action=tokensupply&contractaddress={contract}&apikey={BSCSCAN_API_KEY}"
-        res = requests.get(url, timeout=6).json()
-        if res.get("status") != "1":
-            return "❌ Could not fetch (invalid/limit)."
-        total = int(res["result"]) / 1e18
+        res = safe_get(url)
+        if not res or res.get("status") != "1":
+            return "❌ Could not fetch (invalid or limit)."
+        total = int(res.get("result", "0")) / 1e18
         return f"{total:,.0f} tokens"
     except Exception:
         return "❌ Supply fetch error."
 
-# === TELEGRAM COMMANDS ===
+# === COMMANDS ===
 def web3_panel(update: Update, context: CallbackContext):
     text = (
-        "╭─────────────🌐─────────────╮\n"
-        "<b>WENBNB Web3 Command Center</b>\n"
-        "╰────────────────────────────╯\n\n"
-        "💰 /tokenprice <id> — Live token price\n"
-        "👛 /wallet <address> — Wallet balance\n"
-        "📊 /supply <contract> — Token total supply\n"
-        "🧠 /analyze <address> — AI wallet risk (coming soon)\n\n"
+        "<b>🌐 WENBNB Web3 Command Center</b>\n\n"
+        "💰 /tokenprice &lt;id&gt; — Live token price\n"
+        "👛 /wallet &lt;address&gt; — Wallet balance\n"
+        "📊 /supply &lt;contract&gt; — Token total supply\n"
+        "🧠 /analyze &lt;address&gt; — AI wallet risk (coming soon)\n\n"
         "✨ Hybrid Intelligence powered by <b>WENBNB Neural Engine</b>\n\n"
         f"{BRAND_TAG}"
     )
@@ -102,19 +102,17 @@ def tokenprice(update: Update, context: CallbackContext):
     token = context.args[0] if context.args else "bnb"
     msg = get_token_price(token)
     t = time.strftime("%H:%M:%S", time.localtime())
-    update.message.reply_text(f"{msg}\n\n{BRAND_TAG}\n🕒 {t} (v5.8.2-ProPulse+ UIx)", parse_mode="HTML")
+    update.message.reply_text(f"{msg}\n\n{BRAND_TAG}\n🕒 {t} (v5.8.3-ProPulse+ StableEdge)", parse_mode="HTML")
 
 def wallet(update: Update, context: CallbackContext):
     if not context.args:
         update.message.reply_text("💡 Usage: /wallet <BSC_address>")
         return
-    address = context.args[0]
-    balance = get_wallet_balance(address)
+    addr = context.args[0]
+    bal = get_wallet_balance(addr)
     text = (
-        "╭──────────👛──────────╮\n"
-        f"<b>Wallet:</b>\n<code>{address}</code>\n"
-        f"💎 Balance: <b>{balance}</b>\n"
-        "╰──────────────────────╯\n\n"
+        f"👛 <b>Wallet</b>\n<code>{addr}</code>\n\n"
+        f"💎 Balance: <b>{bal}</b>\n\n"
         f"{BRAND_TAG}"
     )
     update.message.reply_text(text, parse_mode="HTML")
@@ -126,10 +124,8 @@ def supply(update: Update, context: CallbackContext):
     contract = context.args[0]
     total = get_token_supply(contract)
     text = (
-        "╭──────────📊──────────╮\n"
-        f"<b>Token Supply</b>\n<code>{contract}</code>\n"
-        f"Total: <b>{total}</b>\n"
-        "╰──────────────────────╯\n\n"
+        f"📊 <b>Token Supply</b>\n<code>{contract}</code>\n\n"
+        f"📦 Total: <b>{total}</b>\n\n"
         f"{BRAND_TAG}"
     )
     update.message.reply_text(text, parse_mode="HTML")
@@ -138,17 +134,13 @@ def analyze(update: Update, context: CallbackContext):
     if not context.args:
         update.message.reply_text("💡 Usage: /analyze <wallet_address>")
         return
-    wallet = context.args[0]
+    w = context.args[0]
     text = (
-        "╭──────────🧠──────────╮\n"
-        "<b>AI Wallet Risk Analysis</b>\n"
-        "╰──────────────────────╯\n\n"
-        f"🔍 Address: <code>{wallet}</code>\n\n"
-        "📊 Scanning wallet activity, liquidity patterns, and token movements…\n"
-        "💬 <i>Neural Risk Engine</i> is calibrating.\n\n"
-        "⏳ <b>Coming Soon...</b>\n"
-        "This module will detect risky wallets, analyze holding behavior, "
-        "and rate confidence levels from ⚠️ Low → ✅ Safe.\n\n"
+        f"🧠 <b>AI Wallet Risk Analysis</b>\n"
+        f"🔍 Address: <code>{w}</code>\n\n"
+        "📊 Scanning wallet activity, liquidity patterns, and token movements...\n"
+        "💬 Neural Risk Engine calibrating...\n\n"
+        "⏳ Coming Soon — Wallet confidence levels ⚠️→✅\n\n"
         f"{BRAND_TAG}"
     )
     update.message.reply_text(text, parse_mode="HTML")
