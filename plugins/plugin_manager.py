@@ -17,7 +17,7 @@ from telegram.ext import CommandHandler, CallbackContext
 PLUGIN_DIR = "plugins"
 ACTIVE_PLUGINS = {}
 FAILED_PLUGINS = {}
-ADMIN_IDS = [123456789]  # Replace with your real admin Telegram ID
+ADMIN_IDS = [5698007588]  # Replace with your real admin Telegram ID
 BRAND_TAG = "💫 WENBNB Neural Engine — Modular Intelligence 24×7 ⚡"
 
 
