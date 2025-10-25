@@ -1,13 +1,13 @@
 """
-WENBNB Maintenance Core v8.5L — Local Integrity Engine (No S3)
+WENBNB Maintenance Core v8.6 — Local Integrity Engine (Stable Build)
 ───────────────────────────────────────────────────────────────
 Purpose:
-• Self-healing + daily telemetry logging
-• Smart zip-based local backup (no cloud)
-• /backup and /telemetry admin commands
-• Seamless auto-registration with Plugin Manager
+• Daily telemetry logging + self-healing
+• Smart local backups (no S3)
+• /backup and /telemetry commands
+• Verified hot-load with PluginManager
 
-💫 Powered by WENBNB Neural Engine — Integrity & Insight Layer 24×7 ⚡
+💫 WENBNB Neural Engine — Integrity & Insight Layer 24×7 ⚡
 """
 
 import os, time, threading, zipfile, json, traceback, psutil
@@ -15,20 +15,17 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
-# === CONFIG ===
 ADMIN_IDS = [5698007588]  # Replace with your Telegram ID
 BACKUP_DIR = "backups"
 LOGS_DIR = "logs"
 DATA_DIR = "data"
 ANALYTICS_FILE = os.path.join(DATA_DIR, "telemetry.json")
-CHECK_INTERVAL = 86400  # every 24 hours
+CHECK_INTERVAL = 86400
 BRAND_TAG = "💫 WENBNB Neural Engine — Local Integrity Layer 24×7 ⚡"
 
-# === ensure dirs ===
 for d in [BACKUP_DIR, LOGS_DIR, DATA_DIR]:
     os.makedirs(d, exist_ok=True)
 
-# === Backup Creator ===
 def create_backup_archive():
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     archive = os.path.join(BACKUP_DIR, f"WENBNB_Backup_{ts}.zip")
@@ -45,7 +42,6 @@ def create_backup_archive():
         print(f"[Backup Error] {e}")
         return None
 
-# === Telemetry Recorder ===
 def record_telemetry(event, data=None):
     try:
         analytics = {}
@@ -58,11 +54,10 @@ def record_telemetry(event, data=None):
         })
         with open(ANALYTICS_FILE, "w") as f:
             json.dump(analytics, f, indent=2)
-        print(f"[Telemetry Updated] Event: {event}")
+        print(f"[Telemetry Updated] {event}")
     except Exception as e:
         print(f"[Telemetry Error] {e}")
 
-# === System Health ===
 def system_health_report():
     try:
         return {
@@ -74,8 +69,9 @@ def system_health_report():
     except Exception as e:
         return {"error": str(e)}
 
-# === Auto-Maintenance Thread ===
 def maintenance_daemon(bot):
+    time.sleep(10)
+    print("🧠 Maintenance background thread running.")
     while True:
         try:
             health = system_health_report()
@@ -92,12 +88,10 @@ def maintenance_daemon(bot):
             for admin in ADMIN_IDS:
                 bot.send_message(admin, msg, parse_mode="HTML")
         except Exception as e:
-            trace = traceback.format_exc()
             for admin in ADMIN_IDS:
                 bot.send_message(admin, f"⚠️ Maintenance Error:\n<code>{e}</code>", parse_mode="HTML")
         time.sleep(CHECK_INTERVAL)
 
-# === Manual Backup Command ===
 def backup_now(update: Update, context: CallbackContext):
     if update.effective_user.id not in ADMIN_IDS:
         return update.message.reply_text("🚫 Only admins can use this command.")
@@ -109,14 +103,12 @@ def backup_now(update: Update, context: CallbackContext):
     else:
         update.message.reply_text("⚠️ Backup failed. Check logs.")
 
-# === Telemetry Command ===
 def telemetry_report(update: Update, context: CallbackContext):
     if update.effective_user.id not in ADMIN_IDS:
         return update.message.reply_text("🚫 Only admins can view analytics.")
     try:
         if not os.path.exists(ANALYTICS_FILE):
-            update.message.reply_text("📊 No analytics recorded yet.")
-            return
+            return update.message.reply_text("📊 No analytics recorded yet.")
         with open(ANALYTICS_FILE) as f:
             analytics = json.load(f)
         msg = f"📈 <b>Telemetry Summary</b>\n\nEvents tracked: {len(analytics.keys())}\n{BRAND_TAG}"
@@ -124,17 +116,12 @@ def telemetry_report(update: Update, context: CallbackContext):
     except Exception as e:
         update.message.reply_text(f"⚠️ Error loading analytics: {e}")
 
-# === Register Handlers ===
 def register_handlers(dp):
     dp.add_handler(CommandHandler("backup", backup_now))
     dp.add_handler(CommandHandler("telemetry", telemetry_report))
     threading.Thread(target=maintenance_daemon, args=(dp.bot,), daemon=True).start()
-    print("🧠 Maintenance Core v8.5L (Local Mode) active.")
+    print("🧩 Maintenance Core Handlers Registered.")
 
-# === Auto Register for Plugin Manager ===
 def register(dp):
-    try:
-        register_handlers(dp)
-        print("🧩 Maintenance Core successfully registered with PluginManager.")
-    except Exception as e:
-        print(f"[MaintenanceCore Register Error] {e}")
+    register_handlers(dp)
+    print("✅ Maintenance Core v8.6 Registered and Running.")
