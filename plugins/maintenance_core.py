@@ -1,16 +1,16 @@
 """
-WENBNB Maintenance Core v8.5-Pro — Cloud-Aware Integrity Engine
+WENBNB Maintenance Core v8.5L — Local Integrity Engine (No S3)
 ───────────────────────────────────────────────────────────────
 Purpose:
 • Self-healing + daily telemetry logging
-• Smart zip-based backup with S3 upload
+• Smart zip-based local backup (no cloud)
 • /backup and /telemetry admin commands
 • Seamless auto-registration with Plugin Manager
 
 💫 Powered by WENBNB Neural Engine — Integrity & Insight Layer 24×7 ⚡
 """
 
-import os, time, threading, zipfile, json, traceback, psutil, boto3
+import os, time, threading, zipfile, json, traceback, psutil
 from datetime import datetime
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
@@ -21,32 +21,10 @@ BACKUP_DIR = "backups"
 LOGS_DIR = "logs"
 DATA_DIR = "data"
 ANALYTICS_FILE = os.path.join(DATA_DIR, "telemetry.json")
-CHECK_INTERVAL = 86400  # every 24h
-BRAND_TAG = "💫 WENBNB Neural Engine — Integrity & Insight Layer 24×7 ⚡"
+CHECK_INTERVAL = 86400  # every 24 hours
+BRAND_TAG = "💫 WENBNB Neural Engine — Local Integrity Layer 24×7 ⚡"
 
-# === S3 CONFIG ===
-S3_ENABLED = os.getenv("S3_ENABLED", "true").lower() == "true"
-S3_BUCKET = os.getenv("S3_BUCKET", "")
-S3_REGION = os.getenv("S3_REGION", "us-east-1")
-S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY", "")
-S3_SECRET_KEY = os.getenv("S3_SECRET_KEY", "")
-
-if S3_ENABLED:
-    try:
-        s3_client = boto3.client(
-            "s3",
-            aws_access_key_id=S3_ACCESS_KEY,
-            aws_secret_access_key=S3_SECRET_KEY,
-            region_name=S3_REGION
-        )
-        print("☁️ S3 client initialized successfully.")
-    except Exception as e:
-        print(f"[S3 Init Error] {e}")
-        s3_client = None
-else:
-    s3_client = None
-
-# === Ensure directories ===
+# === ensure dirs ===
 for d in [BACKUP_DIR, LOGS_DIR, DATA_DIR]:
     os.makedirs(d, exist_ok=True)
 
@@ -61,23 +39,11 @@ def create_backup_archive():
                     for f in files:
                         path = os.path.join(root, f)
                         z.write(path, os.path.relpath(path, os.getcwd()))
+        print(f"[Backup Created] {archive}")
         return archive
     except Exception as e:
         print(f"[Backup Error] {e}")
         return None
-
-# === S3 Upload ===
-def upload_to_s3(file_path, folder="backups"):
-    if not s3_client or not S3_BUCKET:
-        return False
-    try:
-        key = f"{folder}/{os.path.basename(file_path)}"
-        s3_client.upload_file(file_path, S3_BUCKET, key)
-        print(f"[S3] Uploaded: {key}")
-        return True
-    except Exception as e:
-        print(f"[S3 Upload Error] {e}")
-        return False
 
 # === Telemetry Recorder ===
 def record_telemetry(event, data=None):
@@ -92,14 +58,11 @@ def record_telemetry(event, data=None):
         })
         with open(ANALYTICS_FILE, "w") as f:
             json.dump(analytics, f, indent=2)
-
-        if S3_ENABLED and s3_client:
-            upload_to_s3(ANALYTICS_FILE, folder="telemetry")
-
+        print(f"[Telemetry Updated] Event: {event}")
     except Exception as e:
         print(f"[Telemetry Error] {e}")
 
-# === Health Report ===
+# === System Health ===
 def system_health_report():
     try:
         return {
@@ -111,15 +74,13 @@ def system_health_report():
     except Exception as e:
         return {"error": str(e)}
 
-# === Background Maintenance Loop ===
+# === Auto-Maintenance Thread ===
 def maintenance_daemon(bot):
     while True:
         try:
             health = system_health_report()
             record_telemetry("system_health", health)
             archive = create_backup_archive()
-            if archive:
-                upload_to_s3(archive)
             msg = (
                 "🧠 <b>Maintenance Report</b>\n"
                 f"💾 Backup: {os.path.basename(archive) if archive else 'failed'}\n"
@@ -143,7 +104,6 @@ def backup_now(update: Update, context: CallbackContext):
     update.message.reply_text("⏳ Creating manual backup...")
     archive = create_backup_archive()
     if archive:
-        upload_to_s3(archive)
         update.message.reply_document(open(archive, "rb"))
         update.message.reply_text(f"✅ Manual backup complete!\n{BRAND_TAG}")
     else:
@@ -169,7 +129,7 @@ def register_handlers(dp):
     dp.add_handler(CommandHandler("backup", backup_now))
     dp.add_handler(CommandHandler("telemetry", telemetry_report))
     threading.Thread(target=maintenance_daemon, args=(dp.bot,), daemon=True).start()
-    print("🧠 Maintenance Core v8.5-Pro active.")
+    print("🧠 Maintenance Core v8.5L (Local Mode) active.")
 
 # === Auto Register for Plugin Manager ===
 def register(dp):
