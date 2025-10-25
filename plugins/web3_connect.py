@@ -1,181 +1,229 @@
 """
-WENBNB AI-Powered Web3 Command Center v5.3-Pro
-───────────────────────────────────────────────
-• Smarter BscScan handling (rate-limit + invalid checks)
-• DexScreener fallback for CoinGecko failures
-• Safe Mode + Telemetry integration
-• AI Risk Analyzer skeleton pre-installed 💫
+WENBNB AI-Powered Web3 Command Center v5.3.1 (Patch)
+- Safer wallet balance fetch (retries + normalization)
+- Clear "unverified contract" messaging for /supply
+- Better tokenprice fallback handling
+🚀 Powered by WENBNB Neural Engine — Web3 Intelligence 24×7
 """
 
-import requests, json, os
+import os
+import time
+import requests
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
-# === CONFIG ===
-BRAND_TAG = "💫 WENBNB Neural Engine — Web3 Intelligence 24×7 ⚡"
-BSCSCAN_API_KEY = os.getenv("BSCSCAN_API_KEY")
+BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Web3 Intelligence 24×7"
+
+BSCSCAN_API_KEY = os.getenv("BSCSCAN_API_KEY", "")
 CG_BASE = "https://api.coingecko.com/api/v3"
 BSC_BASE = "https://api.bscscan.com/api"
-SAFE_MODE = True
 
+# ---- Helpers ----
+def safe_request(url, params=None, timeout=6, retries=2, backoff=1.2):
+    """Simple requests.get with retry/backoff and safe JSON return (or None)."""
+    for attempt in range(retries + 1):
+        try:
+            r = requests.get(url, params=params, timeout=timeout)
+            r.raise_for_status()
+            return r.json()
+        except Exception:
+            if attempt < retries:
+                time.sleep(backoff * (attempt + 1))
+            else:
+                return None
 
-# === TELEMETRY SYNC ===
-def record_telemetry(event: str, data=None):
-    try:
-        from plugins.maintenance_pro import record_telemetry as log_event
-        log_event(event, data or {})
-    except Exception:
-        pass
-
-
-# === HELPERS ===
 def format_usd(value):
     try:
         return f"${float(value):,.6f}"
-    except:
+    except Exception:
         return "N/A"
 
+def normalize_address(addr: str):
+    """Ensure 0x prefix and lowercase (safe for queries)."""
+    if not addr:
+        return ""
+    addr = addr.strip()
+    if addr.startswith("ethereum:"):  # handle clipboard weirdness
+        addr = addr.split("ethereum:")[-1]
+    if not addr.startswith("0x"):
+        addr = "0x" + addr
+    return addr.lower()
 
-def resolve_token_id(name: str) -> str:
-    aliases = {
-        "bnb": "binancecoin",
-        "wbnb": "wbnb",
-        "wenbnb": "wenbnb",
-        "busd": "binance-usd",
-        "eth": "ethereum",
-        "btc": "bitcoin",
-    }
-    return aliases.get(name.lower(), name.lower())
-
-
+# ---- CoinGecko price ----
 def get_token_price(token_id="wenbnb", vs_currency="usd"):
     try:
-        resolved_id = resolve_token_id(token_id)
-        url = f"{CG_BASE}/simple/price?ids={resolved_id}&vs_currencies={vs_currency}"
-        res = requests.get(url, timeout=6).json()
-        if resolved_id in res:
-            price = res[resolved_id][vs_currency]
-            record_telemetry("token_price", {"id": token_id, "price": price})
-            return price
+        url = f"{CG_BASE}/simple/price"
+        params = {"ids": token_id, "vs_currencies": vs_currency}
+        data = safe_request(url, params=params)
+        if data and token_id in data and vs_currency in data[token_id]:
+            return data[token_id][vs_currency]
+    except Exception:
+        pass
+    return None
 
-        # === fallback DexScreener ===
-        dex_url = f"https://api.dexscreener.com/latest/dex/search?q={token_id}"
-        dex_data = requests.get(dex_url, timeout=6).json()
-        if "pairs" in dex_data and dex_data["pairs"]:
-            price_usd = dex_data["pairs"][0].get("priceUsd")
-            if price_usd:
-                record_telemetry("token_price_dex", {"id": token_id, "price": price_usd})
-                return float(price_usd)
-        return "N/A"
-    except Exception as e:
-        print(f"[Web3Connect] Token price error: {e}")
-        return "N/A"
+# ---- BscScan helpers ----
+def bsc_account_balance(address):
+    """
+    Returns tuple (success, message)
+    success -> float BNB balance or None
+    message -> descriptive string or float
+    """
+    if not BSCSCAN_API_KEY:
+        return False, "BscScan API key not configured."
 
+    params = {
+        "module": "account",
+        "action": "balance",
+        "address": address,
+        "apikey": BSCSCAN_API_KEY
+    }
+    data = safe_request(BSC_BASE, params=params, retries=2)
+    if not data:
+        return False, "BscScan unreachable or timed out."
 
-def get_wallet_balance(address):
+    # Typical BscScan response: {"status":"1","message":"OK","result":"12345..."}
+    if str(data.get("status")) != "1":
+        # Could be "0" with a message in result
+        return False, "Invalid or unreachable address."
+
     try:
-        url = f"{BSC_BASE}?module=account&action=balance&address={address}&apikey={BSCSCAN_API_KEY}"
-        res = requests.get(url, timeout=8).json()
+        wei = int(data.get("result", 0))
+        bnb = wei / (10**18)
+        return True, bnb
+    except Exception:
+        return False, "Parsing error."
 
-        if res.get("status") == "0":
-            msg = res.get("message", "Unknown error")
-            if "rate limit" in msg.lower():
-                return "⚠️ API rate-limited — try again soon."
-            return "❌ Invalid wallet address or no balance."
+def bsc_token_supply(contract_address):
+    """Return (ok, value_or_reason). If contract not verified -> return (False, 'unverified')"""
+    if not BSCSCAN_API_KEY:
+        return False, "BscScan API key not configured."
 
-        wei_balance = int(res.get("result", 0))
-        bnb_balance = wei_balance / (10**18)
-        record_telemetry("wallet_balance", {"address": address, "balance": bnb_balance})
-        return f"{bnb_balance:.6f} BNB"
-    except Exception as e:
-        print(f"[Web3Connect] Wallet balance error: {e}")
-        return "Error retrieving wallet balance."
+    # First check tokensupply endpoint
+    params = {
+        "module": "stats",
+        "action": "tokensupply",
+        "contractaddress": contract_address,
+        "apikey": BSCSCAN_API_KEY
+    }
+    data = safe_request(BSC_BASE, params=params, retries=2)
+    if not data:
+        return False, "BscScan unreachable."
 
+    # If tokensupply returns non-OK, try contract verification check
+    if str(data.get("status")) == "1" and data.get("result") is not None:
+        try:
+            raw = data.get("result")
+            total = int(raw) / 1e18
+            return True, total
+        except Exception:
+            return False, "Error parsing supply."
 
-def get_token_supply(contract_address):
-    try:
-        url = f"{BSC_BASE}?module=stats&action=tokensupply&contractaddress={contract_address}&apikey={BSCSCAN_API_KEY}"
-        res = requests.get(url, timeout=8).json()
+    # tokensupply failed: check if contract source is verified
+    verify_params = {
+        "module": "contract",
+        "action": "getsourcecode",
+        "address": contract_address,
+        "apikey": BSCSCAN_API_KEY
+    }
+    vdata = safe_request(BSC_BASE, params=verify_params, retries=1)
+    if vdata and isinstance(vdata.get("result"), list) and len(vdata["result"]) > 0:
+        src = vdata["result"][0].get("SourceCode")
+        if src and len(src.strip()) > 0:
+            # strange case: verified but tokensupply failed — report error
+            return False, "Verified but failed to fetch supply."
+        else:
+            return False, "unverified"
+    else:
+        return False, "unverified"
 
-        if res.get("status") == "0":
-            msg = res.get("message", "Unknown error")
-            if "rate limit" in msg.lower():
-                return "⚠️ API rate-limited — try again soon."
-            return "❌ Invalid or unverified contract."
-
-        supply = int(res.get("result", 0)) / 1e18
-        record_telemetry("token_supply", {"contract": contract_address, "supply": supply})
-        return f"{supply:,.0f} tokens"
-    except Exception as e:
-        print(f"[Web3Connect] Token supply error: {e}")
-        return "Error fetching supply."
-
-
-# === COMMANDS ===
+# ---- Commands ----
 def web3_panel(update: Update, context: CallbackContext):
     text = (
         "<b>🌐 WENBNB AI Web3 Command Center</b>\n\n"
-        "🪙 /tokenprice &lt;token_id&gt; — Get live price (CoinGecko + DexScreener)\n"
-        "💎 /wallet &lt;address&gt; — Check BNB wallet balance\n"
-        "📊 /supply &lt;contract&gt; — Token total supply (BSC)\n"
-        "🧠 /analyze &lt;address&gt; — AI wallet risk scan (coming soon)\n\n"
+        "💱 /tokenprice <token_id> — Get live price (CoinGecko)\n"
+        "💎 /wallet <address> — Check BNB wallet balance (read-only)\n"
+        "📊 /supply <contract> — Token total supply (BSC)\n"
+        "🧠 /analyze <address> — AI wallet risk scan (coming soon)\n\n"
         f"{BRAND_TAG}"
     )
     update.message.reply_text(text, parse_mode="HTML")
 
-
 def tokenprice(update: Update, context: CallbackContext):
     if not context.args:
-        update.message.reply_text("💡 Usage: /tokenprice <token_id>\nExample: /tokenprice bnb")
+        update.message.reply_text("💡 Usage: /tokenprice <token_id>  (example: /tokenprice eth)")
         return
-    token_id = context.args[0]
+    token_id = context.args[0].lower()
     price = get_token_price(token_id)
-    text = f"💰 <b>{token_id.upper()}</b> current price:\n<b>{format_usd(price)}</b>\n\n{BRAND_TAG}"
-    update.message.reply_text(text, parse_mode="HTML")
-
+    if price is None:
+        # fallback message — coin not found on CoinGecko
+        update.message.reply_text(f"💰 <b>{token_id.upper()}</b> current price:\n<b>N/A</b>\n\nTip: token may not be listed on CoinGecko yet.\n\n{BRAND_TAG}", parse_mode="HTML")
+        return
+    update.message.reply_text(f"💰 <b>{token_id.upper()}</b> current price:\n<b>{format_usd(price)}</b>\n\n{BRAND_TAG}", parse_mode="HTML")
 
 def wallet_balance(update: Update, context: CallbackContext):
     if not context.args:
         update.message.reply_text("💡 Usage: /wallet <BSC_wallet_address>")
         return
-    address = context.args[0]
-    balance = get_wallet_balance(address)
-    update.message.reply_text(
-        f"👛 Wallet (Safe Mode): <code>{address}</code>\nBalance: <b>{balance}</b>\n\n"
-        f"Balance check allowed — no signing or private keys used.\n\n{BRAND_TAG}",
-        parse_mode="HTML",
-    )
+    raw = context.args[0]
+    address = normalize_address(raw)
 
+    # quick validation length
+    if len(address) != 42 or not address.startswith("0x"):
+        update.message.reply_text("⚠️ Invalid address format. Make sure address is 0x... hex.")
+        return
+
+    ok, result = bsc_account_balance(address)
+    if not ok:
+        # If result says unreachable or rate limit, provide helpful tips
+        if "rate" in str(result).lower() or "unreachable" in str(result).lower():
+            msg = f"👛 Wallet: <code>{address}</code>\nBalance: <b>Invalid or unreachable address.</b>\n\nTip: BscScan may rate-limit requests; try again or ensure API key has quota.\n\n{BRAND_TAG}"
+        else:
+            msg = f"👛 Wallet: <code>{address}</code>\nBalance: <b>{result}</b>\n\n{BRAND_TAG}"
+        update.message.reply_text(msg, parse_mode="HTML")
+        return
+
+    # ok True -> numeric bnb balance returned
+    bnb = result
+    update.message.reply_text(f"👛 Wallet: <code>{address}</code>\nBalance: <b>{bnb:.6f} BNB</b>\n\n{BRAND_TAG}", parse_mode="HTML")
 
 def token_supply(update: Update, context: CallbackContext):
     if not context.args:
         update.message.reply_text("💡 Usage: /supply <contract_address>")
         return
-    contract = context.args[0]
-    supply = get_token_supply(contract)
-    text = f"📊 Token Supply for:\n<code>{contract}</code>\nTotal: <b>{supply}</b>\n\n{BRAND_TAG}"
-    update.message.reply_text(text, parse_mode="HTML")
+    raw = context.args[0]
+    contract = normalize_address(raw)
 
-
-def analyze_wallet(update: Update, context: CallbackContext):
-    if not context.args:
-        update.message.reply_text("💡 Usage: /analyze <wallet_address>")
+    if len(contract) != 42:
+        update.message.reply_text("⚠️ Invalid contract address format.")
         return
-    address = context.args[0]
-    text = (
-        f"🧠 <b>AI Wallet Risk Analyzer — v1.0 Prototype</b>\n\n"
-        f"Analyzing wallet: <code>{address}</code>\n"
-        f"Status: <i>Feature coming in Emotion Sync upgrade (v5.4)</i>\n\n"
-        f"{BRAND_TAG}"
+
+    ok, val = bsc_token_supply(contract)
+    if ok:
+        # val is numeric total tokens
+        update.message.reply_text(f"📊 Token Supply for:\n<code>{contract}</code>\nTotal: <b>{val:,.0f} tokens</b>\n\n{BRAND_TAG}", parse_mode="HTML")
+    else:
+        if val == "unverified":
+            update.message.reply_text(f"📊 Token Supply for:\n<code>{contract}</code>\nTotal: ❌ <b>Invalid or unverified contract</b>.\n\nTip: Verify the contract source on BscScan to enable supply analytics.\n\n{BRAND_TAG}", parse_mode="HTML")
+        else:
+            update.message.reply_text(f"📊 Token Supply for:\n<code>{contract}</code>\nTotal: ❌ <b>{val}</b>\n\n{BRAND_TAG}", parse_mode="HTML")
+
+def analyze_placeholder(update: Update, context: CallbackContext):
+    # Minimal placeholder, will be replaced by Emotion Sync v5.4
+    if not context.args:
+        update.message.reply_text("💡 Usage: /analyze <address>")
+        return
+    address = normalize_address(context.args[0])
+    update.message.reply_text(
+        f"🧠 AI Wallet Risk Analyzer — v1.0 Prototype\n\n"
+        f"Analyzing wallet:\n<code>{address}</code>\n\n"
+        f"Status: <i>Feature coming in Emotion Sync upgrade (v5.4)</i>\n\n{BRAND_TAG}",
+        parse_mode="HTML"
     )
-    update.message.reply_text(text, parse_mode="HTML")
 
-
-# === REGISTER HANDLERS ===
+# ---- Register Handlers ----
 def register_handlers(dp):
     dp.add_handler(CommandHandler("web3", web3_panel))
     dp.add_handler(CommandHandler("tokenprice", tokenprice))
     dp.add_handler(CommandHandler("wallet", wallet_balance))
     dp.add_handler(CommandHandler("supply", token_supply))
-    dp.add_handler(CommandHandler("analyze", analyze_wallet))
-    print("🧠 web3_connect.py v5.3-Pro loaded — Smart BscScan handling + Analyzer ready.")
+    dp.add_handler(CommandHandler("analyze", analyze_placeholder))
