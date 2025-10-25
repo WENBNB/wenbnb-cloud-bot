@@ -1,8 +1,8 @@
 from telegram.ext import CommandHandler
-import requests, html, random, math, os
+import requests, html, random, math, os, re
 
 # === Branding ===
-BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — Neural Market Intelligence v5.7.1 ⚡"
+BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — Neural Market Intelligence v5.7.2 ⚡"
 DEXSCREENER_SEARCH = "https://api.dexscreener.io/latest/dex/search?q={q}"
 COINGECKO_SIMPLE = "https://api.coingecko.com/api/v3/simple/price?ids={id}&vs_currencies=usd"
 BINANCE_BNB = "https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT"
@@ -13,7 +13,7 @@ WEN_TOKEN_ADDRESS = os.getenv("WEN_TOKEN_ADDRESS")
 BSCSCAN_API_KEY = os.getenv("BSCSCAN_API_KEY")
 DEFAULT_TOKEN = "wenbnb"
 
-# === Utilities ===
+# === Utils ===
 def short_float(x):
     try:
         v = float(x)
@@ -58,21 +58,26 @@ def verify_contract(address: str):
         return "⚙️ Verification check failed"
 
 def strict_token_match(pairs, query):
-    """Choose the best match, skip ETH/WETH/USDT noise."""
+    """Smarter filtering — matches symbol/name/address, skips ETH noise."""
     qlow = query.lower()
-    ignore = {"eth", "weth", "usdt", "usdc", "bnb"}
+    ignore = {"eth", "weth", "usdt", "usdc", "bnb", "busd"}
+    exact_match, fallback = None, None
     for p in pairs:
         base = p.get("baseToken", {})
-        quote = p.get("quoteToken", {})
-        bsym = (base.get("symbol") or "").lower()
-        qsym = (quote.get("symbol") or "").lower()
-        if bsym in ignore or qsym in ignore:
+        sym = (base.get("symbol") or "").lower()
+        name = (base.get("name") or "").lower()
+        addr = (base.get("address") or "").lower()
+        if sym in ignore or name in ignore:
             continue
-        if qlow in [(base.get("symbol") or "").lower(),
-                    (base.get("name") or "").lower(),
-                    (base.get("address") or "").lower()]:
-            return p
-    return pairs[0] if pairs else None
+        if qlow == sym or qlow == name or qlow == addr:
+            exact_match = p
+            break
+        if qlow in sym or qlow in name:
+            fallback = p
+    return exact_match or fallback or (pairs[0] if pairs else None)
+
+def is_contract_address(q: str) -> bool:
+    return bool(re.match(r"^0x[a-fA-F0-9]{40}$", q.strip()))
 
 # === /price Command ===
 def price_cmd(update, context):
@@ -94,19 +99,29 @@ def price_cmd(update, context):
         chain, liquidity, volume24, nmr = "Unknown", 0, 0, "N/A"
         dex_source, verify_status = "CoinGecko", ""
 
-        # === Try CoinGecko ===
+        # === 1️⃣ CoinGecko primary lookup ===
         try:
             cg = requests.get(COINGECKO_SIMPLE.format(id=token), timeout=10).json()
             token_price = cg.get(token, {}).get("usd")
         except Exception:
             token_price = None
 
-        # === DexScreener fallback ===
+        # === 2️⃣ DexScreener smart match fallback ===
         if not token_price:
             try:
-                data = requests.get(DEXSCREENER_SEARCH.format(q=WEN_TOKEN_ADDRESS or token), timeout=10).json()
+                query_target = token
+                if token == DEFAULT_TOKEN and WEN_TOKEN_ADDRESS:
+                    query_target = WEN_TOKEN_ADDRESS
+                data = requests.get(DEXSCREENER_SEARCH.format(q=query_target), timeout=10).json()
                 pairs = data.get("pairs", [])
-                match = strict_token_match(pairs, WEN_TOKEN_ADDRESS or token)
+
+                # 🧠 Smart Match Logic
+                if is_contract_address(query_target):
+                    # Look for contract-based match only
+                    match = next((p for p in pairs if (p.get("baseToken", {}).get("address", "").lower() == query_target.lower())), None)
+                else:
+                    match = strict_token_match(pairs, query_target)
+
                 if match:
                     base = match.get("baseToken", {})
                     token_name = base.get("name") or base.get("symbol") or token
@@ -123,17 +138,17 @@ def price_cmd(update, context):
             except Exception:
                 token_price, dex_source = "N/A", "Not Found"
 
-        # === Insight ===
+        # === Insight Engine ===
         insights = [
             f"{token_name} shows <b>healthy flow</b> 💎",
-            f"{token_name} is <b>cooling off</b> slightly 🪶",
-            f"{token_name} looks <b>volatile</b> — monitor closely ⚡",
+            f"{token_name} is <b>cooling off slightly</b> 🪶",
+            f"{token_name} looks <b>volatile</b> — watch carefully ⚡",
             f"{token_name} heating up on {chain} 🔥",
-            f"{token_name} attracting <b>smart money</b> 🧠"
+            f"{token_name} attracting <b>smart traders</b> 🧠"
         ]
         insight = random.choice(insights)
 
-        # === Final message ===
+        # === Message Output ===
         msg = (
             f"💹 <b>WENBNB Market Feed</b>\n\n"
             f"💎 <b>{html.escape(token_name)} ({html.escape(token_symbol)})</b>\n"
@@ -161,4 +176,4 @@ def price_cmd(update, context):
 # === Register ===
 def register(dispatcher, core=None):
     dispatcher.add_handler(CommandHandler("price", price_cmd))
-    print("✅ Loaded plugin: plugins.price_tracker (v5.7.1 Neural Precision-Lock Edition)")
+    print("✅ Loaded plugin: plugins.price_tracker (v5.7.2 Neural SmartMatch Edition)")
