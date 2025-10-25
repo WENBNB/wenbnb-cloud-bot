@@ -1,158 +1,150 @@
 """
-WENBNB Price Tracker v5.5-Pro Sync — Unified Market Engine
-─────────────────────────────────────────────────────────────
-Hybrid data system combining Binance, CoinGecko & DexScreener.
-AI-enhanced insights with Neural Rank analysis.
-
-💫 Powered by WENBNB Neural Engine — Market Intelligence 24×7 ⚡
+WENBNB Neural Engine — v5.6 Stable Edition
+────────────────────────────────────────────
+Restored legacy fallback behavior for /price and /price wenbnb.
+Now prefers DexScreener > CoinGecko > Binance.
 """
 
-import requests, html, random, math, time
 from telegram.ext import CommandHandler
+import requests, html, random, math, time
 
-# === BRANDING ===
-BRAND_TAG = "🚀 WENBNB Neural Engine — Market Intelligence 24×7 ⚡"
+# === Branding ===
+BRAND_FOOTER = "💫 Powered by WENBNB Neural Engine — AI Core Market Intelligence 24×7 ⚡"
+DEXSCREENER_SEARCH = "https://api.dexscreener.io/latest/dex/search?q={q}"
+COINGECKO_SIMPLE = "https://api.coingecko.com/api/v3/simple/price?ids={id}&vs_currencies=usd"
+BINANCE_BNB = "https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT"
 
-# === API SOURCES ===
-BINANCE_URL = "https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price?ids={id}&vs_currencies=usd"
-DEX_URL = "https://api.dexscreener.com/latest/dex/search?q={token}"
-
-# === UTILS ===
-def short_float(v):
+# === Utils ===
+def short_float(x):
     try:
-        val = float(v)
-        if val >= 1:
-            return f"{val:,.4f}"
+        v = float(x)
+        if v >= 1:
+            return f"{v:,.4f}"
         else:
-            return f"{val:.8f}"
-    except:
-        return str(v)
+            return f"{v:.8f}"
+    except Exception:
+        return str(x)
 
-def detect_chain(dex_id: str):
-    d = (dex_id or "").lower()
-    if "pancake" in d: return "BSC"
-    if "uniswap" in d: return "Ethereum"
-    if "base" in d: return "Base"
-    if "arbitrum" in d: return "Arbitrum"
+def detect_chain(dex_id: str) -> str:
+    dex_id = (dex_id or "").lower()
+    if "pancake" in dex_id: return "BSC"
+    if "uniswap" in dex_id: return "Ethereum"
+    if "base" in dex_id: return "Base"
+    if "arbitrum" in dex_id: return "Arbitrum"
     return "Unknown"
 
-def neural_rank(liq, vol):
+def neural_market_rank(L, V):
     try:
-        L = max(1.0, float(liq))
-        V = max(1.0, float(vol))
+        L = max(1.0, float(L))
+        V = max(1.0, float(V))
         score = (math.log10(L) * 0.6 + math.log10(V) * 0.4) * 10
         if score >= 85: return "A+"
         elif score >= 70: return "A"
         elif score >= 55: return "B"
         elif score >= 40: return "C"
         else: return "D"
-    except:
+    except Exception:
         return "N/A"
 
-# === DATA ENGINE ===
-def get_token_data(token):
-    token = token.lower().strip()
-    token_symbol = token.upper()
-    token_price, liquidity, volume24, chain, source = "N/A", 0, 0, "Unknown", "N/A"
-
-    # 1️⃣ Binance (for major pairs)
-    try:
-        pair = token_symbol + "USDT"
-        data = requests.get(BINANCE_URL.format(symbol=pair), timeout=4).json()
-        if "price" in data:
-            return {
-                "name": token_symbol,
-                "price": float(data["price"]),
-                "liquidity": 0,
-                "volume": 0,
-                "chain": "Centralized",
-                "rank": "A+",
-                "source": "Binance"
-            }
-    except Exception:
-        pass
-
-    # 2️⃣ CoinGecko (for listed altcoins)
-    try:
-        data = requests.get(COINGECKO_URL.format(id=token), timeout=6).json()
-        if token in data:
-            price = data[token]["usd"]
-            return {
-                "name": token_symbol,
-                "price": price,
-                "liquidity": 0,
-                "volume": 0,
-                "chain": "Global",
-                "rank": "A",
-                "source": "CoinGecko"
-            }
-    except Exception:
-        pass
-
-    # 3️⃣ DexScreener fallback
-    try:
-        dex = requests.get(DEX_URL.format(token=token), timeout=6).json()
-        pairs = dex.get("pairs", [])
-        if pairs:
-            p = pairs[0]
-            token_name = p.get("baseToken", {}).get("name", token_symbol)
-            token_price = p.get("priceUsd", "N/A")
-            chain = detect_chain(p.get("dexId"))
-            liquidity = p.get("liquidity", {}).get("usd", 0)
-            volume24 = p.get("volume", {}).get("h24", 0)
-            return {
-                "name": token_name,
-                "price": token_price,
-                "liquidity": liquidity,
-                "volume": volume24,
-                "chain": chain,
-                "rank": neural_rank(liquidity, volume24),
-                "source": p.get("dexId", "DEX").capitalize()
-            }
-    except Exception as e:
-        print(f"[Dex Error] {e}")
-
-    return {"name": token_symbol, "price": "N/A", "rank": "N/A", "chain": chain, "source": source}
-
-# === COMMAND ===
+# === /price Command ===
 def price_cmd(update, context):
     try:
         context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
-        token = context.args[0] if context.args else "wenbnb"
-        data = get_token_data(token)
-        timestamp = time.strftime("%H:%M:%S", time.localtime())
+        # 🧠 Default Token Fallback
+        token = context.args[0].upper() if context.args else "WENBNB"
+        if not context.args:
+            update.message.reply_text(
+                "💡 No token specified — showing default <b>WENBNB</b> market data.",
+                parse_mode="HTML"
+            )
 
+        # --- Fetch BNB price ---
+        try:
+            bnb_data = requests.get(BINANCE_BNB, timeout=8).json()
+            bnb_price = float(bnb_data.get("price", 0))
+        except:
+            bnb_price = 0
+
+        token_name, token_symbol, token_price, dex_source = token, token, "N/A", "Not Found"
+        chain, liquidity, volume24, nmr = "Unknown", 0, 0, "N/A"
+
+        # --- Step 1: DexScreener first (better accuracy for new tokens)
+        try:
+            dex_data = requests.get(DEXSCREENER_SEARCH.format(q=token), timeout=8).json()
+            pairs = dex_data.get("pairs", [])
+            if pairs:
+                pair = pairs[0]
+                base = pair.get("baseToken", {})
+                token_name = base.get("name") or token
+                token_symbol = base.get("symbol") or token
+                token_price = pair.get("priceUsd", "N/A")
+                dex_source = pair.get("dexId", "Unknown DEX").capitalize()
+                chain = detect_chain(dex_source)
+                liquidity = pair.get("liquidity", {}).get("usd", 0)
+                volume24 = pair.get("volume", {}).get("h24", 0)
+                nmr = neural_market_rank(liquidity, volume24)
+        except:
+            pass
+
+        # --- Step 2: CoinGecko fallback only if Dex fails
+        if token_price in ["N/A", None, 0]:
+            try:
+                cg_data = requests.get(COINGECKO_SIMPLE.format(id=token.lower()), timeout=8).json()
+                cg_price = cg_data.get(token.lower(), {}).get("usd")
+                if cg_price:
+                    token_price = cg_price
+                    dex_source = "CoinGecko"
+                    chain = "Centralized"
+                    nmr = "A+"
+            except:
+                pass
+
+        # --- If still N/A ---
+        if token_price in ["N/A", None, 0]:
+            update.message.reply_text(
+                f"❌ No valid market data for <b>{html.escape(token)}</b>.\n"
+                f"Tip: Try using contract address or known Dex token name.",
+                parse_mode="HTML"
+            )
+            return
+
+        # --- Neural Insight ---
         insights = [
-            "is showing <b>strong market confidence</b> 💎",
-            "is <b>consolidating</b> after volatility ⚙️",
-            "is <b>gaining traction</b> among traders 🔥",
-            "shows <b>organic activity</b> and positive flow 🌿",
-            "is <b>cooling off</b> — monitor closely 🪶"
+            f"is showing <b>steady momentum</b> 🌙",
+            f"has <b>organic trading activity</b> 🌿",
+            f"is <b>recovering volume</b> 💎",
+            f"shows <b>AI-flagged smart money movement</b> ⚡",
+            f"may see <b>short-term volatility</b> 🧠",
         ]
         insight = random.choice(insights)
 
+        ts = time.strftime("%H:%M:%S", time.localtime())
+
+        # --- Build final output ---
         msg = (
-            f"💹 <b>Neural Market Update</b>\n\n"
-            f"💎 <b>{html.escape(data['name'])}</b>\n"
-            f"🌐 <b>Chain:</b> {data['chain']}\n"
-            f"💰 <b>Price:</b> ${short_float(data['price'])}\n"
-            f"💧 <b>Liquidity:</b> ${short_float(data['liquidity'])}\n"
-            f"📊 <b>24h Volume:</b> ${short_float(data['volume'])}\n"
-            f"🏅 <b>Neural Market Rank:</b> {data['rank']}\n"
-            f"📈 <i>Source:</i> {data['source']}\n\n"
-            f"🧠 Insight: <b>{data['name']}</b> {insight}\n\n"
-            f"{BRAND_TAG}\n⏱️ {timestamp}"
+            f"💎 <b>Live Market Update</b>\n\n"
+            f"💠 <b>{html.escape(token_name)}</b>\n"
+            f"🌐 <b>Chain:</b> {chain}\n"
+            f"💰 <b>Price:</b> ${short_float(token_price)}\n"
+            f"💧 <b>Liquidity:</b> ${short_float(liquidity)}\n"
+            f"📊 <b>24h Volume:</b> ${short_float(volume24)}\n"
+            f"🏅 <b>Neural Market Rank:</b> {nmr}\n"
+            f"📈 <i>Data Source:</i> {dex_source}\n\n"
+            f"🧠 Neural Insight: <b>{token_name}</b> {insight}\n\n"
+            f"{BRAND_FOOTER}\n⏱️ {ts}"
         )
 
         update.message.reply_text(msg, parse_mode="HTML", disable_web_page_preview=True)
 
     except Exception as e:
-        print(f"[Error in /price] {e}")
-        update.message.reply_text("⚙️ Neural Engine syncing... please retry soon.", parse_mode="HTML")
+        print("Error in price_cmd:", e)
+        update.message.reply_text(
+            "⚙️ Neural Engine syncing... please retry soon.",
+            parse_mode="HTML"
+        )
 
-# === REGISTER ===
+# === Register ===
 def register(dispatcher, core=None):
     dispatcher.add_handler(CommandHandler("price", price_cmd))
-    print("✅ Loaded plugin: plugins.price_tracker (v5.5-Pro Sync)")
+    print("✅ Loaded plugin: plugins.price_tracker (v5.6 Stable)")
