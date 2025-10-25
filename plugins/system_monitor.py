@@ -1,20 +1,26 @@
 """
-WENBNB System Monitor v2.9 — Auto-Healing Neural Guardian
-Ensures uptime, API health, and plugin recovery 24×7
-🚀 Powered by WENBNB Neural Engine — Resilience Layer v2.9
+WENBNB System Monitor v8.4-Pro — Neural Heartbeat + Auto-Heal Guardian
+──────────────────────────────────────────────────────────────────────
+Purpose:
+• Real-time system health metrics (CPU, RAM, uptime, API)
+• Intelligent plugin auto-recovery with unified logging
+• Sends heartbeat updates to dashboard (if configured)
+• Emotion-aware notifications (soft alert mode)
+
+💫 Powered by WENBNB Neural Engine — Resilience Framework 24×7
 """
 
-import time, threading, requests, traceback, platform, psutil, importlib, os
+import os, time, threading, requests, traceback, platform, psutil, importlib
 from datetime import datetime
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
 # === CONFIG ===
-ADMIN_IDS = [123456789]  # Replace with your Telegram ID
+ADMIN_IDS = [123456789]  # Replace with your admin ID
 PLUGIN_DIR = "plugins"
 BOT_START_TIME = datetime.now()
 CHECK_INTERVAL = 120  # seconds
-BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Resilience Layer 24×7"
+BRAND_TAG = "💫 WENBNB Neural Engine — Resilience Framework 24×7 ⚡"
 
 SYSTEM_STATUS = {
     "cpu": 0,
@@ -24,39 +30,67 @@ SYSTEM_STATUS = {
     "autoheal": "✅ Active"
 }
 
-ACTIVE_PLUGINS = {}
+FAILED_PLUGINS = {}
 STOP_FLAG = False
+DASHBOARD_URL = os.getenv("DASHBOARD_URL", "")
 
 
-# === AUTO-HEALING CORE ===
+# === LOGGING ===
+def log(msg: str):
+    ts = time.strftime("%H:%M:%S")
+    print(f"[WENBNB | SystemMonitor | {ts}] {msg}")
+
+
+# === DASHBOARD SYNC ===
+def send_dashboard_ping(event: str, data=None):
+    if not DASHBOARD_URL:
+        return
+    try:
+        payload = {"event": event, "time": int(time.time()), "data": data or {}}
+        requests.post(DASHBOARD_URL.rstrip("/") + "/update_activity", json=payload, timeout=5)
+    except Exception:
+        pass
+
+
+# === AUTO-HEAL CORE ===
 def auto_heal_plugins(dispatcher):
     while not STOP_FLAG:
         try:
             for file in os.listdir(PLUGIN_DIR):
-                if file.endswith(".py") and not file.startswith("__"):
-                    module_name = file[:-3]
-                    if module_name not in ACTIVE_PLUGINS or ACTIVE_PLUGINS[module_name] == "❌ Error":
-                        try:
-                            module = importlib.import_module(f"{PLUGIN_DIR}.{module_name}")
-                            if hasattr(module, "register_handlers"):
-                                module.register_handlers(dispatcher)
-                                ACTIVE_PLUGINS[module_name] = "✅ Recovered"
-                                print(f"[AutoHeal] Recovered {module_name}")
-                                for admin_id in ADMIN_IDS:
-                                    dispatcher.bot.send_message(
-                                        admin_id,
-                                        f"🛠️ Auto-Healed Plugin: <b>{module_name}</b>",
-                                        parse_mode="HTML"
-                                    )
-                        except Exception as e:
-                            print(f"[AutoHeal] Failed to reload {module_name}: {e}")
+                if not file.endswith(".py") or file.startswith("__"):
+                    continue
+
+                module_name = file[:-3]
+                if module_name in FAILED_PLUGINS:
+                    try:
+                        module_path = f"{PLUGIN_DIR}.{module_name}"
+                        if module_path in sys.modules:
+                            del sys.modules[module_path]
+                        module = importlib.import_module(module_path)
+
+                        if hasattr(module, "register_handlers"):
+                            module.register_handlers(dispatcher)
+                        elif hasattr(module, "register"):
+                            module.register(dispatcher)
+
+                        del FAILED_PLUGINS[module_name]
+                        log(f"💚 Auto-recovered plugin: {module_name}")
+                        for admin_id in ADMIN_IDS:
+                            dispatcher.bot.send_message(
+                                admin_id,
+                                f"🛠️ <b>Auto-Healed:</b> {module_name}",
+                                parse_mode="HTML"
+                            )
+                        send_dashboard_ping("plugin_recovered", {"plugin": module_name})
+                    except Exception as e:
+                        log(f"⚠️ Auto-heal retry failed for {module_name}: {e}")
             time.sleep(300)
         except Exception as e:
-            print(f"[AutoHeal Thread Error] {e}")
+            log(f"[AutoHeal Error] {e}")
             time.sleep(300)
 
 
-# === SYSTEM MONITOR ===
+# === SYSTEM HEARTBEAT MONITOR ===
 def monitor_system(dispatcher):
     global SYSTEM_STATUS
     while not STOP_FLAG:
@@ -67,7 +101,7 @@ def monitor_system(dispatcher):
             hours, remainder = divmod(int(uptime_seconds), 3600)
             minutes, _ = divmod(remainder, 60)
 
-            # API heartbeat check
+            # API heartbeat
             try:
                 res = requests.get("https://api.binance.com/api/v3/time", timeout=5)
                 api_status = "✅ OK" if res.status_code == 200 else "⚠️ Slow"
@@ -81,29 +115,31 @@ def monitor_system(dispatcher):
                 "api": api_status
             })
 
-            # Notify admin if API fails
             if api_status == "❌ Down":
                 for admin_id in ADMIN_IDS:
                     dispatcher.bot.send_message(
                         admin_id,
-                        "⚠️ <b>Binance API is DOWN!</b>\nSystem entering Watch Mode.",
+                        "⚠️ <b>Binance API appears DOWN!</b>\nSwitching to Watch Mode 🌙",
                         parse_mode="HTML"
                     )
+                send_dashboard_ping("api_down")
+
+            send_dashboard_ping("heartbeat", SYSTEM_STATUS)
 
         except Exception as e:
-            print(f"[SystemMonitor Error] {traceback.format_exc()}")
+            log(f"[SystemMonitor Error] {traceback.format_exc()}")
         time.sleep(CHECK_INTERVAL)
 
 
-# === START MONITOR THREAD ===
+# === START THREADS ===
 def start_monitor(dispatcher):
     threading.Thread(target=monitor_system, args=(dispatcher,), daemon=True).start()
     threading.Thread(target=auto_heal_plugins, args=(dispatcher,), daemon=True).start()
-    print("🧠 WENBNB System Monitor & Auto-Heal threads initialized.")
+    log("🧠 System Monitor threads started (Heartbeat + Auto-Heal).")
 
 
 # === STATUS COMMAND ===
-def status_command(update: Update, context: CallbackContext):
+def system_status(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if user_id not in ADMIN_IDS:
         update.message.reply_text("🚫 Only admin can check system status.")
@@ -111,7 +147,7 @@ def status_command(update: Update, context: CallbackContext):
 
     s = SYSTEM_STATUS
     text = (
-        f"🧩 <b>WENBNB System Monitor v2.9</b>\n\n"
+        f"🧩 <b>WENBNB System Monitor v8.4-Pro</b>\n\n"
         f"🕒 Uptime: <b>{s['uptime']}</b>\n"
         f"💻 CPU Usage: <b>{s['cpu']}%</b>\n"
         f"📈 RAM Usage: <b>{s['ram']}%</b>\n"
@@ -123,7 +159,8 @@ def status_command(update: Update, context: CallbackContext):
     update.message.reply_text(text, parse_mode="HTML")
 
 
-# === REGISTER HANDLERS ===
+# === REGISTER ===
 def register_handlers(dp):
-    dp.add_handler(CommandHandler("status", status_command))
+    dp.add_handler(CommandHandler("system", system_status))
     start_monitor(dp)
+    log("💫 System Monitor registered successfully.")
