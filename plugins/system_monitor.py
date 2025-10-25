@@ -16,7 +16,7 @@ from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
 # === CONFIG ===
-ADMIN_IDS = [123456789]  # Replace with your admin ID
+ADMIN_IDS = [5698007588]  # Replace with your admin ID
 PLUGIN_DIR = "plugins"
 BOT_START_TIME = datetime.now()
 CHECK_INTERVAL = 120  # seconds
