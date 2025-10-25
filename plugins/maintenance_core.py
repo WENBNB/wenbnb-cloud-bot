@@ -1,7 +1,13 @@
 """
-WENBNB Maintenance Core v8.4-Pro
-Self-healing • Telemetry • S3 Cloud Backup • Sync-Safe Launch
-🚀 Powered by WENBNB Neural Engine — Integrity & Insight Layer 24×7
+WENBNB Maintenance Core v8.5-Pro — Cloud-Aware Integrity Engine
+───────────────────────────────────────────────────────────────
+Purpose:
+• Self-healing + daily telemetry logging
+• Smart zip-based backup with S3 upload
+• /backup and /telemetry admin commands
+• Seamless auto-registration with Plugin Manager
+
+💫 Powered by WENBNB Neural Engine — Integrity & Insight Layer 24×7 ⚡
 """
 
 import os, time, threading, zipfile, json, traceback, psutil, boto3
@@ -15,8 +21,8 @@ BACKUP_DIR = "backups"
 LOGS_DIR = "logs"
 DATA_DIR = "data"
 ANALYTICS_FILE = os.path.join(DATA_DIR, "telemetry.json")
-CHECK_INTERVAL = 86400  # 24h
-BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Integrity & Insight Layer 24×7"
+CHECK_INTERVAL = 86400  # every 24h
+BRAND_TAG = "💫 WENBNB Neural Engine — Integrity & Insight Layer 24×7 ⚡"
 
 # === S3 CONFIG ===
 S3_ENABLED = os.getenv("S3_ENABLED", "true").lower() == "true"
@@ -33,6 +39,7 @@ if S3_ENABLED:
             aws_secret_access_key=S3_SECRET_KEY,
             region_name=S3_REGION
         )
+        print("☁️ S3 client initialized successfully.")
     except Exception as e:
         print(f"[S3 Init Error] {e}")
         s3_client = None
@@ -43,7 +50,7 @@ else:
 for d in [BACKUP_DIR, LOGS_DIR, DATA_DIR]:
     os.makedirs(d, exist_ok=True)
 
-# === Core Backup Logic ===
+# === Backup Creator ===
 def create_backup_archive():
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     archive = os.path.join(BACKUP_DIR, f"WENBNB_Backup_{ts}.zip")
@@ -59,6 +66,7 @@ def create_backup_archive():
         print(f"[Backup Error] {e}")
         return None
 
+# === S3 Upload ===
 def upload_to_s3(file_path, folder="backups"):
     if not s3_client or not S3_BUCKET:
         return False
@@ -87,10 +95,11 @@ def record_telemetry(event, data=None):
 
         if S3_ENABLED and s3_client:
             upload_to_s3(ANALYTICS_FILE, folder="telemetry")
+
     except Exception as e:
         print(f"[Telemetry Error] {e}")
 
-# === System Health ===
+# === Health Report ===
 def system_health_report():
     try:
         return {
@@ -102,7 +111,7 @@ def system_health_report():
     except Exception as e:
         return {"error": str(e)}
 
-# === Maintenance Daemon ===
+# === Background Maintenance Loop ===
 def maintenance_daemon(bot):
     while True:
         try:
@@ -127,45 +136,45 @@ def maintenance_daemon(bot):
                 bot.send_message(admin, f"⚠️ Maintenance Error:\n<code>{e}</code>", parse_mode="HTML")
         time.sleep(CHECK_INTERVAL)
 
-# === Admin Commands ===
+# === Manual Backup Command ===
 def backup_now(update: Update, context: CallbackContext):
-    user = update.effective_user
-    chat_id = update.effective_chat.id
-    if user.id not in ADMIN_IDS:
-        return context.bot.send_message(chat_id, "🚫 Only admins can use this command.")
-
-    context.bot.send_message(chat_id, "⏳ Creating manual backup...")
+    if update.effective_user.id not in ADMIN_IDS:
+        return update.message.reply_text("🚫 Only admins can use this command.")
+    update.message.reply_text("⏳ Creating manual backup...")
     archive = create_backup_archive()
     if archive:
         upload_to_s3(archive)
-        context.bot.send_document(chat_id, open(archive, "rb"))
-        context.bot.send_message(chat_id, f"✅ Manual backup complete!\n{BRAND_TAG}", parse_mode="HTML")
+        update.message.reply_document(open(archive, "rb"))
+        update.message.reply_text(f"✅ Manual backup complete!\n{BRAND_TAG}")
     else:
-        context.bot.send_message(chat_id, "⚠️ Backup failed. Check logs.")
+        update.message.reply_text("⚠️ Backup failed. Check logs.")
 
+# === Telemetry Command ===
 def telemetry_report(update: Update, context: CallbackContext):
-    user = update.effective_user
-    chat_id = update.effective_chat.id
-    if user.id not in ADMIN_IDS:
-        return context.bot.send_message(chat_id, "🚫 Only admins can view analytics.")
+    if update.effective_user.id not in ADMIN_IDS:
+        return update.message.reply_text("🚫 Only admins can view analytics.")
     try:
         if not os.path.exists(ANALYTICS_FILE):
-            return context.bot.send_message(chat_id, "📊 No analytics recorded yet.")
+            update.message.reply_text("📊 No analytics recorded yet.")
+            return
         with open(ANALYTICS_FILE) as f:
             analytics = json.load(f)
         msg = f"📈 <b>Telemetry Summary</b>\n\nEvents tracked: {len(analytics.keys())}\n{BRAND_TAG}"
-        context.bot.send_message(chat_id, msg, parse_mode="HTML")
+        update.message.reply_text(msg, parse_mode="HTML")
     except Exception as e:
-        context.bot.send_message(chat_id, f"⚠️ Error loading analytics: {e}")
+        update.message.reply_text(f"⚠️ Error loading analytics: {e}")
 
 # === Register Handlers ===
 def register_handlers(dp):
     dp.add_handler(CommandHandler("backup", backup_now))
     dp.add_handler(CommandHandler("telemetry", telemetry_report))
+    threading.Thread(target=maintenance_daemon, args=(dp.bot,), daemon=True).start()
+    print("🧠 Maintenance Core v8.5-Pro active.")
 
-    # Safe delayed daemon startup (ensures handlers fully register first)
-    threading.Timer(5.0, lambda: threading.Thread(
-        target=maintenance_daemon, args=(dp.bot,), daemon=True
-    ).start()).start()
-
-    print("🧠 Maintenance Core v8.4-Pro (S3 + Sync-Safe) active after 5s init delay.")
+# === Auto Register for Plugin Manager ===
+def register(dp):
+    try:
+        register_handlers(dp)
+        print("🧩 Maintenance Core successfully registered with PluginManager.")
+    except Exception as e:
+        print(f"[MaintenanceCore Register Error] {e}")
