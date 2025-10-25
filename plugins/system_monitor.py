@@ -1,9 +1,12 @@
 """
-WENBNB System Monitor v8.4-Pro — Auto-Healing + Reboot Awareness
-────────────────────────────────────────────────────────────────
-Ensures uptime, API health, and plugin recovery 24×7
-Now enhanced with Last Reboot tracking + Emotion Sync integration.
-🚀 Powered by WENBNB Neural Engine — Resilience Framework 24×7 ⚡
+WENBNB System Monitor v8.4-Pro++ — Auto-Healing + Dual Command Support
+────────────────────────────────────────────────────────────────────────────
+Monitors CPU, RAM, uptime, and API health + maintains self-healing plugin sync.
+Now includes:
+• Dual command support (/status + /system)
+• Heartbeat-aware monitoring threads
+• Safe reboot telemetry access
+💫 Powered by WENBNB Neural Engine — Resilience Framework 24×7 ⚡
 """
 
 import time, threading, requests, traceback, platform, psutil, importlib, os, json
@@ -69,7 +72,6 @@ def monitor_system(dispatcher):
             hours, remainder = divmod(int(uptime_seconds), 3600)
             minutes, _ = divmod(remainder, 60)
 
-            # API heartbeat check
             try:
                 res = requests.get("https://api.binance.com/api/v3/time", timeout=5)
                 api_status = "✅ OK" if res.status_code == 200 else "⚠️ Slow"
@@ -83,7 +85,6 @@ def monitor_system(dispatcher):
                 "api": api_status
             })
 
-            # Notify admin if API fails
             if api_status == "❌ Down":
                 for admin_id in ADMIN_IDS:
                     dispatcher.bot.send_message(
@@ -104,16 +105,15 @@ def start_monitor(dispatcher):
     print("🧠 WENBNB System Monitor & Auto-Heal threads initialized.")
 
 
-# === STATUS COMMAND (Upgraded v8.4-Pro) ===
+# === STATUS COMMANDS ===
 def status_command(update: Update, context: CallbackContext):
+    """Main system report command."""
     user_id = update.effective_user.id
     if user_id not in ADMIN_IDS:
         update.message.reply_text("🚫 Only admin can check system status.")
         return
 
     s = SYSTEM_STATUS
-
-    # 🕒 Try to read last reboot info
     reboot_file = "data/last_reboot.json"
     last_reboot = "N/A"
     try:
@@ -125,7 +125,7 @@ def status_command(update: Update, context: CallbackContext):
         print(f"[Status] Failed to read last reboot time: {e}")
 
     text = (
-        f"🧩 <b>WENBNB System Monitor v8.4-Pro</b>\n\n"
+        f"🧩 <b>WENBNB System Monitor v8.4-Pro++</b>\n\n"
         f"🕒 Uptime: <b>{s['uptime']}</b>\n"
         f"🔁 Last Reboot: <b>{last_reboot}</b>\n"
         f"💻 CPU Usage: <b>{s['cpu']}%</b>\n"
@@ -138,7 +138,28 @@ def status_command(update: Update, context: CallbackContext):
     update.message.reply_text(text, parse_mode="HTML")
 
 
+def reboot_info(update: Update, context: CallbackContext):
+    """Quick access to last reboot time."""
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
+        update.message.reply_text("🚫 Only admin can view reboot info.")
+        return
+
+    reboot_file = "data/last_reboot.json"
+    if os.path.exists(reboot_file):
+        with open(reboot_file, "r") as f:
+            info = json.load(f)
+            timestamp = info.get("timestamp", "Unknown")
+    else:
+        timestamp = "No data recorded yet."
+
+    update.message.reply_text(f"🕓 <b>Last Reboot:</b> {timestamp}", parse_mode="HTML")
+
+
 # === REGISTER HANDLERS ===
 def register_handlers(dp):
     dp.add_handler(CommandHandler("status", status_command))
+    dp.add_handler(CommandHandler("system", status_command))  # ✅ Added alias
+    dp.add_handler(CommandHandler("rebootinfo", reboot_info))
     start_monitor(dp)
+    print("✅ System Monitor Handlers Registered — /status & /system ready.")
