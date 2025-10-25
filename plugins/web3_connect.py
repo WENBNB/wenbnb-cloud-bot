@@ -1,8 +1,8 @@
 """
-WENBNB AI-Powered Web3 Command Center v5.0-ProSafe
-───────────────────────────────────────────────────
+WENBNB AI-Powered Web3 Command Center v5.1-ProSafe++
+────────────────────────────────────────────────────
 Integrates blockchain data, wallet validation, and token intelligence.
-Now with Safe Mode Guard (no private key ops) + optional telemetry logging.
+Now with Safe Mode Guard (no signing ops), HTML-safe output, and telemetry sync.
 🚀 Powered by WENBNB Neural Engine — Web3 Intelligence 24×7 ⚡
 """
 
@@ -10,23 +10,23 @@ import requests, json, time, os
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
+# ====== CONFIG ======
 BRAND_TAG = "💫 WENBNB Neural Engine — Web3 Intelligence 24×7 ⚡"
-
-# ====== CONFIGURATION ======
 BSCSCAN_API_KEY = os.getenv("BSCSCAN_API_KEY")
 CG_BASE = "https://api.coingecko.com/api/v3"
 BSC_BASE = "https://api.bscscan.com/api"
-SAFE_MODE = True  # 🔒 disables signing or sensitive operations
+SAFE_MODE = True  # 🔒 prevents any signing or sensitive wallet ops
 
-# ====== HELPER FUNCTIONS ======
+# ====== TELEMETRY BRIDGE ======
 def record_telemetry(event: str, data=None):
-    """Optional telemetry if maintenance_pro is active."""
+    """Optional telemetry hook to maintenance_pro."""
     try:
         from plugins.maintenance_pro import record_telemetry as log_event
         log_event(event, data or {})
     except Exception:
         pass
 
+# ====== HELPERS ======
 def format_usd(value):
     try:
         return f"${float(value):,.6f}"
@@ -37,7 +37,9 @@ def get_token_price(token_id="wenbnb", vs_currency="usd"):
     try:
         url = f"{CG_BASE}/simple/price?ids={token_id}&vs_currencies={vs_currency}"
         data = requests.get(url, timeout=6).json()
-        return data[token_id][vs_currency]
+        if token_id in data:
+            return data[token_id][vs_currency]
+        return "N/A"
     except Exception as e:
         print(f"[Web3Connect] Price fetch error: {e}")
         return "N/A"
@@ -69,17 +71,17 @@ def get_token_supply(contract_address):
 def web3_panel(update: Update, context: CallbackContext):
     text = (
         "<b>🌐 WENBNB AI Web3 Command Center</b>\n\n"
-        "🪙 /tokenprice <id> — Get live price from CoinGecko\n"
-        "💎 /wallet <address> — Check BNB wallet balance\n"
-        "📊 /supply <contract> — Token total supply (BSC)\n"
-        "🧠 /analyze <address> — AI wallet risk scan (coming soon)\n\n"
+        "🪙 /tokenprice &lt;token_id&gt; — Get live price from CoinGecko\n"
+        "💎 /wallet &lt;address&gt; — Check BNB wallet balance\n"
+        "📊 /supply &lt;contract&gt; — Token total supply (BSC)\n"
+        "🧠 /analyze &lt;address&gt; — AI wallet risk scan (coming soon)\n\n"
         f"{BRAND_TAG}"
     )
     update.message.reply_text(text, parse_mode="HTML")
 
 def tokenprice(update: Update, context: CallbackContext):
     if not context.args:
-        update.message.reply_text("💡 Usage: /tokenprice <token_id>\nExample: /tokenprice wenbnb")
+        update.message.reply_text("💡 Usage: /tokenprice <token_id>\nExample: /tokenprice binancecoin")
         return
     token_id = context.args[0].lower()
     price = get_token_price(token_id)
@@ -93,10 +95,11 @@ def wallet_balance(update: Update, context: CallbackContext):
     address = context.args[0]
     if SAFE_MODE:
         record_telemetry("wallet_request_safe", {"address": address})
+        balance = get_wallet_balance(address)
         update.message.reply_text(
             f"👛 Wallet (Safe Mode): <code>{address}</code>\n"
             f"Balance check allowed — no signing or private keys used.\n\n"
-            f"Balance: <b>{get_wallet_balance(address)}</b>\n\n{BRAND_TAG}",
+            f"Balance: <b>{balance}</b>\n\n{BRAND_TAG}",
             parse_mode="HTML",
         )
     else:
@@ -117,4 +120,4 @@ def register_handlers(dp):
     dp.add_handler(CommandHandler("tokenprice", tokenprice))
     dp.add_handler(CommandHandler("wallet", wallet_balance))
     dp.add_handler(CommandHandler("supply", token_supply))
-    print("🧠 web3_connect.py v5.0-ProSafe initialized — SafeMode active.")
+    print("🧠 web3_connect.py v5.1-ProSafe++ initialized — SafeMode & HTML-safe active.")
