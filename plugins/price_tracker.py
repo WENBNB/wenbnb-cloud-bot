@@ -2,13 +2,13 @@ from telegram.ext import CommandHandler
 import requests, html, random, math, os
 
 # === Branding ===
-BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — Neural Market Intelligence v5.6.3 ⚡"
+BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — Neural Market Intelligence v5.6.4 ⚡"
 DEXSCREENER_SEARCH = "https://api.dexscreener.io/latest/dex/search?q={q}"
 COINGECKO_SIMPLE = "https://api.coingecko.com/api/v3/simple/price?ids={id}&vs_currencies=usd"
 BINANCE_BNB = "https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT"
 
 # === Config ===
-WEN_TOKEN_ADDRESS = os.getenv("WEN_TOKEN_ADDRESS")  # 💎 keep this exactly
+WEN_TOKEN_ADDRESS = os.getenv("WEN_TOKEN_ADDRESS")  # ⚙️ from Render env
 DEFAULT_TOKEN = "wenbnb"
 
 # === Utility ===
@@ -43,7 +43,7 @@ def neural_rank(liquidity_usd: float, volume24_usd: float) -> str:
     except Exception:
         return "N/A"
 
-# === Core ===
+# === /price Command ===
 def price_cmd(update, context):
     try:
         context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
@@ -64,24 +64,36 @@ def price_cmd(update, context):
         except Exception:
             bnb_price = 0
 
-        # --- Primary lookups ---
+        # --- Placeholders ---
         token_name, token_symbol, token_price, dex_source = token, "", None, "CoinGecko"
         chain, liquidity, volume24, nmr = "Unknown", 0, 0, "N/A"
 
-        # --- CoinGecko first ---
+        # --- CoinGecko primary ---
         try:
             cg_data = requests.get(COINGECKO_SIMPLE.format(id=token), timeout=10).json()
             token_price = cg_data.get(token, {}).get("usd")
         except Exception:
             token_price = None
 
-        # --- DexScreener fallback ---
+        # --- DexScreener fallback with DexMatch Filter ---
         if not token_price or token_price == "N/A":
             try:
                 dex_data = requests.get(DEXSCREENER_SEARCH.format(q=WEN_TOKEN_ADDRESS or token), timeout=10).json()
                 pairs = dex_data.get("pairs", [])
+                pair = None
+
                 if pairs:
-                    pair = pairs[0]
+                    qlow = (WEN_TOKEN_ADDRESS or token).lower()
+                    for p in pairs:
+                        base = p.get("baseToken", {})
+                        addr = (base.get("address") or "").lower()
+                        sym = (base.get("symbol") or "").lower()
+                        if qlow in [addr, sym]:
+                            pair = p
+                            break
+                    if not pair:
+                        pair = pairs[0]
+
                     base = pair.get("baseToken", {})
                     token_name = base.get("name") or base.get("symbol") or token
                     token_symbol = base.get("symbol") or token
@@ -94,17 +106,17 @@ def price_cmd(update, context):
             except Exception:
                 token_price, dex_source = "N/A", "Not Found"
 
-        # --- Insight tone ---
+        # --- Neural Insight tone ---
         insights = [
             f"{token_name} shows <b>healthy flow</b> 💎",
             f"{token_name} is <b>cooling off</b> slightly 🪶",
-            f"{token_name} looks <b>volatile</b> — watch it ⚡",
+            f"{token_name} looks <b>volatile</b> — watch closely ⚡",
             f"{token_name} heating up on {chain} 🔥",
             f"{token_name} attracting <b>smart money</b> 🧠"
         ]
         insight = random.choice(insights)
 
-        # --- Final message ---
+        # --- Response ---
         msg = (
             f"💹 <b>WENBNB Market Feed</b>\n\n"
             f"💎 <b>{html.escape(token_name)} ({html.escape(token_symbol or token.upper())})</b>\n"
@@ -128,4 +140,4 @@ def price_cmd(update, context):
 # === Register ===
 def register(dispatcher, core=None):
     dispatcher.add_handler(CommandHandler("price", price_cmd))
-    print("✅ Loaded plugin: plugins.price_tracker (v5.6.3 WENBNB Default Mode)")
+    print("✅ Loaded plugin: plugins.price_tracker (v5.6.4 DexMatch Filter Patch)")
