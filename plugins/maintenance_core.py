@@ -1,6 +1,10 @@
 """
-WENBNB Maintenance Core v4.0
-Self-healing, telemetry, and S3 cloud-backup integration.
+WENBNB Maintenance Core v8.4-Pro — Neural Auto-Integrity & Backup Engine
+────────────────────────────────────────────────────────────────────────────
+Purpose:
+• Scheduled system health checks, backup creation, and S3 sync
+• Cross-syncs with System Monitor (auto-heal alerts)
+• Generates telemetry and sends daily admin reports
 🚀 Powered by WENBNB Neural Engine — Integrity & Insight Layer 24×7
 """
 
@@ -10,13 +14,13 @@ from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
 # === CONFIG ===
-ADMIN_IDS = [123456789]  # your Telegram ID(s)
+ADMIN_IDS = [5698007588]  # replace with your Telegram ID
 BACKUP_DIR = "backups"
 LOGS_DIR = "logs"
 DATA_DIR = "data"
 ANALYTICS_FILE = os.path.join(DATA_DIR, "telemetry.json")
 CHECK_INTERVAL = 86400  # every 24h
-BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Integrity & Insight Layer 24×7"
+BRAND_TAG = "🚀 WENBNB Neural Engine — Integrity & Insight Layer 24×7 ⚡"
 
 # === S3 CONFIG ===
 S3_ENABLED = os.getenv("S3_ENABLED", "true").lower() == "true"
@@ -31,7 +35,7 @@ if S3_ENABLED:
             "s3",
             aws_access_key_id=S3_ACCESS_KEY,
             aws_secret_access_key=S3_SECRET_KEY,
-            region_name=S3_REGION
+            region_name=S3_REGION,
         )
     except Exception as e:
         print(f"[S3 Init Error] {e}")
@@ -39,11 +43,11 @@ if S3_ENABLED:
 else:
     s3_client = None
 
-# === ensure dirs ===
 for d in [BACKUP_DIR, LOGS_DIR, DATA_DIR]:
     os.makedirs(d, exist_ok=True)
 
 
+# === UTILITIES ===
 def create_backup_archive():
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     archive = os.path.join(BACKUP_DIR, f"WENBNB_Backup_{ts}.zip")
@@ -81,14 +85,13 @@ def record_telemetry(event, data=None):
                 analytics = json.load(f)
         analytics.setdefault(event, []).append({
             "timestamp": datetime.now().isoformat(),
-            "data": data or {}
+            "data": data or {},
         })
         with open(ANALYTICS_FILE, "w") as f:
             json.dump(analytics, f, indent=2)
 
         if S3_ENABLED and s3_client:
             upload_to_s3(ANALYTICS_FILE, folder="telemetry")
-
     except Exception as e:
         print(f"[Telemetry Error] {e}")
 
@@ -99,12 +102,13 @@ def system_health_report():
             "cpu": psutil.cpu_percent(interval=1),
             "mem": psutil.virtual_memory().percent,
             "disk": psutil.disk_usage('/').percent,
-            "uptime": time.strftime("%H:%M:%S", time.gmtime(time.time() - psutil.boot_time()))
+            "uptime": f"{int(time.time() - psutil.boot_time()) // 3600}h",
         }
     except Exception as e:
         return {"error": str(e)}
 
 
+# === MAIN LOOP ===
 def maintenance_daemon(bot):
     while True:
         try:
@@ -114,11 +118,12 @@ def maintenance_daemon(bot):
             if archive:
                 upload_to_s3(archive)
             msg = (
-                "🧠 <b>Maintenance Report</b>\n"
-                f"💾 Backup: {os.path.basename(archive) if archive else 'failed'}\n"
-                f"⚙️ CPU: {health.get('cpu', '?')}%\n"
-                f"💻 RAM: {health.get('mem', '?')}%\n"
-                f"💿 Disk: {health.get('disk', '?')}%\n\n"
+                "🧠 <b>Neural Maintenance Summary</b>\n"
+                f"🕒 Uptime: {health.get('uptime','?')}\n"
+                f"💻 CPU: {health.get('cpu','?')}%\n"
+                f"📈 RAM: {health.get('mem','?')}%\n"
+                f"💾 Disk: {health.get('disk','?')}%\n"
+                f"💾 Backup: {os.path.basename(archive) if archive else 'failed'}\n\n"
                 f"{BRAND_TAG}"
             )
             for admin in ADMIN_IDS:
@@ -130,6 +135,7 @@ def maintenance_daemon(bot):
         time.sleep(CHECK_INTERVAL)
 
 
+# === COMMANDS ===
 def backup_now(update: Update, context: CallbackContext):
     if update.effective_user.id not in ADMIN_IDS:
         return update.message.reply_text("🚫 Only admins can use this command.")
@@ -152,14 +158,20 @@ def telemetry_report(update: Update, context: CallbackContext):
             return
         with open(ANALYTICS_FILE) as f:
             analytics = json.load(f)
-        msg = f"📈 <b>Telemetry Summary</b>\n\nEvents tracked: {len(analytics.keys())}\n{BRAND_TAG}"
+        msg = (
+            f"📈 <b>Telemetry Summary</b>\n\n"
+            f"Tracked events: <b>{len(analytics.keys())}</b>\n"
+            f"Latest: {list(analytics.keys())[-1] if analytics else 'None'}\n\n"
+            f"{BRAND_TAG}"
+        )
         update.message.reply_text(msg, parse_mode="HTML")
     except Exception as e:
         update.message.reply_text(f"⚠️ Error loading analytics: {e}")
 
 
+# === REGISTER ===
 def register_handlers(dp):
     dp.add_handler(CommandHandler("backup", backup_now))
     dp.add_handler(CommandHandler("telemetry", telemetry_report))
     threading.Thread(target=maintenance_daemon, args=(dp.bot,), daemon=True).start()
-    print("🧠 Maintenance Core v4.0 (S3) active.")
+    print("🧠 Maintenance Core v8.4-Pro (Auto-Telemetry + S3) active.")
