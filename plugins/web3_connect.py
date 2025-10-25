@@ -1,10 +1,11 @@
 """
-WENBNB Web3 Connect v6.0-ProStable — RPC Synced Neural Web3 Command Center
+WENBNB Web3 Connect v6.1-PulseEdge — Dual-Mode Token Intelligence
 ─────────────────────────────────────────────────────────────────────────────
-✅ Integrated Binance + CoinGecko + DexScreener stack for token prices
-✅ On-chain RPC fallback for /wallet and /supply (no API keys required)
-✅ HTML-safe replies with clean, bold UI
-✅ Supports dynamic token aliasing for FLOKI, PEPE, etc.
+✅ Dual-mode /tokenprice : supports <symbol> or <contract address>
+✅ API chain: Binance → CoinMarketCap → CoinGecko → DexScreener
+✅ HTML-safe formatting (no parse errors)
+✅ Bold WENBNB Neural Engine branding
+✅ Clean footer with live timestamp only
 💫 Powered by WENBNB Neural Engine — Web3 Intelligence 24×7 ⚡
 """
 
@@ -17,15 +18,13 @@ from web3 import Web3
 BSC_RPC = "https://bsc-dataseed.binance.org/"
 w3 = Web3(Web3.HTTPProvider(BSC_RPC))
 
-PLUGIN_NAME = "web3_connect"
-BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Web3 Intelligence 24×7 ⚡"
+BRAND_TAG = "🚀 Powered by <b>WENBNB Neural Engine</b> — Web3 Intelligence 24×7 ⚡"
 
-# === API URLs ===
-BINANCE_URL = "https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-CG_URL = "https://api.coingecko.com/api/v3/simple/price?ids={tid}&vs_currencies=usd"
-DEX_URL = "https://api.dexscreener.com/latest/dex/tokens/{contract}"
+# === API KEYS (optional) ===
+CMC_KEY = os.getenv("CMC_API_KEY", "")
+CMC_URL = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol={symbol}"
 
-# === TOKEN MAP ===
+# === TOKEN ALIASES ===
 ALIASES = {
     "bnb": ("BNBUSDT", "binancecoin", "0xB8c77482e45F1F44dE1745F52C74426C631bDD52"),
     "eth": ("ETHUSDT", "ethereum", "0x2170Ed0880ac9A755fd29B2688956BD959F933F8"),
@@ -35,60 +34,79 @@ ALIASES = {
     "wenbnb": ("", "wenbnb", "0x4507cEf57C46789eF8d1a19EA45f4216bae2B528"),
 }
 
-# === PRICE ENGINE ===
+# === TOKEN PRICE ENGINE ===
 def get_token_price(token: str):
     token = token.lower().strip()
+
+    # If user entered contract
+    if token.startswith("0x") and len(token) == 42:
+        try:
+            r = requests.get(f"https://api.dexscreener.com/latest/dex/tokens/{token}", timeout=6)
+            data = r.json()
+            if "pairs" in data and data["pairs"]:
+                price = float(data["pairs"][0].get("priceUsd"))
+                return price, "DexScreener (Contract)"
+        except Exception:
+            return None, None
+
+    # If token is in aliases
     if token not in ALIASES:
-        return f"❓ Unknown token <b>{token.upper()}</b>\n🧠 WENBNB Neural Feed learning new assets..."
+        return f"❓ Unknown token <b>{token.upper()}</b>\n🧠 WENBNB Neural Feed learning new assets...", None
 
-    binance_symbol, coingecko_id, contract = ALIASES[token]
+    binance_symbol, cmc_symbol, contract = ALIASES[token]
 
-    # 1️⃣ Binance (fastest, live)
+    # 1️⃣ Binance (fastest)
     try:
         if binance_symbol:
-            res = requests.get(BINANCE_URL.format(symbol=binance_symbol), timeout=4)
-            data = res.json()
+            r = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={binance_symbol}", timeout=4)
+            data = r.json()
             if "price" in data:
-                price = float(data["price"])
-                return price, "Binance (Live)"
+                return float(data["price"]), "Binance (Live)"
     except Exception:
         pass
 
-    # 2️⃣ CoinGecko (fallback)
+    # 2️⃣ CoinMarketCap
     try:
-        res = requests.get(CG_URL.format(tid=coingecko_id), timeout=6)
-        data = res.json()
-        if coingecko_id in data:
-            price = data[coingecko_id]["usd"]
-            return price, "CoinGecko"
+        if CMC_KEY:
+            headers = {"X-CMC_PRO_API_KEY": CMC_KEY}
+            r = requests.get(CMC_URL.format(symbol=token.upper()), headers=headers, timeout=6)
+            data = r.json()
+            quote = data["data"][token.upper()]["quote"]["USD"]["price"]
+            return float(quote), "CoinMarketCap"
     except Exception:
         pass
 
-    # 3️⃣ DexScreener (last resort)
+    # 3️⃣ CoinGecko
     try:
-        res = requests.get(DEX_URL.format(contract=contract), timeout=6)
-        data = res.json()
+        r = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={cmc_symbol}&vs_currencies=usd", timeout=6)
+        data = r.json()
+        if cmc_symbol in data:
+            return data[cmc_symbol]["usd"], "CoinGecko"
+    except Exception:
+        pass
+
+    # 4️⃣ DexScreener fallback
+    try:
+        r = requests.get(f"https://api.dexscreener.com/latest/dex/tokens/{contract}", timeout=6)
+        data = r.json()
         if "pairs" in data and data["pairs"]:
-            price = float(data["pairs"][0].get("priceUsd"))
-            return price, "DexScreener (DEX)"
+            return float(data["pairs"][0].get("priceUsd")), "DexScreener"
     except Exception:
         pass
 
     return None, None
 
 
-# === WALLET BALANCE via RPC ===
+# === RPC FUNCTIONS ===
 def get_wallet_balance_rpc(address):
     try:
         checksum_addr = w3.to_checksum_address(address)
         wei_balance = w3.eth.get_balance(checksum_addr)
-        bnb_balance = wei_balance / 1e18
-        return f"{bnb_balance:.6f} BNB"
+        return f"{wei_balance / 1e18:.6f} BNB"
     except Exception:
         return "❌ Invalid or unreachable address."
 
 
-# === TOKEN SUPPLY via RPC ===
 def get_token_supply_rpc(contract):
     try:
         checksum_contract = w3.to_checksum_address(contract)
@@ -102,11 +120,11 @@ def get_token_supply_rpc(contract):
         return "❌ Could not fetch via RPC."
 
 
-# === COMMAND HANDLERS ===
+# === COMMANDS ===
 def web3_panel(update: Update, context: CallbackContext):
     text = (
         "🌐 <b>WENBNB Web3 Command Center</b>\n\n"
-        "💰 /tokenprice <id> — Live token price\n"
+        "💰 /tokenprice &lt;id&gt; or &lt;contract&gt; — Live token price\n"
         "👛 /wallet <address> — Wallet balance\n"
         "📊 /supply <contract> — Token total supply\n"
         "🧠 /analyze <address> — AI wallet risk (coming soon)\n\n"
@@ -118,22 +136,32 @@ def web3_panel(update: Update, context: CallbackContext):
 
 def tokenprice(update: Update, context: CallbackContext):
     token = context.args[0] if context.args else "bnb"
-    price, source = get_token_price(token)
     timestamp = time.strftime("%H:%M:%S", time.localtime())
+
+    try:
+        price, source = get_token_price(token)
+    except Exception:
+        price, source = None, None
+
+    if isinstance(price, str):  # For unknown token message
+        update.message.reply_text(price, parse_mode="HTML")
+        return
 
     if price:
         msg = (
             f"💰 <b>{token.upper()} current price:</b> ${price:,.6f}\n"
             f"🕒 <b>Source:</b> {source}\n\n"
             f"{BRAND_TAG}\n"
-            f"⏱️ {timestamp} (v6.0-ProStable)"
+            f"⏱️ {timestamp}"
         )
     else:
         msg = (
             f"❌ Could not fetch <b>{token.upper()}</b> price.\n"
             f"Try again later or check contract validity.\n\n"
-            f"{BRAND_TAG}\n⏱️ {timestamp} (v6.0-ProStable)"
+            f"{BRAND_TAG}\n"
+            f"⏱️ {timestamp}"
         )
+
     update.message.reply_text(msg, parse_mode="HTML")
 
 
