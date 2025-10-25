@@ -2,16 +2,18 @@ from telegram.ext import CommandHandler
 import requests, html, random, math, os
 
 # === Branding ===
-BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — Neural Market Intelligence v5.6.4 ⚡"
+BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — Neural Market Intelligence v5.7.0 ⚡"
 DEXSCREENER_SEARCH = "https://api.dexscreener.io/latest/dex/search?q={q}"
 COINGECKO_SIMPLE = "https://api.coingecko.com/api/v3/simple/price?ids={id}&vs_currencies=usd"
 BINANCE_BNB = "https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT"
+BSCSCAN_VERIFY = "https://api.bscscan.com/api?module=contract&action=getsourcecode&address={addr}&apikey={api}"
 
 # === Config ===
-WEN_TOKEN_ADDRESS = os.getenv("WEN_TOKEN_ADDRESS")  # ⚙️ from Render env
+WEN_TOKEN_ADDRESS = os.getenv("WEN_TOKEN_ADDRESS")
+BSCSCAN_API_KEY = os.getenv("BSCSCAN_API_KEY")  # Optional but enhances verify layer
 DEFAULT_TOKEN = "wenbnb"
 
-# === Utility ===
+# === Utils ===
 def short_float(x):
     try:
         v = float(x)
@@ -43,22 +45,38 @@ def neural_rank(liquidity_usd: float, volume24_usd: float) -> str:
     except Exception:
         return "N/A"
 
+def verify_contract(address: str) -> str:
+    """Check BscScan for contract verification."""
+    try:
+        if not BSCSCAN_API_KEY:
+            return "⚙️ Verification unavailable (no API key)"
+        url = BSCSCAN_VERIFY.format(addr=address, api=BSCSCAN_API_KEY)
+        res = requests.get(url, timeout=10).json()
+        if res.get("status") == "1":
+            data = res.get("result", [{}])[0]
+            if data.get("SourceCode"):
+                return "✅ Verified Source"
+            else:
+                return "⚠️ Unverified Contract"
+        else:
+            return "⚠️ Unable to verify contract"
+    except Exception:
+        return "⚙️ Verification check failed"
+
 # === /price Command ===
 def price_cmd(update, context):
     try:
         context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
-        # --- Token selection ---
-        if context.args:
-            token = context.args[0].lower()
-        else:
-            token = DEFAULT_TOKEN
+        # --- Token ---
+        token = context.args[0].lower() if context.args else DEFAULT_TOKEN
+        if not context.args:
             update.message.reply_text(
                 f"💡 No token specified — showing default market data for <b>{DEFAULT_TOKEN.upper()}</b>.",
                 parse_mode="HTML"
             )
 
-        # --- Fetch BNB price ---
+        # --- BNB price ---
         try:
             bnb_price = float(requests.get(BINANCE_BNB, timeout=10).json().get("price", 0))
         except Exception:
@@ -66,16 +84,16 @@ def price_cmd(update, context):
 
         # --- Placeholders ---
         token_name, token_symbol, token_price, dex_source = token, "", None, "CoinGecko"
-        chain, liquidity, volume24, nmr = "Unknown", 0, 0, "N/A"
+        chain, liquidity, volume24, nmr, verify_status = "Unknown", 0, 0, "N/A", ""
 
-        # --- CoinGecko primary ---
+        # === CoinGecko ===
         try:
             cg_data = requests.get(COINGECKO_SIMPLE.format(id=token), timeout=10).json()
             token_price = cg_data.get(token, {}).get("usd")
         except Exception:
             token_price = None
 
-        # --- DexScreener fallback with DexMatch Filter ---
+        # === DexScreener Fallback ===
         if not token_price or token_price == "N/A":
             try:
                 dex_data = requests.get(DEXSCREENER_SEARCH.format(q=WEN_TOKEN_ADDRESS or token), timeout=10).json()
@@ -86,9 +104,13 @@ def price_cmd(update, context):
                     qlow = (WEN_TOKEN_ADDRESS or token).lower()
                     for p in pairs:
                         base = p.get("baseToken", {})
-                        addr = (base.get("address") or "").lower()
-                        sym = (base.get("symbol") or "").lower()
-                        if qlow in [addr, sym]:
+                        quote = p.get("quoteToken", {})
+                        if qlow in [
+                            (base.get("address") or "").lower(),
+                            (quote.get("address") or "").lower(),
+                            (base.get("symbol") or "").lower(),
+                            (quote.get("symbol") or "").lower()
+                        ]:
                             pair = p
                             break
                     if not pair:
@@ -103,10 +125,14 @@ def price_cmd(update, context):
                     liquidity = pair.get("liquidity", {}).get("usd", 0)
                     volume24 = pair.get("volume", {}).get("h24", 0)
                     nmr = neural_rank(liquidity, volume24)
+
+                    token_address = base.get("address") or ""
+                    if token_address:
+                        verify_status = verify_contract(token_address)
             except Exception:
                 token_price, dex_source = "N/A", "Not Found"
 
-        # --- Neural Insight tone ---
+        # === Insight ===
         insights = [
             f"{token_name} shows <b>healthy flow</b> 💎",
             f"{token_name} is <b>cooling off</b> slightly 🪶",
@@ -116,7 +142,7 @@ def price_cmd(update, context):
         ]
         insight = random.choice(insights)
 
-        # --- Response ---
+        # === Build message ===
         msg = (
             f"💹 <b>WENBNB Market Feed</b>\n\n"
             f"💎 <b>{html.escape(token_name)} ({html.escape(token_symbol or token.upper())})</b>\n"
@@ -126,8 +152,12 @@ def price_cmd(update, context):
             f"📊 <b>24h Volume:</b> ${short_float(volume24)}\n"
             f"🏅 <b>Neural Market Rank:</b> {nmr}\n"
             f"🔥 <b>BNB:</b> ${short_float(bnb_price)}\n"
-            f"📈 <i>Data Source:</i> {dex_source}\n\n"
-            f"🧠 Insight: <b>{insight}</b>\n\n"
+            f"📈 <i>Data Source:</i> {dex_source}\n"
+        )
+        if verify_status:
+            msg += f"🔰 <b>Verification:</b> {verify_status}\n"
+        msg += (
+            f"\n🧠 Insight: <b>{insight}</b>\n\n"
             f"{BRAND_FOOTER}"
         )
 
@@ -135,9 +165,12 @@ def price_cmd(update, context):
 
     except Exception as e:
         print("Error in price_cmd:", e)
-        update.message.reply_text("⚙️ Neural Engine syncing... please retry soon.", parse_mode="HTML")
+        update.message.reply_text(
+            "⚙️ Neural Engine syncing... please retry soon.",
+            parse_mode="HTML"
+        )
 
 # === Register ===
 def register(dispatcher, core=None):
     dispatcher.add_handler(CommandHandler("price", price_cmd))
-    print("✅ Loaded plugin: plugins.price_tracker (v5.6.4 DexMatch Filter Patch)")
+    print("✅ Loaded plugin: plugins.price_tracker (v5.7.0 Neural Verify Layer Edition)")
