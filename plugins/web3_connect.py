@@ -1,20 +1,17 @@
 """
-WENBNB AI Web3 Command Center v5.4-Pro+ ⚙️
+WENBNB AI Web3 Command Center v5.4.1-Pro+ ⚙️
 ────────────────────────────────────────────
-Hybrid data bridge for blockchain analytics, wallet balance,
-token supply & price tracking. Powered by WENBNB Neural Engine.
-
-💫 Features:
-• CoinGecko + DexScreener hybrid pricing
-• On-chain RPC fallback for token supply
-• Rate-limit aware wallet checks
-• Auto-alias mapping for common tokens
+Hybrid Web3 Intelligence Core for:
+• Live price (CoinGecko + DexScreener fallback)
+• BNB wallet balance check
+• On-chain token supply via BscScan + RPC
+• AI Wallet Analyzer (placeholder v1)
+────────────────────────────────────────────
 """
 
-import requests, json, os
+import requests, json, os, time
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
-
 from web3 import Web3
 
 # === CONFIG ===
@@ -27,12 +24,18 @@ web3 = Web3(Web3.HTTPProvider(BSC_RPC))
 
 BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Web3 Intelligence 24×7"
 
+# === COMMON ALIASES ===
 ALIASES = {
     "bnb": "binancecoin",
     "bsc": "binancecoin",
     "eth": "ethereum",
     "btc": "bitcoin",
+    "doge": "dogecoin",
+    "xrp": "ripple",
     "wenbnb": "wenbnb",
+    "shib": "shiba-inu",
+    "sol": "solana",
+    "matic": "polygon",
 }
 
 # === HELPERS ===
@@ -51,19 +54,25 @@ def get_token_price(token_id="bnb", vs_currency="usd"):
         data = res.json()
         if tid in data:
             return data[tid][vs_currency]
-        # Fallback → DexScreener (by token name lookup)
-        if token_id.lower() in ["bnb", "binancecoin"]:
-            contract = "0xB8c77482e45F1F44dE1745F52C74426C631bDD52"  # BNB contract
-            durl = f"{DS_BASE}/{contract}"
+        # fallback DexScreener if CoinGecko fails
+        known_contracts = {
+            "bnb": "0xB8c77482e45F1F44dE1745F52C74426C631bDD52",
+            "eth": "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
+            "doge": "0xbA2aE424d960c26247Dd6c32edC70B295c744C43",
+        }
+        if token_id.lower() in known_contracts:
+            caddr = known_contracts[token_id.lower()]
+            durl = f"{DS_BASE}/{caddr}"
             dres = requests.get(durl, timeout=5).json()
             price = dres.get("pairs", [{}])[0].get("priceUsd")
             return float(price) if price else "N/A"
         return "N/A"
-    except Exception as e:
+    except Exception:
         return "N/A"
 
 def get_wallet_balance(address):
     try:
+        time.sleep(0.5)  # small delay for rate limit safety
         url = f"{BSC_BASE}?module=account&action=balance&address={address}&apikey={BSCSCAN_API_KEY}"
         res = requests.get(url, timeout=5).json()
         if res.get("status") == "1":
@@ -76,19 +85,22 @@ def get_wallet_balance(address):
         return "⚠️ Error contacting BscScan API."
 
 def get_token_supply(contract_address):
-    """Try BscScan first; fallback to direct RPC."""
+    """Try BscScan first; fallback to direct RPC (auto-decimals)."""
     try:
         url = f"{BSC_BASE}?module=stats&action=tokensupply&contractaddress={contract_address}&apikey={BSCSCAN_API_KEY}"
         res = requests.get(url, timeout=5).json()
         if res.get("status") == "1":
             total = int(res.get("result", 0)) / 1e18
             return f"{total:,.0f} tokens"
-        # Fallback to RPC
-        abi = [{"constant": True, "inputs": [], "name": "totalSupply",
-                "outputs": [{"name": "", "type": "uint256"}], "type": "function"}]
+        # fallback: use RPC direct call
+        abi = [
+            {"constant": True, "inputs": [], "name": "totalSupply", "outputs": [{"name": "", "type": "uint256"}], "type": "function"},
+            {"constant": True, "inputs": [], "name": "decimals", "outputs": [{"name": "", "type": "uint8"}], "type": "function"}
+        ]
         contract = web3.eth.contract(address=Web3.to_checksum_address(contract_address), abi=abi)
-        supply = contract.functions.totalSupply().call()
-        return f"{supply / 1e18:,.0f} tokens (via RPC)"
+        decimals = contract.functions.decimals().call()
+        supply = contract.functions.totalSupply().call() / (10 ** decimals)
+        return f"{supply:,.0f} tokens (via RPC)"
     except Exception:
         return "❌ Invalid or unverified contract.\nTip: Verify contract on BscScan or try again later."
 
