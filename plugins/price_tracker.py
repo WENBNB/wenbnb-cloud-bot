@@ -1,16 +1,25 @@
-from telegram.ext import CommandHandler
-import requests, html, random, math, os
+# plugins/price_tracker.py
+"""
+WENBNB Market Feed v8.3 — Tri-Fusion Data Sync
+Combines CoinGecko + DexScreener + Binance (BNB) with smart fallback,
+chain detection emojis, and a short Neural Pulse insight.
+"""
 
-# === Branding ===
-BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — Neural Market Intelligence v8.1.9 ⚡"
+from telegram.ext import CommandHandler
+from telegram import Update
+from telegram.ext import CallbackContext
+import requests, html, random, math, os, time
+
+# Branding
+BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — Market Feed v8.3 ⚡"
 DEXSCREENER_SEARCH = "https://api.dexscreener.io/latest/dex/search?q={q}"
 COINGECKO_SIMPLE = "https://api.coingecko.com/api/v3/simple/price?ids={id}&vs_currencies=usd"
 BINANCE_BNB = "https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT"
 
-# === Default Contract ===
-DEFAULT_WENBNB_CONTRACT = "0x78525f54e46d2821ec59bfae27201058881b4444"
+# Default token id (CoinGecko-style id) when user omits args
+DEFAULT_TOKEN_ID = os.getenv("DEFAULT_TOKEN_ID", "wenbnb")  # keep lowercase id
 
-# === Utility ===
+# Utilities
 def short_float(x):
     try:
         v = float(x)
@@ -21,13 +30,19 @@ def short_float(x):
     except Exception:
         return str(x)
 
-def detect_chain(dex_id: str) -> str:
-    dex_id = (dex_id or "").lower()
-    if "pancake" in dex_id: return "BSC"
-    if "uniswap" in dex_id: return "Ethereum"
-    if "base" in dex_id: return "Base"
-    if "arbitrum" in dex_id: return "Arbitrum"
-    return "Unknown"
+def chain_emoji(name: str) -> str:
+    s = (name or "").lower()
+    if "bsc" in s or "pancake" in s or "bnb" in s:
+        return "🔶 BSC"
+    if "ethereum" in s or "uni" in s or "uniswap" in s:
+        return "💎 Ethereum"
+    if "base" in s:
+        return "🪩 Base"
+    if "arbitrum" in s:
+        return "🛰️ Arbitrum"
+    if "solana" in s:
+        return "🟣 Solana"
+    return "❓ Unknown"
 
 def neural_market_rank(liquidity_usd: float, volume24_usd: float) -> str:
     try:
@@ -42,103 +57,149 @@ def neural_market_rank(liquidity_usd: float, volume24_usd: float) -> str:
     except Exception:
         return "N/A"
 
-# === /price Command ===
-def price_cmd(update, context):
+# Core helpers
+def fetch_bnb_price():
+    """Return float BNB price or None."""
     try:
-        context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        r = requests.get(BINANCE_BNB, timeout=8)
+        j = r.json()
+        return float(j.get("price", 0))
+    except Exception:
+        return None
 
-        # 🧠 Default token fallback (Contract-based)
-        if context.args:
-            token = context.args[0].strip()
-        else:
-            token = DEFAULT_WENBNB_CONTRACT
-            update.message.reply_text(
-                "💡 No token specified — showing default <b>WENBNB</b> market data.",
-                parse_mode="HTML"
-            )
+def try_coingecko_price(token_id: str):
+    """Try CoinGecko simple price (token_id should be coingecko id)."""
+    try:
+        url = COINGECKO_SIMPLE.format(id=token_id)
+        j = requests.get(url, timeout=8).json()
+        return j.get(token_id, {}).get("usd")
+    except Exception:
+        return None
 
-        # --- Fetch BNB price ---
+def try_dexscreener(token_query: str):
+    """Probe DexScreener; return first pair dict or None."""
+    try:
+        url = DEXSCREENER_SEARCH.format(q=token_query)
+        j = requests.get(url, timeout=8).json()
+        pairs = j.get("pairs", [])
+        if not pairs:
+            return None
+        # prefer pair with highest liquidity
+        pairs_sorted = sorted(pairs, key=lambda p: (p.get("liquidity", {}).get("usd") or 0), reverse=True)
+        return pairs_sorted[0]
+    except Exception:
+        return None
+
+def build_insight(token_name: str, token_symbol: str, prob_source: str, rank: str):
+    """Small neural-like insight to make output feel human."""
+    templates = [
+        f"{token_name} is showing {('strong momentum' if rank in ['A+','A'] else 'moderate activity')} — watch volume spikes.",
+        f"Signals: {('smart money accumulation' if rank in ['A+','A'] else 'low liquidity risk')}.",
+        f"Community chatter rising — keep an eye on {token_symbol or token_name}.",
+        f"Liquidity/volume profile: {rank} — developer/market activity may be {('high' if rank in ['A+','A'] else 'low')}."
+    ]
+    # prefer shorter, crisp insight
+    return random.choice(templates) + f" (source: {prob_source})"
+
+# === /price handler ===
+def price_cmd(update: Update, context: CallbackContext):
+    chat_id = update.effective_chat.id
+    context.bot.send_chat_action(chat_id=chat_id, action="typing")
+
+    # token arg: try to accept contract, symbol or coingecko id
+    if context.args:
+        query_raw = context.args[0].strip()
+    else:
+        query_raw = DEFAULT_TOKEN_ID
+
+    # Normalize
+    query = query_raw.strip()
+    token_name = query.upper()
+    token_symbol = ""
+    token_price = None
+    dex_source = "CoinGecko"
+    chain_display = "❓ Unknown"
+    liquidity = 0
+    volume24 = 0
+    rank = "N/A"
+    bnb_price = fetch_bnb_price()
+
+    # 1) Try CoinGecko by id (best for official tokens)
+    cg_id = query.lower()
+    token_price = try_coingecko_price(cg_id)
+
+    # 2) If CoinGecko fails, try DexScreener probe (accepts symbol/contract)
+    pair = None
+    if not token_price:
+        pair = try_dexscreener(query)
+        if pair:
+            base = pair.get("baseToken", {}) or {}
+            token_name = base.get("name") or base.get("symbol") or query
+            token_symbol = base.get("symbol") or token_symbol or query
+            token_price = pair.get("priceUsd") or pair.get("baseToken", {}).get("priceUsd")
+            dex_source = pair.get("dexId", "DexScreener").capitalize()
+            chain_display = chain_emoji(pair.get("dexId") or pair.get("chainId") or pair.get("pairName"))
+            liquidity = pair.get("liquidity", {}).get("usd", 0) or 0
+            volume24 = pair.get("volume", {}).get("h24", 0) or 0
+            rank = neural_market_rank(liquidity, volume24)
+
+    # 3) If CoinGecko gave price, try to enrich with DexScreener for liquidity/chain
+    if token_price and not pair:
+        # attempt to get pair to show liquidity/chain info (best-effort)
         try:
-            bnb_data = requests.get(BINANCE_BNB, timeout=10).json()
-            bnb_price = float(bnb_data.get("price", 0))
+            pair = try_dexscreener(query) or try_dexscreener(token_symbol or token_name)
+            if pair:
+                liquidity = pair.get("liquidity", {}).get("usd", 0) or 0
+                volume24 = pair.get("volume", {}).get("h24", 0) or 0
+                dex_source = pair.get("dexId", dex_source).capitalize()
+                chain_display = chain_emoji(pair.get("dexId") or pair.get("pairName"))
+                rank = neural_market_rank(liquidity, volume24)
         except Exception:
-            bnb_price = 0
+            pass
 
-        # --- Initialize placeholders ---
-        token_name, token_symbol, token_price, dex_source = token, "", None, "DexScreener"
-        chain, liquidity, volume24, nmr = "Unknown", 0, 0, "N/A"
-
-        # --- DexScreener first (direct contract query) ---
-        try:
-            dex_data = requests.get(DEXSCREENER_SEARCH.format(q=token), timeout=10).json()
-            pairs = dex_data.get("pairs", [])
-            if pairs:
-                pair = pairs[0]
-                base = pair.get("baseToken", {})
-                token_name = base.get("name") or base.get("symbol") or token
-                token_symbol = base.get("symbol") or token
-                token_price = pair.get("priceUsd", "N/A")
-                dex_source = pair.get("dexId", "Unknown DEX").capitalize()
-                chain = detect_chain(dex_source)
-                liquidity = pair.get("liquidity", {}).get("usd", 0)
-                volume24 = pair.get("volume", {}).get("h24", 0)
-                nmr = neural_market_rank(liquidity, volume24)
-            else:
-                token_price = None
-        except Exception:
-            token_price, dex_source = None, "Not Found"
-
-        # --- CoinGecko fallback if Dex fails ---
-        if not token_price or token_price == "N/A":
-            try:
-                cg_data = requests.get(COINGECKO_SIMPLE.format(id=token.lower()), timeout=10).json()
-                token_price = cg_data.get(token.lower(), {}).get("usd")
-            except Exception:
-                token_price = None
-
-        # --- If no valid data ---
-        if not token_price:
-            update.message.reply_text(
-                f"❌ No valid market data for <b>{html.escape(token.upper())}</b>.",
-                parse_mode="HTML"
-            )
-            return
-
-        # --- Neural Insight selection ---
-        insights = [
-            f"is showing <b>strong momentum</b> 💎",
-            f"is <b>cooling off</b> slightly 🪶",
-            f"looks <b>volatile</b> — monitor closely ⚡",
-            f"is <b>heating up</b> on {chain} 🔥",
-            f"shows <b>smart money movement</b> signals 🧠"
-        ]
-        insight = random.choice(insights)
-
-        # --- Build message ---
-        msg = (
-            f"💹 <b>Live Market Update</b>\n\n"
-            f"💎 <b>{html.escape(token_name)} ({html.escape(token_symbol or token)})</b>\n"
-            f"🌐 <b>Chain:</b> {chain}\n"
-            f"💰 <b>Price:</b> ${short_float(token_price)}\n"
-            f"💧 <b>Liquidity:</b> ${short_float(liquidity)}\n"
-            f"📊 <b>24h Volume:</b> ${short_float(volume24)}\n"
-            f"🏅 <b>Neural Market Rank:</b> {nmr}\n"
-            f"🔥 <b>BNB:</b> ${short_float(bnb_price)}\n"
-            f"📈 <i>Data Source:</i> {dex_source}\n\n"
-            f"🧠 Insight: <b>{token_name}</b> {insight}\n\n"
-            f"{BRAND_FOOTER}"
-        )
-
-        update.message.reply_text(msg, parse_mode="HTML", disable_web_page_preview=True)
-
-    except Exception as e:
-        print("Error in price_cmd:", e)
+    # Final safety: if still no price, present friendly error
+    if token_price in (None, "", "N/A"):
         update.message.reply_text(
-            "⚙️ Neural Engine syncing... please retry soon.",
+            f"⚠️ Could not find price for '<b>{html.escape(query)}</b>'.\n"
+            "Try a coin ID (CoinGecko), contract address or token symbol. Example:\n"
+            "/price bitcoin  or  /price 0xContractAddress  or  /price WENBNB",
             parse_mode="HTML"
         )
+        return
 
-# === Register ===
+    # Format values
+    try:
+        token_price_f = float(token_price)
+    except Exception:
+        token_price_f = token_price
+
+    # Build message
+    lines = []
+    lines.append(f"💹 <b>WENBNB Market Feed</b>\n")
+    lines.append(f"💎 <b>{html.escape(str(token_name))} {f'({html.escape(token_symbol)})' if token_symbol else ''}</b>")
+    lines.append(f"🌐 <b>Chain:</b> {chain_display}")
+    lines.append(f"💰 <b>Price:</b> ${short_float(token_price_f)}")
+    if liquidity:
+        lines.append(f"💧 <b>Liquidity:</b> ${short_float(liquidity)}")
+    if volume24:
+        lines.append(f"📊 <b>24h Volume:</b> ${short_float(volume24)}")
+    if rank and rank != "N/A":
+        lines.append(f"🏅 <b>Neural Rank:</b> {rank}")
+    if bnb_price:
+        lines.append(f"🔥 <b>BNB:</b> ${short_float(bnb_price)}")
+    lines.append(f"📈 <i>Data Source:</i> {dex_source}")
+    lines.append("")  # spacer
+
+    # Neural Pulse insight
+    insight = build_insight(token_name, token_symbol or token_name, dex_source, rank)
+    lines.append(f"🧠 Neural Pulse: <i>{html.escape(insight)}</i>")
+    lines.append("")  # spacer
+    lines.append(BRAND_FOOTER)
+
+    reply = "\n".join(lines)
+    update.message.reply_text(reply, parse_mode="HTML", disable_web_page_preview=True)
+
+# Registration for loader
 def register(dispatcher, core=None):
     dispatcher.add_handler(CommandHandler("price", price_cmd))
-    print("✅ Loaded plugin: plugins.price_tracker (v8.1.9 Stable Default Contract Build)")
+    print("✅ Loaded plugin: plugins.price_tracker (v8.3 Tri-Fusion)")
