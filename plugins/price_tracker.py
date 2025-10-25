@@ -1,20 +1,17 @@
-"""
-WENBNB Neural Engine — v5.6 Stable Edition
-────────────────────────────────────────────
-Restored legacy fallback behavior for /price and /price wenbnb.
-Now prefers DexScreener > CoinGecko > Binance.
-"""
-
 from telegram.ext import CommandHandler
-import requests, html, random, math, time
+import requests, html, random, math, os
 
 # === Branding ===
-BRAND_FOOTER = "💫 Powered by WENBNB Neural Engine — AI Core Market Intelligence 24×7 ⚡"
+BRAND_FOOTER = "💫 Powered by <b>WENBNB Neural Engine</b> — Neural Market Intelligence v5.6.3 ⚡"
 DEXSCREENER_SEARCH = "https://api.dexscreener.io/latest/dex/search?q={q}"
 COINGECKO_SIMPLE = "https://api.coingecko.com/api/v3/simple/price?ids={id}&vs_currencies=usd"
 BINANCE_BNB = "https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT"
 
-# === Utils ===
+# === Config ===
+WEN_TOKEN_ADDRESS = os.getenv("WEN_TOKEN_ADDRESS")  # 💎 keep this exactly
+DEFAULT_TOKEN = "wenbnb"
+
+# === Utility ===
 def short_float(x):
     try:
         v = float(x)
@@ -31,12 +28,12 @@ def detect_chain(dex_id: str) -> str:
     if "uniswap" in dex_id: return "Ethereum"
     if "base" in dex_id: return "Base"
     if "arbitrum" in dex_id: return "Arbitrum"
+    if "solana" in dex_id: return "Solana"
     return "Unknown"
 
-def neural_market_rank(L, V):
+def neural_rank(liquidity_usd: float, volume24_usd: float) -> str:
     try:
-        L = max(1.0, float(L))
-        V = max(1.0, float(V))
+        L, V = max(1.0, float(liquidity_usd)), max(1.0, float(volume24_usd))
         score = (math.log10(L) * 0.6 + math.log10(V) * 0.4) * 10
         if score >= 85: return "A+"
         elif score >= 70: return "A"
@@ -46,105 +43,89 @@ def neural_market_rank(L, V):
     except Exception:
         return "N/A"
 
-# === /price Command ===
+# === Core ===
 def price_cmd(update, context):
     try:
         context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
-        # 🧠 Default Token Fallback
-        token = context.args[0].upper() if context.args else "WENBNB"
-        if not context.args:
+        # --- Token selection ---
+        if context.args:
+            token = context.args[0].lower()
+        else:
+            token = DEFAULT_TOKEN
             update.message.reply_text(
-                "💡 No token specified — showing default <b>WENBNB</b> market data.",
+                f"💡 No token specified — showing default market data for <b>{DEFAULT_TOKEN.upper()}</b>.",
                 parse_mode="HTML"
             )
 
         # --- Fetch BNB price ---
         try:
-            bnb_data = requests.get(BINANCE_BNB, timeout=8).json()
-            bnb_price = float(bnb_data.get("price", 0))
-        except:
+            bnb_price = float(requests.get(BINANCE_BNB, timeout=10).json().get("price", 0))
+        except Exception:
             bnb_price = 0
 
-        token_name, token_symbol, token_price, dex_source = token, token, "N/A", "Not Found"
+        # --- Primary lookups ---
+        token_name, token_symbol, token_price, dex_source = token, "", None, "CoinGecko"
         chain, liquidity, volume24, nmr = "Unknown", 0, 0, "N/A"
 
-        # --- Step 1: DexScreener first (better accuracy for new tokens)
+        # --- CoinGecko first ---
         try:
-            dex_data = requests.get(DEXSCREENER_SEARCH.format(q=token), timeout=8).json()
-            pairs = dex_data.get("pairs", [])
-            if pairs:
-                pair = pairs[0]
-                base = pair.get("baseToken", {})
-                token_name = base.get("name") or token
-                token_symbol = base.get("symbol") or token
-                token_price = pair.get("priceUsd", "N/A")
-                dex_source = pair.get("dexId", "Unknown DEX").capitalize()
-                chain = detect_chain(dex_source)
-                liquidity = pair.get("liquidity", {}).get("usd", 0)
-                volume24 = pair.get("volume", {}).get("h24", 0)
-                nmr = neural_market_rank(liquidity, volume24)
-        except:
-            pass
+            cg_data = requests.get(COINGECKO_SIMPLE.format(id=token), timeout=10).json()
+            token_price = cg_data.get(token, {}).get("usd")
+        except Exception:
+            token_price = None
 
-        # --- Step 2: CoinGecko fallback only if Dex fails
-        if token_price in ["N/A", None, 0]:
+        # --- DexScreener fallback ---
+        if not token_price or token_price == "N/A":
             try:
-                cg_data = requests.get(COINGECKO_SIMPLE.format(id=token.lower()), timeout=8).json()
-                cg_price = cg_data.get(token.lower(), {}).get("usd")
-                if cg_price:
-                    token_price = cg_price
-                    dex_source = "CoinGecko"
-                    chain = "Centralized"
-                    nmr = "A+"
-            except:
-                pass
+                dex_data = requests.get(DEXSCREENER_SEARCH.format(q=WEN_TOKEN_ADDRESS or token), timeout=10).json()
+                pairs = dex_data.get("pairs", [])
+                if pairs:
+                    pair = pairs[0]
+                    base = pair.get("baseToken", {})
+                    token_name = base.get("name") or base.get("symbol") or token
+                    token_symbol = base.get("symbol") or token
+                    token_price = pair.get("priceUsd", "N/A")
+                    dex_source = pair.get("dexId", "Unknown DEX").capitalize()
+                    chain = detect_chain(dex_source)
+                    liquidity = pair.get("liquidity", {}).get("usd", 0)
+                    volume24 = pair.get("volume", {}).get("h24", 0)
+                    nmr = neural_rank(liquidity, volume24)
+            except Exception:
+                token_price, dex_source = "N/A", "Not Found"
 
-        # --- If still N/A ---
-        if token_price in ["N/A", None, 0]:
-            update.message.reply_text(
-                f"❌ No valid market data for <b>{html.escape(token)}</b>.\n"
-                f"Tip: Try using contract address or known Dex token name.",
-                parse_mode="HTML"
-            )
-            return
-
-        # --- Neural Insight ---
+        # --- Insight tone ---
         insights = [
-            f"is showing <b>steady momentum</b> 🌙",
-            f"has <b>organic trading activity</b> 🌿",
-            f"is <b>recovering volume</b> 💎",
-            f"shows <b>AI-flagged smart money movement</b> ⚡",
-            f"may see <b>short-term volatility</b> 🧠",
+            f"{token_name} shows <b>healthy flow</b> 💎",
+            f"{token_name} is <b>cooling off</b> slightly 🪶",
+            f"{token_name} looks <b>volatile</b> — watch it ⚡",
+            f"{token_name} heating up on {chain} 🔥",
+            f"{token_name} attracting <b>smart money</b> 🧠"
         ]
         insight = random.choice(insights)
 
-        ts = time.strftime("%H:%M:%S", time.localtime())
-
-        # --- Build final output ---
+        # --- Final message ---
         msg = (
-            f"💎 <b>Live Market Update</b>\n\n"
-            f"💠 <b>{html.escape(token_name)}</b>\n"
+            f"💹 <b>WENBNB Market Feed</b>\n\n"
+            f"💎 <b>{html.escape(token_name)} ({html.escape(token_symbol or token.upper())})</b>\n"
             f"🌐 <b>Chain:</b> {chain}\n"
             f"💰 <b>Price:</b> ${short_float(token_price)}\n"
             f"💧 <b>Liquidity:</b> ${short_float(liquidity)}\n"
             f"📊 <b>24h Volume:</b> ${short_float(volume24)}\n"
             f"🏅 <b>Neural Market Rank:</b> {nmr}\n"
+            f"🔥 <b>BNB:</b> ${short_float(bnb_price)}\n"
             f"📈 <i>Data Source:</i> {dex_source}\n\n"
-            f"🧠 Neural Insight: <b>{token_name}</b> {insight}\n\n"
-            f"{BRAND_FOOTER}\n⏱️ {ts}"
+            f"🧠 Insight: <b>{insight}</b>\n\n"
+            f"{BRAND_FOOTER}"
         )
 
         update.message.reply_text(msg, parse_mode="HTML", disable_web_page_preview=True)
 
     except Exception as e:
         print("Error in price_cmd:", e)
-        update.message.reply_text(
-            "⚙️ Neural Engine syncing... please retry soon.",
-            parse_mode="HTML"
-        )
+        update.message.reply_text("⚙️ Neural Engine syncing... please retry soon.", parse_mode="HTML")
 
 # === Register ===
 def register(dispatcher, core=None):
     dispatcher.add_handler(CommandHandler("price", price_cmd))
-    print("✅ Loaded plugin: plugins.price_tracker (v5.6 Stable)")
+    print("✅ Loaded plugin: plugins.price_tracker (v5.6.3 WENBNB Default Mode)")
