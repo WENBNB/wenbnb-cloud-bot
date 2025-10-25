@@ -1,12 +1,12 @@
 """
-WENBNB Plugin Manager v8.6-Pro+ — Neural Self-Healing + Maintenance Integration
+WENBNB Plugin Manager v8.6-Pro++ — Emotion-Safe + Render Optimized
 ────────────────────────────────────────────────────────────────────────────────
 Purpose:
 • Dynamically load, reload, and validate all /plugins modules
-• Auto-detects maintenance_pro.py and verifies its telemetry status
-• Dual compatibility for register() & register_handlers()
-• Emotion-Safe import mode for Neural Engine 8.x builds
-• Self-healing reimport + integrated health sync
+• Auto-detects maintenance_pro telemetry
+• Compatible with register() & register_handlers()
+• Self-healing reload without circular imports (Render-safe)
+• Emotion-Sync protected for Neural Engine 8.x
 
 💫 Powered by WENBNB Neural Engine — Modular Intelligence 24×7 ⚡
 """
@@ -42,7 +42,7 @@ def load_all_plugins(dispatcher):
 
                 module = importlib.import_module(module_path)
 
-                # Compatibility for both types of handlers
+                # Compatibility: register_handlers() or register()
                 if hasattr(module, "register_handlers"):
                     module.register_handlers(dispatcher)
                     ACTIVE_PLUGINS[module_name] = "✅ Registered via register_handlers()"
@@ -51,12 +51,12 @@ def load_all_plugins(dispatcher):
                     ACTIVE_PLUGINS[module_name] = "✅ Registered via register()"
                 else:
                     ACTIVE_PLUGINS[module_name] = "⚠️ No entry function found"
-                    log(f"⚠️ {module_name}: Missing register or register_handlers.")
+                    log(f"⚠️ {module_name}: Missing register or register_handlers().")
 
                 loaded.append(module_name)
                 log(f"✅ Loaded plugin: {module_name}")
 
-                # Special case: maintenance_pro
+                # Maintenance Suite Check
                 if module_name == "maintenance_pro":
                     log("🧠 Maintenance Suite detected — verifying telemetry sync.")
                     try:
@@ -66,7 +66,7 @@ def load_all_plugins(dispatcher):
                             log(f"💾 Maintenance telemetry active (Last reboot: {status})")
                             ACTIVE_PLUGINS[module_name] += " 🩵 (Telemetry OK)"
                         else:
-                            log("⚠️ maintenance_pro missing get_last_reboot() check.")
+                            log("⚠️ maintenance_pro missing get_last_reboot() function.")
                     except Exception as e:
                         log(f"⚠️ maintenance_pro check failed: {e}")
 
@@ -84,6 +84,7 @@ def load_all_plugins(dispatcher):
     validate_plugin_integrity()
     return loaded, failed
 
+
 # === VALIDATION ===
 def validate_plugin_integrity():
     for name in list(ACTIVE_PLUGINS.keys()):
@@ -96,6 +97,7 @@ def validate_plugin_integrity():
                 ACTIVE_PLUGINS[name] = "⚠️ Invalid structure"
         except Exception as e:
             ACTIVE_PLUGINS[name] = f"⚠️ Validation Error: {e}"
+
 
 # === AUTO RECOVERY ===
 def attempt_recover(dispatcher):
@@ -126,20 +128,20 @@ def attempt_recover(dispatcher):
     else:
         log("💤 No recoverable modules at this time.")
 
-# === /modules COMMAND ===
+
+# === /modules ===
 def modules_status(update: Update, context: CallbackContext):
     if update.effective_user.id not in ADMIN_IDS:
         update.message.reply_text("🚫 Only admin can check module status.")
         return
 
-    text = "🧩 <b>WENBNB Plugin Status — v8.6-Pro+</b>\n\n"
+    text = "🧩 <b>WENBNB Plugin Status — v8.6-Pro++</b>\n\n"
     sections = {
         "✅": "🟢 Active Modules",
         "⚠️": "🟡 Warnings",
         "❌": "🔴 Failed Loads"
     }
 
-    # Organize by state
     categorized = {k: [] for k in sections.keys()}
     for name, status in ACTIVE_PLUGINS.items():
         if "✅" in status:
@@ -153,29 +155,24 @@ def modules_status(update: Update, context: CallbackContext):
         if categorized[emoji]:
             text += f"\n<b>{title}</b>\n" + "\n".join(categorized[emoji]) + "\n"
 
-    if FAILED_PLUGINS:
-        text += "\n🔻 <b>Failed Modules:</b>\n"
-        for name, err in FAILED_PLUGINS.items():
-            text += f"❌ <b>{name}</b>: {err}\n"
-
     text += f"\n{BRAND_TAG}"
     update.message.reply_text(text, parse_mode="HTML")
 
-# === /reload COMMAND ===
+
+# === /reload ===
 def reload_plugins(update: Update, context: CallbackContext):
     if update.effective_user.id not in ADMIN_IDS:
         update.message.reply_text("🚫 Only admin can reload modules.")
         return
 
-    from wenbot import dp
+    dispatcher = context.dispatcher  # ✅ FIXED: use active dispatcher (no dp import)
     ACTIVE_PLUGINS.clear()
     FAILED_PLUGINS.clear()
-    update.message.reply_text("🔄 Reloading all plugins, please wait...", parse_mode="HTML")
+    update.message.reply_text("🔄 Reloading all plugins...", parse_mode="HTML")
 
-    loaded, failed = load_all_plugins(dp)
-    attempt_recover(dp)
+    loaded, failed = load_all_plugins(dispatcher)
+    attempt_recover(dispatcher)
 
-    # Auto-check maintenance after reload
     if "maintenance_pro" in ACTIVE_PLUGINS:
         update.message.reply_text("🧠 Maintenance Suite verified & active 💫", parse_mode="HTML")
 
@@ -185,6 +182,7 @@ def reload_plugins(update: Update, context: CallbackContext):
         f"{BRAND_TAG}"
     )
     update.message.reply_text(summary, parse_mode="HTML")
+
 
 # === ERROR HANDLER ===
 def plugin_error_handler(update, context):
@@ -198,9 +196,10 @@ def plugin_error_handler(update, context):
                 f"⚠️ Neural Core Error:\n<code>{str(e)}</code>", parse_mode="HTML"
             )
 
+
 # === REGISTER HANDLERS ===
 def register_handlers(dp):
     dp.add_handler(CommandHandler("modules", modules_status))
     dp.add_handler(CommandHandler("reload", reload_plugins))
     dp.add_error_handler(plugin_error_handler)
-    log("💫 PluginManager v8.6-Pro+ initialized — maintenance-aware & emotion-safe.")
+    log("💫 PluginManager v8.6-Pro++ initialized — maintenance-aware & Render-safe.")
