@@ -1,8 +1,8 @@
 """
-WENBNB Web3 Connect v5.8-ProPulse+ — AI Hybrid Web3 Command Center
-──────────────────────────────────────────────────────────────────────────
-Enhanced version with auto-fallback, API health retry, wallet/supply fix,
-and smart token resolver for Floki, TokenFi, Pepe etc.
+WENBNB Web3 Connect v5.8.1-ProPulse+ Extended
+───────────────────────────────────────────────────────────────
+Enhanced version with wallet/supply fixes, polished analyze panel,
+and modernized WENBNB design for Telegram interface.
 💫 Powered by WENBNB Neural Engine — Web3 Intelligence 24×7 ⚡
 """
 
@@ -22,7 +22,7 @@ CG_URL = "https://api.coingecko.com/api/v3/simple/price?ids={tid}&vs_currencies=
 DEX_URL = "https://api.dexscreener.com/latest/dex/tokens/{contract}"
 BSC_BASE = "https://api.bscscan.com/api"
 
-# === TOKEN MAP (extended) ===
+# === TOKEN MAP ===
 ALIASES = {
     "bnb": ("BNBUSDT", "binancecoin", "0xB8c77482e45F1F44dE1745F52C74426C631bDD52"),
     "eth": ("ETHUSDT", "ethereum", "0x2170Ed0880ac9A755fd29B2688956BD959F933F8"),
@@ -33,25 +33,6 @@ ALIASES = {
     "tokenfi": ("", "tokenfi", "0x4507cEf57C46789eF8d1a19EA45f4216bae2B528"),
     "wenbnb": ("", "wenbnb", "0x4507cEf57C46789eF8d1a19EA45f4216bae2B528"),
 }
-
-# === API HEALTH CHECK ===
-def check_api(url, headers=None):
-    try:
-        res = requests.get(url, headers=headers, timeout=4)
-        return res.status_code == 200
-    except:
-        return False
-
-def get_api_status():
-    status = {
-        "Binance": "🟢" if check_api("https://api.binance.com/api/v3/ping") else "🔴",
-        "CoinMarketCap": "🟢" if check_api(
-            "https://pro-api.coinmarketcap.com/v1/cryptocurrency/map",
-            {"X-CMC_PRO_API_KEY": CMC_KEY}) else "🔴",
-        "CoinGecko": "🟢" if check_api("https://api.coingecko.com/api/v3/ping") else "🔴",
-        "DexScreener": "🟢" if check_api("https://api.dexscreener.com/latest/dex/pairs/eth") else "🔴",
-    }
-    return status
 
 # === PRICE ENGINE ===
 def get_token_price(token: str):
@@ -69,29 +50,20 @@ def get_token_price(token: str):
             if "price" in d:
                 p = float(d["price"])
                 return f"💰 {token.upper()} price: ${p:,.4f}\n🕒 Source: Binance (Live)"
-        except: pass
+        except Exception as e:
+            print(f"[Binance Error] {e}")
 
-    # CMC
-    if CMC_KEY:
-        try:
-            headers = {"X-CMC_PRO_API_KEY": CMC_KEY}
-            r = requests.get(CMC_URL.format(symbol=token.upper()), headers=headers, timeout=6)
-            d = r.json()
-            if "data" in d and token.upper() in d["data"]:
-                p = d["data"][token.upper()]["quote"]["USD"]["price"]
-                return f"💰 {token.upper()} price: ${p:,.4f}\n🕒 Source: CoinMarketCap"
-        except: pass
-
-    # CoinGecko
+    # CoinGecko fallback
     try:
         r = requests.get(CG_URL.format(tid=coingecko_id), timeout=6)
         d = r.json()
         if coingecko_id in d:
             p = d[coingecko_id]["usd"]
             return f"💰 {token.upper()} price: ${p:,.6f}\n🕒 Source: CoinGecko"
-    except: pass
+    except Exception as e:
+        print(f"[CG Error] {e}")
 
-    # Dex
+    # DexScreener fallback
     try:
         r = requests.get(DEX_URL.format(contract=contract), timeout=6)
         d = r.json()
@@ -99,54 +71,54 @@ def get_token_price(token: str):
             p = d["pairs"][0].get("priceUsd")
             if p:
                 return f"💰 {token.upper()} price: ${float(p):,.6f}\n🕒 Source: DexScreener"
-    except: pass
+    except Exception as e:
+        print(f"[Dex Error] {e}")
 
     return f"⚠️ Unable to fetch {token.upper()} price right now."
 
 def handle_tokenprice_command(token):
     msg = get_token_price(token)
     t = time.strftime("%H:%M:%S", time.localtime())
-    return f"{msg}\n\n{BRAND_TAG}\n⏱️ {t} (v5.8-ProPulse+)"
+    return f"{msg}\n\n{BRAND_TAG}\n⏱️ {t} (v5.8.1-ProPulse+)"
 
 # === WALLET BALANCE ===
 def get_wallet_balance(address):
     try:
-        if not BSCSCAN_API_KEY:
-            return "⚠️ Missing BscScan API key — please configure it."
         url = f"{BSC_BASE}?module=account&action=balance&address={address}&apikey={BSCSCAN_API_KEY}"
-        r = requests.get(url).json()
-        wei = int(r.get("result", 0))
-        return f"{wei/1e18:.6f} BNB"
-    except:
-        return "❌ Invalid address or network error."
+        res = requests.get(url).json()
+        if res.get("status") != "1":
+            return "❌ Invalid address or network issue."
+        wei_balance = int(res.get("result", 0))
+        bnb_balance = wei_balance / 1e18
+        return f"{bnb_balance:.6f} BNB"
+    except Exception as e:
+        print(f"[Wallet Error] {e}")
+        return "❌ Network or API error."
 
 # === TOKEN SUPPLY ===
 def get_token_supply(contract):
     try:
-        if not BSCSCAN_API_KEY:
-            return "⚠️ Missing BscScan API key — please configure it."
         url = f"{BSC_BASE}?module=stats&action=tokensupply&contractaddress={contract}&apikey={BSCSCAN_API_KEY}"
-        r = requests.get(url).json()
-        return f"{int(r.get('result',0))/1e18:,.0f} tokens"
-    except:
+        res = requests.get(url).json()
+        if res.get("status") != "1":
+            return "❌ Could not fetch token supply (API limit or invalid contract)."
+        result = int(res.get("result", 0))
+        return f"{result / 1e18:,.0f} tokens"
+    except Exception as e:
+        print(f"[Supply Error] {e}")
         return "❌ Could not fetch token supply."
 
 # === COMMAND HANDLERS ===
 def web3_panel(update: Update, context: CallbackContext):
-    s = get_api_status()
     text = (
-        "🌐 <b>WENBNB Web3 Command Center</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🌐 <b>WENBNB Web3 Command Center</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "💰 /tokenprice &lt;id&gt; — Live token price\n"
         "👛 /wallet &lt;address&gt; — Wallet balance\n"
         "📊 /supply &lt;contract&gt; — Token total supply\n"
         "🧠 /analyze &lt;address&gt; — AI wallet risk (coming soon)\n\n"
-        "🛰️ <b>Data Source Status:</b>\n"
-        f" • Binance {s['Binance']}\n"
-        f" • CoinMarketCap {s['CoinMarketCap']}\n"
-        f" • CoinGecko {s['CoinGecko']}\n"
-        f" • DexScreener {s['DexScreener']}\n\n"
-        "⚙️ <b>Core Version:</b> Web3 Connect v5.8-ProPulse+\n"
-        "💫 <i>Hybrid Intelligence powered by WENBNB Neural Engine</i>\n"
+        "💫 Hybrid Intelligence powered by WENBNB Neural Engine\n"
         "──────────────────────────────\n"
         f"{BRAND_TAG}"
     )
@@ -158,28 +130,52 @@ def tokenprice(update: Update, context: CallbackContext):
 
 def wallet(update: Update, context: CallbackContext):
     if not context.args:
-        update.message.reply_text("💡 Usage: /wallet &lt;BSC_address&gt;")
+        update.message.reply_text("💡 Usage: /wallet <BSC_address>")
         return
-    addr = context.args[0]
-    bal = get_wallet_balance(addr)
-    update.message.reply_text(
-        f"👛 <b>Wallet</b>: <code>{addr}</code>\n💎 Balance: <b>{bal}</b>\n\n{BRAND_TAG}",
-        parse_mode="HTML"
+    address = context.args[0]
+    balance = get_wallet_balance(address)
+    text = (
+        f"👛 <b>Wallet:</b>\n<code>{address}</code>\n\n"
+        f"💎 Balance: <b>{balance}</b>\n\n{BRAND_TAG}"
     )
+    update.message.reply_text(text, parse_mode="HTML")
 
 def supply(update: Update, context: CallbackContext):
     if not context.args:
-        update.message.reply_text("💡 Usage: /supply &lt;contract_address&gt;")
+        update.message.reply_text("💡 Usage: /supply <contract_address>")
         return
-    c = context.args[0]
-    s = get_token_supply(c)
-    update.message.reply_text(
-        f"📊 <b>Token Supply</b>\n<code>{c}</code>\nTotal: <b>{s}</b>\n\n{BRAND_TAG}",
-        parse_mode="HTML"
+    contract = context.args[0]
+    supply = get_token_supply(contract)
+    text = (
+        f"📊 <b>Token Supply</b>\n<code>{contract}</code>\n"
+        f"Total: <b>{supply}</b>\n\n{BRAND_TAG}"
     )
+    update.message.reply_text(text, parse_mode="HTML")
 
+# === NEW ANALYZE PANEL (COMING SOON) ===
+def analyze(update: Update, context: CallbackContext):
+    if not context.args:
+        update.message.reply_text("💡 Usage: /analyze <wallet_address>")
+        return
+    wallet = context.args[0]
+    text = (
+        "━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🧠 <b>AI Wallet Risk Analysis</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔍 Address: <code>{wallet}</code>\n\n"
+        "📊 Scanning wallet activity, liquidity patterns, and token movements...\n"
+        "💬 <i>Neural Risk Engine</i> is calibrating.\n\n"
+        "⏳ <b>Coming Soon...</b>\n"
+        "This module will detect risky wallets, analyze holding patterns, "
+        "and rate confidence levels from ⚠️ Low → ✅ Safe.\n\n"
+        f"{BRAND_TAG}"
+    )
+    update.message.reply_text(text, parse_mode="HTML")
+
+# === REGISTER COMMANDS ===
 def register_handlers(dp):
     dp.add_handler(CommandHandler("web3", web3_panel))
     dp.add_handler(CommandHandler("tokenprice", tokenprice))
     dp.add_handler(CommandHandler("wallet", wallet))
     dp.add_handler(CommandHandler("supply", supply))
+    dp.add_handler(CommandHandler("analyze", analyze))
