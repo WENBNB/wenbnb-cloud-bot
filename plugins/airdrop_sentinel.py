@@ -12,7 +12,7 @@ Commands:
  - /airdropremove <name>                       (admin remove)
  - /airdropset <threshold>                     (admin: set alert threshold %)
 
-Requires: ADMIN_ID or ADMIN_CHAT_ID env var for admin notifications.
+Requires: ADMIN_ID env var for admin notifications.
 """
 
 import os
@@ -28,8 +28,7 @@ from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext, JobQueue
 
 # ==== CONFIG ====
-ADMIN_ID = int(os.getenv("ADMIN_ID", os.getenv("ADMIN_CHAT_ID", "0")))
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", os.getenv("ADMIN_ID", "0")))
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 DEX_SEARCH = "https://api.dexscreener.io/latest/dex/search?q={q}"
 WATCHLIST_FILE = "data/airdrop_watchlist.json"
 TELEMETRY_FILE = "data/airdrop_telemetry.json"
@@ -165,7 +164,7 @@ def format_token_report(info: Dict[str, Any]) -> str:
         f"{BRAND_TAG}"
     )
 
-# ==== Safe reply helper ====
+# ==== Safe message reply (auto-fallback if Telegram rejects HTML) ====
 def safe_reply(update: Update, text: str, parse_mode="HTML", **kwargs):
     try:
         update.message.reply_text(text, parse_mode=parse_mode, **kwargs)
@@ -174,10 +173,6 @@ def safe_reply(update: Update, text: str, parse_mode="HTML", **kwargs):
             update.message.reply_text(text, parse_mode=None, **kwargs)
         except Exception:
             pass
-
-# ==== Admin Check ====
-def is_admin(user_id: int) -> bool:
-    return str(user_id) in [str(ADMIN_ID), str(ADMIN_CHAT_ID)]
 
 # ==== Auto-learn logic ====
 LEARN_THRESHOLD = DEFAULT_THRESHOLD
@@ -266,12 +261,21 @@ def airdropcheck_cmd(update: Update, context: CallbackContext):
         update.message.chat.send_action("typing")
     except Exception:
         pass
+
     args = context.args
     if not args:
-        safe_reply(update,
-            "🧩 Usage:\n/airdropcheck <wallet | contract | symbol>\n\n💡 Example:\n/airdropcheck 0xYourWallet\n/airdropcheck 0xContractAddress\n/airdropcheck WENBNB"
+        update.message.reply_text(
+            "🧩 Usage:\n"
+            "/airdropcheck <wallet | contract | symbol>\n\n"
+            "Examples:\n"
+            "/airdropcheck 0xYourWallet\n"
+            "/airdropcheck 0xContractAddress\n"
+            "/airdropcheck WENBNB",
+            parse_mode=None,
+            disable_web_page_preview=True
         )
         return
+
     query = args[0].strip()
     pair = find_best_pair(query)
     if pair:
@@ -284,6 +288,7 @@ def airdropcheck_cmd(update: Update, context: CallbackContext):
             except Exception:
                 pass
         return
+
     if query.lower().startswith("0x") and len(query) >= 40:
         s = sum((ord(c) * (i + 1)) for i, c in enumerate(query[-12:])) & 0xFFFFFFFF
         rnd = random.Random(s)
@@ -301,7 +306,11 @@ def airdropcheck_cmd(update: Update, context: CallbackContext):
         )
         safe_reply(update, msg)
         return
-    safe_reply(update, "⚠️ Could not detect token on DEX and input is not a valid 0x wallet address.")
+
+    safe_reply(update,
+        "⚠️ Could not detect token on DEX and input is not a valid 0x wallet address.\n"
+        "If you meant a token, use the contract address or try another symbol."
+    )
 
 def airdropalert_cmd(update: Update, context: CallbackContext):
     wl = load_watchlist()
@@ -327,34 +336,36 @@ def airdropwatchlist_cmd(update: Update, context: CallbackContext):
     lines.append(f"\n{BRAND_TAG}")
     safe_reply(update, "\n".join(lines))
 
-# ==== Admin Commands ====
+# Admin Commands
 def airdropadd_cmd(update: Update, context: CallbackContext):
-    if not is_admin(update.effective_user.id):
+    if update.effective_user.id != ADMIN_ID:
         safe_reply(update, "🚫 Admin only.")
         return
     if len(context.args) < 2:
         safe_reply(update, "Usage: /airdropadd <name> <contract>")
         return
-    name, contract = context.args[0], context.args[1]
+    name = context.args[0]
+    contract = context.args[1]
     add_to_watchlist(name, contract, notes="manual add")
     safe_reply(update, f"✅ Added {name} to watchlist.")
 
 def airdropremove_cmd(update: Update, context: CallbackContext):
-    if not is_admin(update.effective_user.id):
+    if update.effective_user.id != ADMIN_ID:
         safe_reply(update, "🚫 Admin only.")
         return
     if not context.args:
         safe_reply(update, "Usage: /airdropremove <name>")
         return
     name = context.args[0]
-    if remove_from_watchlist(name):
+    ok = remove_from_watchlist(name)
+    if ok:
         safe_reply(update, f"✅ Removed {name} from watchlist.")
     else:
         safe_reply(update, "⚠️ Not found.")
 
 def airdropset_cmd(update: Update, context: CallbackContext):
     global LEARN_THRESHOLD
-    if not is_admin(update.effective_user.id):
+    if update.effective_user.id != ADMIN_ID:
         safe_reply(update, "🚫 Admin only.")
         return
     if not context.args:
