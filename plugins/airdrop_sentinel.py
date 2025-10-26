@@ -5,12 +5,12 @@ Auto-discovers tokens via /airdropcheck and adds high-probability projects
 to a persistent watchlist. Periodically scans watchlist and alerts admin.
 
 Commands:
- - /airdropcheck <wallet|contract|symbol>   (manual scan + auto-learn)
- - /airdropalert                             (show alert/watch status)
- - /airdropwatchlist                         (list watched tokens)
- - /airdropadd <name> <contract>             (admin add)
- - /airdropremove <name>                     (admin remove)
- - /airdropset <threshold>                   (admin: set alert threshold %)
+ - /airdropcheck <wallet | contract | symbol>   (manual scan + auto-learn)
+ - /airdropalert                               (show alert/watch status)
+ - /airdropwatchlist                           (list watched tokens)
+ - /airdropadd <name> <contract>               (admin add)
+ - /airdropremove <name>                       (admin remove)
+ - /airdropset <threshold>                     (admin: set alert threshold %)
 
 Requires: ADMIN_ID env var for admin notifications.
 """
@@ -93,11 +93,10 @@ def remove_from_watchlist(name: str):
 def record_telemetry(event: str, data: Dict[str, Any]):
     t = _load_json(TELEMETRY_FILE, [])
     t.append({"ts": datetime.now().isoformat(), "event": event, "data": data})
-    # keep last 500
     t = t[-500:]
     _save_json(TELEMETRY_FILE, t)
 
-# ==== Dex probe & probability model (same core model) ====
+# ==== Dex probe & probability model ====
 def probe_dexscreener(query: str, timeout=8) -> Optional[dict]:
     try:
         r = requests.get(DEX_SEARCH.format(q=query), timeout=timeout)
@@ -165,8 +164,18 @@ def format_token_report(info: Dict[str, Any]) -> str:
         f"{BRAND_TAG}"
     )
 
-# ==== Auto-learn logic: if manual /airdropcheck returns token mode and prob >= learn threshold, add to watchlist ====
-LEARN_THRESHOLD = DEFAULT_THRESHOLD  # can be changed via /airdropset for admin
+# ==== Safe message reply (auto-fallback if Telegram rejects HTML) ====
+def safe_reply(update: Update, text: str, parse_mode="HTML", **kwargs):
+    try:
+        update.message.reply_text(text, parse_mode=parse_mode, **kwargs)
+    except Exception:
+        try:
+            update.message.reply_text(text, parse_mode=None, **kwargs)
+        except Exception:
+            pass
+
+# ==== Auto-learn logic ====
+LEARN_THRESHOLD = DEFAULT_THRESHOLD
 
 def maybe_autolearn(pair: dict, name_hint: str = ""):
     try:
@@ -182,25 +191,19 @@ def maybe_autolearn(pair: dict, name_hint: str = ""):
             if key not in wl:
                 item = add_to_watchlist(name, contract, notes="auto-learned")
                 record_telemetry("auto_learn", {"name": name, "contract": contract, "prob": prob})
-                # notify admin
                 if ADMIN_ID:
-                    try:
-                        msg = (
-                            f"🧠 <b>Auto-Learned Token</b>\n"
-                            f"🔷 {item['name']} — added to watchlist (auto-learn)\n"
-                            f"🎯 Airdrop Sim Prob: <b>{prob:.0f}%</b>\n"
-                            f"🔗 Contract: <code>{contract}</code>\n\n{BRAND_TAG}"
-                        )
-                        # can't import bot directly here — caller should notify.
-                        # return message payload to be sent by caller.
-                        return {"notify": True, "msg": msg}
-                    except Exception:
-                        pass
+                    msg = (
+                        f"🧠 <b>Auto-Learned Token</b>\n"
+                        f"🔷 {item['name']} — added to watchlist (auto-learn)\n"
+                        f"🎯 Airdrop Sim Prob: <b>{prob:.0f}%</b>\n"
+                        f"🔗 Contract: <code>{contract}</code>\n\n{BRAND_TAG}"
+                    )
+                    return {"notify": True, "msg": msg}
     except Exception as e:
         print(f"[AirdropSentinel] maybe_autolearn error: {e}")
     return None
 
-# ==== Scanner used by job queue ====
+# ==== Scanner job ====
 def scan_token_contract(contract: str) -> Optional[Dict[str, Any]]:
     try:
         data = probe_dexscreener(contract)
@@ -232,13 +235,10 @@ def job_scan_watchlist(context: CallbackContext):
         last_prob = meta.get("last_prob", 0) or 0
         meta["last_prob"] = prob
         meta["last_scan"] = datetime.now().isoformat()
-        # save current state
         wl[key] = meta
         save_watchlist(wl)
         record_telemetry("watch_scan", {"name": key, "prob": prob})
-        # Alert conditions: crosses threshold or rises by >10%
         if prob >= LEARN_THRESHOLD and (last_prob == 0 or prob - last_prob >= 10):
-            # send admin message
             if ADMIN_ID:
                 try:
                     msg = (
@@ -255,7 +255,7 @@ def job_scan_watchlist(context: CallbackContext):
                 except Exception as e:
                     print(f"[AirdropSentinel] failed to send alert: {e}")
 
-# ==== Command Handlers ====
+# ==== Commands ====
 def airdropcheck_cmd(update: Update, context: CallbackContext):
     try:
         update.message.chat.send_action("typing")
@@ -265,34 +265,31 @@ def airdropcheck_cmd(update: Update, context: CallbackContext):
     args = context.args
     if not args:
         update.message.reply_text(
-            "🧩 Usage:\n/airdropcheck <wallet|contract|symbol>\n\n"
-            "Examples:\n/airdropcheck 0xYourWallet\n/airdropcheck 0xContractAddress\n/airdropcheck WENBNB",
-            parse_mode="HTML"
+            "🧩 Usage:\n"
+            "/airdropcheck <wallet | contract | symbol>\n\n"
+            "Examples:\n"
+            "/airdropcheck 0xYourWallet\n"
+            "/airdropcheck 0xContractAddress\n"
+            "/airdropcheck WENBNB",
+            parse_mode=None,
+            disable_web_page_preview=True
         )
         return
 
     query = args[0].strip()
-    # prefer Dex probe
     pair = find_best_pair(query)
     if pair:
         info = token_report_from_pair(pair)
-        # show report
-        update.message.reply_text(format_token_report(info), parse_mode="HTML", disable_web_page_preview=True)
-        # attempt auto-learn and notify admin if added
+        safe_reply(update, format_token_report(info), disable_web_page_preview=True)
         res = maybe_autolearn(pair, name_hint=query)
         if res and res.get("notify") and ADMIN_ID:
             try:
-                # send admin notification
                 context.bot.send_message(chat_id=ADMIN_ID, text=res["msg"], parse_mode="HTML")
             except Exception:
                 pass
         return
 
-    # if no pair, treat as wallet?
     if query.lower().startswith("0x") and len(query) >= 40:
-        # wallet mode deterministic scan
-        from math import floor
-        # simple deterministic seed-based score for wallets (mirrors older plugin style)
         s = sum((ord(c) * (i + 1)) for i, c in enumerate(query[-12:])) & 0xFFFFFFFF
         rnd = random.Random(s)
         score = int((rnd.random() * 80) + 10)
@@ -307,13 +304,12 @@ def airdropcheck_cmd(update: Update, context: CallbackContext):
             f"🔗 DeFi Protocols Detected (est.): {protocols}\n\n"
             f"{BRAND_TAG}"
         )
-        update.message.reply_text(msg, parse_mode="HTML")
+        safe_reply(update, msg)
         return
 
-    update.message.reply_text(
+    safe_reply(update,
         "⚠️ Could not detect token on DEX and input is not a valid 0x wallet address.\n"
-        "If you meant a token, use the contract address or try another symbol.",
-        parse_mode="HTML"
+        "If you meant a token, use the contract address or try another symbol."
     )
 
 def airdropalert_cmd(update: Update, context: CallbackContext):
@@ -325,12 +321,12 @@ def airdropalert_cmd(update: Update, context: CallbackContext):
         f"Scan interval: <b>{DEFAULT_INTERVAL_MINUTES} minutes</b>\n\n"
         f"{BRAND_TAG}"
     )
-    update.message.reply_text(text, parse_mode="HTML")
+    safe_reply(update, text)
 
 def airdropwatchlist_cmd(update: Update, context: CallbackContext):
     wl = load_watchlist()
     if not wl:
-        update.message.reply_text("📋 Watchlist is empty.", parse_mode="HTML")
+        safe_reply(update, "📋 Watchlist is empty.")
         return
     lines = ["📋 <b>Watchlist</b>\n"]
     for k, v in wl.items():
@@ -338,49 +334,49 @@ def airdropwatchlist_cmd(update: Update, context: CallbackContext):
         last_scan = v.get("last_scan") or "never"
         lines.append(f"• <b>{k}</b> — {v.get('contract')} — last {last:.0f}% at {last_scan}")
     lines.append(f"\n{BRAND_TAG}")
-    update.message.reply_text("\n".join(lines), parse_mode="HTML")
+    safe_reply(update, "\n".join(lines))
 
-# admin only
+# Admin Commands
 def airdropadd_cmd(update: Update, context: CallbackContext):
     if update.effective_user.id != ADMIN_ID:
-        update.message.reply_text("🚫 Admin only.")
+        safe_reply(update, "🚫 Admin only.")
         return
     if len(context.args) < 2:
-        update.message.reply_text("Usage: /airdropadd <name> <contract>")
+        safe_reply(update, "Usage: /airdropadd <name> <contract>")
         return
     name = context.args[0]
     contract = context.args[1]
     add_to_watchlist(name, contract, notes="manual add")
-    update.message.reply_text(f"✅ Added {name} to watchlist.", parse_mode="HTML")
+    safe_reply(update, f"✅ Added {name} to watchlist.")
 
 def airdropremove_cmd(update: Update, context: CallbackContext):
     if update.effective_user.id != ADMIN_ID:
-        update.message.reply_text("🚫 Admin only.")
+        safe_reply(update, "🚫 Admin only.")
         return
     if not context.args:
-        update.message.reply_text("Usage: /airdropremove <name>")
+        safe_reply(update, "Usage: /airdropremove <name>")
         return
     name = context.args[0]
     ok = remove_from_watchlist(name)
     if ok:
-        update.message.reply_text(f"✅ Removed {name} from watchlist.", parse_mode="HTML")
+        safe_reply(update, f"✅ Removed {name} from watchlist.")
     else:
-        update.message.reply_text("⚠️ Not found.", parse_mode="HTML")
+        safe_reply(update, "⚠️ Not found.")
 
 def airdropset_cmd(update: Update, context: CallbackContext):
     global LEARN_THRESHOLD
     if update.effective_user.id != ADMIN_ID:
-        update.message.reply_text("🚫 Admin only.")
+        safe_reply(update, "🚫 Admin only.")
         return
     if not context.args:
-        update.message.reply_text(f"Current threshold: {LEARN_THRESHOLD}%")
+        safe_reply(update, f"Current threshold: {LEARN_THRESHOLD}%")
         return
     try:
         val = int(context.args[0])
         LEARN_THRESHOLD = max(1, min(100, val))
-        update.message.reply_text(f"✅ Alert/learn threshold set to {LEARN_THRESHOLD}%", parse_mode="HTML")
+        safe_reply(update, f"✅ Alert/learn threshold set to {LEARN_THRESHOLD}%")
     except Exception:
-        update.message.reply_text("⚠️ Use integer percent, e.g. /airdropset 70")
+        safe_reply(update, "⚠️ Use integer percent, e.g. /airdropset 70")
 
 # ==== Register plugin & job ====
 def register(dispatcher):
@@ -391,7 +387,6 @@ def register(dispatcher):
     dispatcher.add_handler(CommandHandler("airdropremove", airdropremove_cmd))
     dispatcher.add_handler(CommandHandler("airdropset", airdropset_cmd))
 
-    # schedule job if job_queue available
     jq = getattr(dispatcher, "job_queue", None)
     if isinstance(jq, JobQueue):
         try:
@@ -402,4 +397,4 @@ def register(dispatcher):
     else:
         print("⚠️ JobQueue not found; sentinel scanning requires dispatcher.job_queue.")
 
-    print("🎯 Loaded plugin: airdrop_sentinel.py (v5.1 Auto-Learn)")
+    print("🎯 Loaded plugin: airdrop_sentinel.py
