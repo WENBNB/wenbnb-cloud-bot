@@ -10,7 +10,7 @@ from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
 DATA_FILE = "giveaway_data.json"
-ADMIN_IDS = [123456789]  # replace with your Telegram ID(s)
+ADMIN_IDS = [5698007588]  # replace with your Telegram ID(s)
 BRAND_FOOTER = "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7"
 
 
@@ -125,3 +125,4 @@ def register_handlers(dp):
     dp.add_handler(CommandHandler("giveaway_end", giveaway_end))
     dp.add_handler(CommandHandler("join", join_giveaway))
     dp.add_handler(CommandHandler("giveaway_info", giveaway_info))
+
