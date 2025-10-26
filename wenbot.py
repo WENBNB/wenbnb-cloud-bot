@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # ============================================================
-#  WENBNB Neural Engine v8.6-Pro — Unified Emotion + Plugin Core
-#  Render-Safe, Auto-Healing, Single Polling Instance Protection
+#  💫 WENBNB Neural Engine v8.6-ProStable
+#  Unified Emotion + Plugin Core + Auto-Healing Poll Protection
+#  Render-safe + Background JobQueue + Modular Plugin Loader
 # ============================================================
 
 import os
@@ -13,16 +14,22 @@ import threading
 import requests
 from flask import Flask, jsonify
 from telegram import Update, ParseMode, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import (
+    Updater,
+    CommandHandler,
+    MessageHandler,
+    Filters,
+    CallbackContext,
+)
 
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.6-Pro"
+ENGINE_VERSION = "v8.6-ProStable"
 CORE_VERSION = "v5.0"
 BRAND_SIGNATURE = os.getenv(
     "BRAND_SIGNATURE",
-    "💫 Powered by WENBNB Neural Engine — Modular Intelligence 24×7 ⚡"
+    "💫 <b>Powered by WENBNB Neural Engine</b> — Modular Intelligence 24×7 ⚡"
 )
 
 logging.basicConfig(
@@ -31,7 +38,7 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 logger = logging.getLogger("WENBNB")
-logger.info(f"WENBNB Neural Engine {ENGINE_VERSION} initializing...")
+logger.info(f"🧠 Initializing WENBNB Neural Engine {ENGINE_VERSION} ...")
 
 # ===========================
 # 🔐 Environment Variables
@@ -117,9 +124,12 @@ def start_bot():
     logger.info("🚀 Initializing Telegram Updater...")
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
+    dp.job_queue = updater.job_queue  # ✅ Required for background airdrop scans
 
     # === Load Plugin Handlers ===
+    logger.info("🔍 Loading all plugin modules...")
     register_all_plugins(dp)
+    logger.info("🧠 Plugin load sequence complete. Starting core commands...")
 
     # === Core Commands ===
     def start_cmd(update: Update, context: CallbackContext):
@@ -132,14 +142,21 @@ def start_bot():
         keyboard = [
             [KeyboardButton("/price"), KeyboardButton("/tokeninfo")],
             [KeyboardButton("/meme"), KeyboardButton("/aianalyze")],
-            [KeyboardButton("/airdropcheck"), KeyboardButton("/about")]
+            [KeyboardButton("/airdropcheck"), KeyboardButton("/airdropalert")],
+            [KeyboardButton("/web3"), KeyboardButton("/about")]
         ]
-        update.message.reply_text(text, parse_mode=ParseMode.HTML,
-                                  reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
+        update.message.reply_text(
+            text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
 
     def about_cmd(update: Update, context: CallbackContext):
         update.message.reply_text(
-            f"🌐 <b>About WENBNB</b>\n\nHybrid AI + Web3 Neural Assistant.\n\n{BRAND_SIGNATURE}",
+            f"🌐 <b>About WENBNB</b>\n\n"
+            f"Hybrid AI + Web3 Neural Assistant.\n"
+            f"Now running <b>Neural Engine {ENGINE_VERSION}</b>.\n\n"
+            f"{BRAND_SIGNATURE}",
             parse_mode=ParseMode.HTML
         )
 
