@@ -1,22 +1,20 @@
-# plugins/memory_engine.py
 """
-💫 WENBNB Neural Memory Engine v8.2 — “Synaptic Soul” Build
-Emotion-aware personality core for /aianalyze, /memory, /forget.
-Refined natural tone — Warm, adaptive, and humanlike.
+WENBNB Neural Memory Engine v8.3 — "Clean Pulse Edition"
+Emotion Sync + Context Memory System
+Refined for natural tone and premium personality.
 """
 
-import json, os, time, random
+import os
+import json
+import time
 from textblob import TextBlob
 from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 
-# === CONFIG ===
-MEMORY_FILE = "data/user_memory.json"
-os.makedirs("data", exist_ok=True)
+MEMORY_FILE = "user_memory.json"
 BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Emotional Intelligence 24×7"
 
-
-# === MEMORY CORE ===
+# ====== Load & Save ======
 
 def load_memory():
     if os.path.exists(MEMORY_FILE):
@@ -26,131 +24,116 @@ def load_memory():
 
 def save_memory(data):
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+        json.dump(data, f, indent=2)
 
+# ====== Emotion Analysis ======
 
-# === EMOTION ANALYSIS ===
-
-def analyze_emotion(text: str):
+def analyze_emotion(text):
     blob = TextBlob(text)
     polarity = blob.sentiment.polarity
-
-    if polarity > 0.35:
-        mood = "😊 Positive"
-        tone = "upbeat"
-    elif polarity < -0.35:
-        mood = "😔 Negative"
-        tone = "low"
+    if polarity > 0.3:
+        return "Positive"
+    elif polarity < -0.3:
+        return "Negative"
     else:
-        mood = "😐 Neutral"
-        tone = "balanced"
+        return "Balanced"
 
-    return mood, tone
+# ====== Memory Update ======
 
-
-# === EMOTION-RESPONSIVE REPLIES ===
-
-def emotional_reply(user_name: str, mood: str, text: str):
-    if "Positive" in mood:
-        responses = [
-            f"You sound radiant today, {user_name}! ✨ That kind of vibe could move markets.",
-            f"Haha, I can literally *feel* that bullish spark in your words, {user_name} 😎",
-            f"Love the confidence, {user_name}! Keep that energy up 💫"
-        ]
-    elif "Negative" in mood:
-        responses = [
-            f"Hey {user_name}… sounds like today’s been heavy. Let’s turn that around 💛",
-            f"I sense a bit of frustration there — breathe, we’ve got this together 🌱",
-            f"Even strong minds have low days, {user_name}. You’re still golden ✨"
-        ]
-    else:
-        responses = [
-            f"Balanced tone, {user_name} — calm before the next big move, huh?",
-            f"I like this energy. Not too high, not too low — just *centered*. ⚖️",
-            f"You sound grounded, {user_name}. Perfect mindset for precision. 🧠"
-        ]
-
-    return random.choice(responses)
-
-
-# === MEMORY OPERATIONS ===
-
-def update_memory(user_id: str, text: str, mood: str):
-    memory = load_memory()
+def update_memory(user_id, message, memory):
+    mood = analyze_emotion(message)
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
 
-    if user_id not in memory:
-        memory[user_id] = {"entries": []}
+    if str(user_id) not in memory:
+        memory[str(user_id)] = {"entries": []}
 
-    memory[user_id]["entries"].append({
-        "text": text,
+    memory[str(user_id)]["entries"].append({
+        "text": message,
         "mood": mood,
         "time": timestamp
     })
 
-    if len(memory[user_id]["entries"]) > 10:
-        memory[user_id]["entries"].pop(0)
-
+    # keep last 10
+    memory[str(user_id)]["entries"] = memory[str(user_id)]["entries"][-10:]
     save_memory(memory)
+    return mood
 
-
-# === COMMAND HANDLERS ===
+# ====== Commands ======
 
 def aianalyze(update: Update, context: CallbackContext):
     user = update.effective_user
-    text = " ".join(context.args)
+    memory = load_memory()
+    args = context.args
 
-    if not text:
+    if not args:
         update.message.reply_text(
-            "🧠 Tell me how you feel or what’s on your mind.\nExample: `/aianalyze I’m feeling bullish today!`",
-            parse_mode="Markdown"
+            "💭 Use like:\n<code>/aianalyze I'm feeling bullish about WENBNB!</code>",
+            parse_mode="HTML"
         )
         return
 
-    mood, tone = analyze_emotion(text)
-    update_memory(str(user.id), text, mood)
-    reply = emotional_reply(user.first_name, mood, text)
+    text = " ".join(args)
+    mood = update_memory(user.id, text, memory)
 
-    msg = (
-        f"{reply}\n\n"
-        f"🪞 <b>Mood sensed:</b> {mood}\n"
+    # Response tone library
+    tones = {
+        "Positive": [
+            f"✨ Love that energy, {user.first_name}! Keep that bullish spark alive — your optimism radiates pure alpha.",
+            f"🌞 I can sense your vibe — bright, charged, and unstoppable. That’s pure WENBNB spirit!"
+        ],
+        "Negative": [
+            f"💭 Hey {user.first_name}, I can feel the storm in your words. Let’s take a breath — every dip has a rebound.",
+            f"😔 It’s okay to feel off. Even the Neural Engine needs cooldown time. You’re not alone in this."
+        ],
+        "Balanced": [
+            f"🌙 Calm and steady, {user.first_name}. Your tone is balanced — that’s real trader discipline.",
+            f"🧘 Neural tone stabilized — clarity detected. You’re vibing smooth and centered today."
+        ]
+    }
+
+    chosen = tones.get(mood, ["I’m syncing your mood…"]).copy()
+    import random
+    reply = (
+        f"🪞 Emotional sync active: <b>{mood}</b>\n\n"
+        f"{random.choice(chosen)}\n\n"
         f"{BRAND_TAG}"
     )
 
-    update.message.reply_text(msg, parse_mode="HTML")
+    update.message.reply_text(reply, parse_mode="HTML")
 
 
-def memory(update: Update, context: CallbackContext):
+def show_memory(update: Update, context: CallbackContext):
     user = update.effective_user
-    memory = load_memory().get(str(user.id))
+    memory = load_memory()
+    data = memory.get(str(user.id))
 
-    if not memory or not memory.get("entries"):
-        update.message.reply_text("💭 No emotional data yet. Start with `/aianalyze` and talk to me.")
+    if not data or not data.get("entries"):
+        update.message.reply_text("🫧 No emotional data found yet. Use /aianalyze to start syncing 💫")
         return
 
-    text = "<b>🧠 Your Emotional Memory</b>\n\n"
-    for e in memory["entries"][-5:]:
-        text += f"🕒 <i>{e['time']}</i>\n💬 {e['text']}\nMood: {e['mood']}\n\n"
-    text += f"{BRAND_TAG}"
+    text = "<b>🧠 WENBNB Emotional Memory Snapshot</b>\n\n"
+    for item in data["entries"][-5:]:
+        text += f"🕒 {item['time']}\n💬 {item['text']}\nMood: {item['mood']}\n\n"
 
+    text += BRAND_TAG
     update.message.reply_text(text, parse_mode="HTML")
 
 
-def forget(update: Update, context: CallbackContext):
-    user = update.effective_user
+def reset_memory(update: Update, context: CallbackContext):
     memory = load_memory()
+    user = update.effective_user
 
     if str(user.id) in memory:
         del memory[str(user.id)]
         save_memory(memory)
-        update.message.reply_text(f"🧹 All your emotional traces cleared, {user.first_name}.\nFresh sync awaits 💞")
+        update.message.reply_text("🧹 Memory cleared successfully.\nStarting fresh with you ✨")
     else:
-        update.message.reply_text("🤖 No memory found for you — we’re clean as new silicon 💫")
+        update.message.reply_text("🫧 No stored memory to reset.")
 
 
-# === REGISTER ===
+# ====== Register ======
 
 def register_handlers(dp):
     dp.add_handler(CommandHandler("aianalyze", aianalyze))
-    dp.add_handler(CommandHandler("memory", memory))
-    dp.add_handler(CommandHandler("forget", forget))
+    dp.add_handler(CommandHandler("memory", show_memory))
+    dp.add_handler(CommandHandler("forget", reset_memory))
