@@ -1,86 +1,97 @@
 """
-WENBNB Neural Chat Core v7.6 — Hybrid + AI Dashboard Edition
+WENBNB Neural Chat Core v8.6-ProStable
+Unified REST AI + Emotion Sync Integration
 Default AI Mode ON + /ai_mode toggle + /ai_status monitor
-Powered by WENBNB Neural Engine — Emotional Context Intelligence 24×7
 """
 
-import openai, os, time, datetime, psutil
+import os, time, datetime, psutil, requests
 from telegram import Update
 from telegram.ext import MessageHandler, Filters, CommandHandler, CallbackContext
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# === API & Config ===
+AI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+AI_MODEL = "gpt-4o-mini"
 
-# === Brand Tag ===
-BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Emotional Context Intelligence 24×7"
-
-# === State Variables ===
+BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Emotional Intelligence 24×7"
 AI_MODE = True
-ADMIN_IDS = [123456789]  # 🔧 Replace with your Telegram ID
+ADMIN_IDS = [123456789]  # 🔧 replace with your Telegram ID
 conversation_memory = {}
 last_emotion = "neutral"
 start_time = datetime.datetime.now()
 
-# === Emotion Detection ===
-def detect_emotion(message):
-    global last_emotion
+# === Helper: AI Generate ===
+def ai_generate(prompt, emotion_hint=None):
+    """Universal AI call via REST (no SDK dependency)"""
     try:
-        analysis = openai.ChatCompletion.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role": "system", "content": "Detect emotion (happy, sad, angry, calm, excited, neutral)."},
-                {"role": "user", "content": message}
-            ],
-            max_tokens=10,
-            temperature=0.4
+        prefix = (
+            "You are WENBNB AI — an emotionally intelligent, crypto-aware assistant. "
+            "Keep replies human, witty, and context-aware.\n\n"
         )
-        emotion = analysis["choices"][0]["message"]["content"].strip().lower()
-        last_emotion = emotion if emotion in ["happy", "sad", "angry", "calm", "excited"] else "neutral"
-        return last_emotion
-    except:
+        if emotion_hint:
+            prefix += f"User mood context: {emotion_hint}\n\n"
+
+        data = {
+            "model": AI_MODEL,
+            "messages": [{"role": "user", "content": prefix + prompt}],
+            "temperature": 0.9,
+            "max_tokens": 250,
+        }
+
+        r = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {AI_API_KEY}"},
+            json=data,
+            timeout=20,
+        )
+
+        res = r.json()
+        return res.get("choices", [{}])[0].get("message", {}).get("content", "⚡ Neural silence detected.")
+    except Exception as e:
+        return f"⚠️ Neural Core Error: {str(e)}"
+
+# === Emotion Detection (Light heuristic) ===
+def detect_emotion(message):
+    msg = message.lower()
+    if any(x in msg for x in ["happy", "great", "love", "awesome", "amazing", "excited"]):
+        return "happy"
+    elif any(x in msg for x in ["sad", "bad", "depressed", "down", "tired"]):
+        return "sad"
+    elif any(x in msg for x in ["angry", "mad", "furious", "rage"]):
+        return "angry"
+    elif any(x in msg for x in ["calm", "peaceful", "okay", "fine"]):
+        return "calm"
+    else:
         return "neutral"
 
-# === Generate Neural Reply ===
+# === Generate Reply ===
 def generate_neural_reply(user_id, message):
     global conversation_memory, last_emotion
     context = conversation_memory.get(user_id, "")
     emotion = detect_emotion(message)
+    last_emotion = emotion
 
     prompt = (
-        f"You are WENBNB AI — an empathetic crypto assistant.\n"
         f"User emotion: {emotion}\n"
-        f"Recent context:\n{context}\n"
+        f"Recent context:\n{context}\n\n"
         f"User: {message}\nAI:"
     )
 
-    try:
-        completion = openai.ChatCompletion.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role": "system", "content": "You are WENBNB Neural AI. Respond with empathy and intelligence."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.9,
-            max_tokens=250
-        )
+    ai_text = ai_generate(prompt, emotion_hint=emotion)
+    conversation_memory[user_id] = (context + f"\nUser: {message}\nAI: {ai_text}")[-1500:]
 
-        ai_text = completion["choices"][0]["message"]["content"].strip()
-        conversation_memory[user_id] = (context + f"\nUser: {message}\nAI: {ai_text}")[-1500:]
+    emotion_icon = {
+        "happy": "😊", "sad": "😢", "angry": "😠",
+        "excited": "🤩", "calm": "🧘", "neutral": "💫"
+    }.get(emotion, "💫")
 
-        emotion_icon = {
-            "happy": "😊", "sad": "😢", "angry": "😠",
-            "excited": "🤩", "calm": "🧘", "neutral": "🤖"
-        }.get(emotion, "🤖")
-
-        return f"{emotion_icon} {ai_text}\n\n{BRAND_TAG}"
-
-    except Exception as e:
-        return f"⚠️ Neural Core Error: {e}"
+    return f"{emotion_icon} {ai_text}\n\n{BRAND_TAG}"
 
 # === Chat Handler ===
 def neural_chat_handler(update: Update, context: CallbackContext):
     global AI_MODE
     if not AI_MODE:
         return
+
     message = update.message.text.strip()
     if message.startswith("/"):
         return
