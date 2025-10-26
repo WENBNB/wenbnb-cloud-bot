@@ -1,125 +1,95 @@
-# plugins/memory_ai.py
 """
-WENBNB Memory Engine — Emotion Context Mode v4.1
-Codename: “AI Soul Integration”
+🧠 WENBNB Memory AI Interface v8.0.6-Pro
+Emotion Sync Personality + Neural Recall Bridge
+Connects directly with memory_engine.py (SQLite Memory Core)
 """
 
-import os, json, datetime, random
+import os
+import sqlite3
+import datetime
+import random
 from telegram import Update
-from telegram.ext import CommandHandler, CallbackContext
+from telegram.ext import CommandHandler, MessageHandler, Filters, CallbackContext
 
-MEMORY_FILE = "memory_data.json"
-BRAND_FOOTER = "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7"
+DB_PATH = "data/memory.db"
+BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Emotion Sync v8.0.6"
 
+# === INTERNAL DB HANDLERS ===
+def fetch_last_memory(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT text, emotion, timestamp FROM user_memory WHERE user_id=? ORDER BY ROWID DESC LIMIT 1", (str(user_id),))
+    row = c.fetchone()
+    conn.close()
+    return row
 
-# === CORE MEMORY SYSTEM ===
+def clear_memory(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM user_memory WHERE user_id=?", (str(user_id),))
+    conn.commit()
+    conn.close()
 
-def load_memory():
-    if not os.path.exists(MEMORY_FILE):
-        return {"users": {}}
-    with open(MEMORY_FILE, "r") as f:
-        return json.load(f)
-
-def save_memory(data):
-    with open(MEMORY_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-def analyze_emotion(message: str):
-    """Tiny emotional AI model simulation — detects tone."""
-    message = message.lower()
-    if any(x in message for x in ["sad", "depressed", "bad", "lost", "broke"]):
-        return "😔 low"
-    elif any(x in message for x in ["angry", "mad", "furious"]):
-        return "😡 frustrated"
-    elif any(x in message for x in ["happy", "great", "love", "excited", "amazing"]):
-        return "😊 positive"
-    elif any(x in message for x in ["tired", "sleepy", "bored"]):
-        return "🥱 tired"
-    else:
-        return "😐 neutral"
-
-
-def remember_user(update: Update, context: CallbackContext):
-    """Records each user’s last chat, emotion & time"""
-    user = update.effective_user
-    msg = update.message.text
-    data = load_memory()
-
-    user_data = data["users"].get(str(user.id), {})
-    emotion = analyze_emotion(msg)
-    user_data.update({
-        "last_message": msg,
-        "last_emotion": emotion,
-        "last_seen": datetime.datetime.now().isoformat()
-    })
-    data["users"][str(user.id)] = user_data
-    save_memory(data)
-
-    # subtle emotional connection
+# === EMOTION-BASED PERSONALITY ===
+def get_dynamic_reply(emotion, user_name):
     responses = {
-        "😊 positive": [
-            f"Amazing energy @{user.username}! Keep it up 💫",
-            f"I love when you sound so positive, @{user.username} 🌞"
+        "😊 Positive": [
+            f"Your energy is contagious @{user_name}! 🌞",
+            f"I love that vibe, @{user_name}. Keep radiating positivity 💫"
         ],
-        "😔 low": [
-            f"Hey @{user.username}, I can feel that. Just remember — it always gets better 💛",
-            f"Sending some digital sunshine ☀️ to lift you up, @{user.username}"
+        "😔 Negative": [
+            f"Hey @{user_name}, I can sense that. Remember — storms don’t last forever 🌤️",
+            f"You’re not alone in this one, @{user_name} 💛"
         ],
-        "😡 frustrated": [
-            f"Deep breaths, @{user.username}. You’re stronger than the moment 💪",
-            f"Take a pause — even the Neural Engine cools down sometimes 😅"
-        ],
-        "🥱 tired": [
-            f"Looks like you need a recharge @{user.username}. Rest mode recommended 😴",
-            f"Power down for a bit, @{user.username}. AI’s orders 🧘"
-        ],
-        "😐 neutral": [
-            f"Hey @{user.username}, all good today?",
-            f"Neural silence detected — tell me what’s up 🤖"
+        "😐 Neutral": [
+            f"Hey @{user_name}, I’m right here if you wanna talk 💬",
+            f"Neural calm detected — wanna chat, @{user_name}? 🤖"
         ]
     }
+    return random.choice(responses.get(emotion, ["I’m always tuned to your frequency 💫"]))
 
-    mood = responses.get(emotion, ["I'm here for you always 💫"])
-    update.message.reply_text(
-        random.choice(mood) + "\n\n" + BRAND_FOOTER
-    )
-
-
-def recall_memory(update: Update, context: CallbackContext):
-    """/memory — recall user emotion and last message"""
+# === MESSAGE LISTENER ===
+def auto_emotion_sync(update: Update, context: CallbackContext):
+    """Listens to normal chats and responds emotionally"""
     user = update.effective_user
-    data = load_memory()
-    user_data = data["users"].get(str(user.id))
+    text = update.message.text
+    if not text or text.startswith("/"):
+        return  # skip commands
 
-    if not user_data:
-        update.message.reply_text("🤖 I don’t have any memory of you yet. Say something first!")
+    # get latest emotion memory
+    last_entry = fetch_last_memory(user.id)
+    emotion_hint = last_entry[1] if last_entry else "😐 Neutral"
+    reply = get_dynamic_reply(emotion_hint, user.username or user.first_name)
+    update.message.reply_text(reply + "\n\n" + BRAND_TAG)
+
+# === COMMANDS ===
+def recall_memory(update: Update, context: CallbackContext):
+    """Shows user’s latest emotional memory snapshot"""
+    user = update.effective_user
+    entry = fetch_last_memory(user.id)
+    if not entry:
+        update.message.reply_text("🤖 I haven’t logged any memory for you yet.\nTry chatting with /aianalyze 💭")
         return
 
-    text = (
+    text, emotion, timestamp = entry
+    msg = (
         f"🧠 <b>Memory Recall — {user.first_name}</b>\n"
-        f"💬 Last message: {user_data.get('last_message')}\n"
-        f"❤️ Emotion detected: {user_data.get('last_emotion')}\n"
-        f"🕒 Last seen: {user_data.get('last_seen')}\n\n"
-        f"{BRAND_FOOTER}"
+        f"💬 Last message: {text}\n"
+        f"❤️ Emotion detected: {emotion}\n"
+        f"🕒 Last seen: {timestamp}\n\n"
+        f"{BRAND_TAG}"
     )
-    update.message.reply_text(text, parse_mode="HTML")
+    update.message.reply_text(msg, parse_mode="HTML")
 
-
-def clear_memory(update: Update, context: CallbackContext):
-    """/forget — user can clear their memory"""
+def forget_memory(update: Update, context: CallbackContext):
+    """Deletes user’s emotional memory"""
     user = update.effective_user
-    data = load_memory()
-    if str(user.id) in data["users"]:
-        del data["users"][str(user.id)]
-        save_memory(data)
-        update.message.reply_text(f"🧹 Memory of @{user.username} deleted successfully.\n\n{BRAND_FOOTER}")
-    else:
-        update.message.reply_text("🤖 I had nothing stored for you yet.")
-
+    clear_memory(user.id)
+    update.message.reply_text(f"🧹 Memory of @{user.username or user.first_name} cleared.\n{BRAND_TAG}")
 
 # === REGISTRATION ===
-
 def register_handlers(dp):
     dp.add_handler(CommandHandler("memory", recall_memory))
-    dp.add_handler(CommandHandler("forget", clear_memory))
+    dp.add_handler(CommandHandler("forget", forget_memory))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, auto_emotion_sync))
+    print("💞 memory_ai.py loaded — Emotion Sync active with SQLite Memory Core.")
