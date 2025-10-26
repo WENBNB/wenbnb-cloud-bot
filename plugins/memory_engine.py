@@ -1,120 +1,122 @@
 """
-WENBNB Neural Memory Engine v4.1-E
-Emotion Context + Persistent Hybrid Memory System
-Locked & Approved — "AI Soul Integration"
+🧠 WENBNB Neural Memory Engine v8.0.6-Pro
+Emotion Context + Persistent SQLite Memory Core
+Optimized for Emotion Sync + Adaptive Recall
 """
 
-import json
 import os
+import sqlite3
 import time
-from textblob import TextBlob
 from telegram import Update
-from telegram.ext import CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import CommandHandler, CallbackContext
 
-MEMORY_FILE = "user_memory.json"
-BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7"
+DB_PATH = "data/memory.db"
+os.makedirs("data", exist_ok=True)
 
-# ===== LOAD + SAVE MEMORY =====
+BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Pro Memory Core 24×7"
 
-def load_memory():
-    if os.path.exists(MEMORY_FILE):
-        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+# ===== DB INIT =====
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS user_memory (
+        user_id TEXT,
+        text TEXT,
+        emotion TEXT,
+        timestamp TEXT
+    )
+    """)
+    conn.commit()
+    conn.close()
 
-def save_memory(memory):
-    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(memory, f, indent=4)
+init_db()
 
 # ===== EMOTION DETECTION =====
+def detect_emotion(text):
+    text_l = text.lower()
+    positives = ["good", "great", "amazing", "love", "happy", "bullish", "win", "yes"]
+    negatives = ["sad", "bad", "angry", "bearish", "down", "lose", "tired", "no"]
+    pos_score = sum(w in text_l for w in positives)
+    neg_score = sum(w in text_l for w in negatives)
 
-def analyze_emotion(text):
-    blob = TextBlob(text)
-    polarity = blob.sentiment.polarity
-    if polarity > 0.3:
-        return "😊 Positive", "💫 Glad to feel your energy!"
-    elif polarity < -0.3:
-        return "😔 Negative", "💭 I sense you’re upset, but I’m here for you."
+    if pos_score > neg_score:
+        return "😊 Positive", "💫 I can feel your upbeat energy!"
+    elif neg_score > pos_score:
+        return "😔 Negative", "💭 That sounds rough, but I’ve got your back."
     else:
-        return "😐 Neutral", "✨ I’m calm and listening."
+        return "😐 Neutral", "✨ Calm and centered — syncing your vibe."
 
 # ===== MEMORY UPDATE =====
+def save_message(user_id, text, emotion):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT INTO user_memory (user_id, text, emotion, timestamp) VALUES (?, ?, ?, ?)",
+              (str(user_id), text, emotion, time.strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
 
-def update_user_memory(user_id, message, memory):
-    emotion_label, emotion_text = analyze_emotion(message)
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+def get_recent_memory(user_id, limit=5):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT text, emotion, timestamp FROM user_memory WHERE user_id=? ORDER BY ROWID DESC LIMIT ?",
+              (str(user_id), limit))
+    rows = c.fetchall()
+    conn.close()
+    return rows[::-1]  # reverse chronological
 
-    if str(user_id) not in memory:
-        memory[str(user_id)] = {"context": [], "last_emotion": "Neutral"}
-
-    memory[str(user_id)]["context"].append({
-        "text": message,
-        "emotion": emotion_label,
-        "time": timestamp
-    })
-    memory[str(user_id)]["last_emotion"] = emotion_label
-    if len(memory[str(user_id)]["context"]) > 10:
-        memory[str(user_id)]["context"].pop(0)
-
-    save_memory(memory)
-    return emotion_label, emotion_text
+def clear_memory(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM user_memory WHERE user_id=?", (str(user_id),))
+    conn.commit()
+    conn.close()
 
 # ===== COMMANDS =====
-
 def aianalyze(update: Update, context: CallbackContext):
     user = update.effective_user
-    memory = load_memory()
-    user_id = str(user.id)
-
-    text = " ".join(context.args)
-    if not text:
+    if not context.args:
         update.message.reply_text(
-            "🧠 Send me a message like:\n<code>/aianalyze I feel bullish about WENBNB!</code>",
+            "🧠 Send me something to analyze:\n<code>/aianalyze I’m feeling bullish about WENBNB!</code>",
             parse_mode="HTML"
         )
         return
 
-    emotion_label, emotion_text = update_user_memory(user_id, text, memory)
+    text = " ".join(context.args)
+    emotion_label, emotion_msg = detect_emotion(text)
+    save_message(user.id, text, emotion_label)
+
     reply = (
-        f"{emotion_text}\n\n"
+        f"{emotion_msg}\n\n"
         f"<b>Emotion Detected:</b> {emotion_label}\n"
-        f"<b>Context Saved:</b> \"{text}\"\n\n"
-        "Your vibe is now synced with WENBNB Neural Memory 🧠💫\n\n"
+        f"<b>Memory Saved:</b> \"{text}\"\n\n"
+        "Your emotional context is now synced 💾🧠\n\n"
         f"{BRAND_TAG}"
     )
-
     update.message.reply_text(reply, parse_mode="HTML")
 
 def show_memory(update: Update, context: CallbackContext):
     user = update.effective_user
-    memory = load_memory()
-    data = memory.get(str(user.id))
-
-    if not data:
-        update.message.reply_text("🧩 No active memory found. Start by talking to me using /aianalyze.")
+    entries = get_recent_memory(user.id)
+    if not entries:
+        update.message.reply_text("🧩 No memory yet. Start with /aianalyze 💭")
         return
 
-    text = "<b>🧠 Your WENBNB Neural Memory Snapshot</b>\n\n"
-    for c in data["context"][-5:]:
-        text += f"🕒 <i>{c['time']}</i>\n💬 {c['text']}\nMood: {c['emotion']}\n\n"
-
-    text += f"{BRAND_TAG}"
-    update.message.reply_text(text, parse_mode="HTML")
+    msg = "<b>🧠 WENBNB Neural Memory Snapshot</b>\n\n"
+    for text, emotion, ts in entries:
+        msg += f"🕒 <i>{ts}</i>\n💬 {text}\nMood: {emotion}\n\n"
+    msg += BRAND_TAG
+    update.message.reply_text(msg, parse_mode="HTML")
 
 def reset_memory(update: Update, context: CallbackContext):
-    memory = load_memory()
     user = update.effective_user
+    clear_memory(user.id)
+    update.message.reply_text("🧹 Memory cleared successfully.\nI’ll start fresh with you 💞")
 
-    if str(user.id) in memory:
-        del memory[str(user.id)]
-        save_memory(memory)
-        update.message.reply_text("🧹 Memory cleared successfully.\nI’ll start fresh with you 💞")
-    else:
-        update.message.reply_text("No stored memory found for you.")
-
-# ===== REGISTRATION =====
-
+# ===== REGISTER HANDLERS =====
 def register_handlers(dp):
     dp.add_handler(CommandHandler("aianalyze", aianalyze))
     dp.add_handler(CommandHandler("mymemory", show_memory))
     dp.add_handler(CommandHandler("resetmemory", reset_memory))
+
+    print("🧠 memory_engine.py loaded — SQLite neural memory active.")
