@@ -1,10 +1,11 @@
 """
-WENBNB Smart Giveaway Manager v3.0-ProStable+
+WENBNB Smart Giveaway Manager v3.0.1-ProStable++
 ───────────────────────────────────────────────
 • Multi-Round Auto Giveaway
 • Round Timer (seconds-based)
 • Auto-Winner Selection per Round
 • Premium Bold + Emoji UI
+• Reward-Label System (Manual + Future AutoDetect Ready)
 • Render-Safe Async Compatible
 """
 
@@ -30,6 +31,30 @@ def save_data(data):
 def is_admin(user_id):
     return user_id in ADMIN_IDS
 
+
+# === (Future-Ready) Smart Reward Formatter ===
+def format_reward(raw_reward: str):
+    """
+    Keeps manual reward labeling clean,
+    but ready for auto-detect upgrade when needed.
+    """
+    reward = raw_reward.strip()
+
+    # 💤 Current Phase: Manual (use whatever text admin enters)
+    return reward
+
+    # 🚀 Future Upgrade (uncomment later)
+    # reward_lower = reward.lower()
+    # if "usdt" in reward_lower:
+    #     return f"💵 {reward.upper()}"
+    # elif "bnb" in reward_lower:
+    #     return f"🔶 {reward.upper()}"
+    # elif "wenbnb" in reward_lower:
+    #     return f"💎 {reward.upper()}"
+    # else:
+    #     return f"🎁 {reward}"
+
+
 # === GIVEAWAY START ===
 def giveaway_start(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
@@ -42,7 +67,8 @@ def giveaway_start(update: Update, context: CallbackContext):
         update.message.reply_text("⚙️ Usage: /giveaway_start <reward> <rounds> <seconds>")
         return
 
-    reward, total_rounds, round_time = args[0], int(args[1]), int(args[2])
+    reward_raw, total_rounds, round_time = args[0], int(args[1]), int(args[2])
+    reward = format_reward(reward_raw)
 
     data = {
         "active": True,
@@ -56,17 +82,18 @@ def giveaway_start(update: Update, context: CallbackContext):
     save_data(data)
 
     text = (
-        f"💫 <b>WENBNB Multi-Round Giveaway Activated!</b>\n\n"
+        f"✨ <b>WENBNB Multi-Round Giveaway Activated!</b>\n\n"
         f"🎁 <b>Reward:</b> {reward}\n"
         f"🔄 <b>Rounds:</b> {total_rounds}\n"
         f"⏰ <b>Round Duration:</b> {round_time} seconds\n\n"
-        f"🪩 <b>Join Now →</b> /join\n"
+        f"💫 <b>Join Now →</b> /join\n"
         f"Winners announced automatically at the end of each round!\n\n"
         f"{BRAND_FOOTER}"
     )
     update.message.reply_text(text, parse_mode="HTML")
 
     threading.Thread(target=run_rounds, args=(context.bot, update.effective_chat.id), daemon=True).start()
+
 
 # === JOIN GIVEAWAY ===
 def join_giveaway(update: Update, context: CallbackContext):
@@ -85,6 +112,7 @@ def join_giveaway(update: Update, context: CallbackContext):
     save_data(data)
     update.message.reply_text(f"🎯 @{user.username}, you’ve successfully joined the giveaway!\n\n{BRAND_FOOTER}", parse_mode="HTML")
 
+
 # === AUTO ROUND LOGIC ===
 def run_rounds(bot, chat_id):
     data = load_data()
@@ -93,7 +121,7 @@ def run_rounds(bot, chat_id):
     round_time = data.get("round_time", 60)
 
     for current in range(1, total + 1):
-        bot.send_message(chat_id, f"🔥 <b>Round {current} of {total} started!</b>\n💎 Reward: {reward}\n/join to enter now!\n⏰ Closing in {round_time} seconds...", parse_mode="HTML")
+        bot.send_message(chat_id, f"🔥 <b>Round {current} of {total} started!</b>\n💎 Reward: {reward}\n💬 /join to enter now!\n⏳ Closing in {round_time} seconds...", parse_mode="HTML")
         time.sleep(round_time)
 
         data = load_data()
@@ -124,6 +152,7 @@ def run_rounds(bot, chat_id):
     )
     bot.send_message(chat_id, summary, parse_mode="HTML")
 
+
 # === ADMIN END ===
 def giveaway_end(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
@@ -139,6 +168,7 @@ def giveaway_end(update: Update, context: CallbackContext):
     data["active"] = False
     save_data(data)
     update.message.reply_text("🧊 Giveaway force-ended by admin.", parse_mode="HTML")
+
 
 # === INFO ===
 def giveaway_info(update: Update, context: CallbackContext):
@@ -157,10 +187,11 @@ def giveaway_info(update: Update, context: CallbackContext):
     )
     update.message.reply_text(text, parse_mode="HTML")
 
+
 # === REGISTER ===
 def register_handlers(dp):
     dp.add_handler(CommandHandler("giveaway_start", giveaway_start))
     dp.add_handler(CommandHandler("join", join_giveaway))
     dp.add_handler(CommandHandler("giveaway_end", giveaway_end))
     dp.add_handler(CommandHandler("giveaway_info", giveaway_info))
-    print("✅ Loaded plugin: giveaway_ai.py v3.0-ProStable+ (AutoRound + Premium UI)")
+    print("✅ Loaded plugin: giveaway_ai.py v3.0.1-ProStable++ (Reward Label System + Enhanced UI)")
