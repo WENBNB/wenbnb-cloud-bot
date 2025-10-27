@@ -56,10 +56,13 @@ def admin_reboot(update: Update, context: CallbackContext):
     time.sleep(2)
     update.message.reply_text("✅ WENBNB Neural Engine rebooted successfully ⚡")
 
-# === Plugin Register Hook ===
+# ====== PLUGIN REGISTRATION ======
 def register(dp):
+    """Admin Tools Register Function (Force Priority for /admin)"""
     from telegram.ext import CommandHandler
-    dp.add_handler(CommandHandler("admin", admin_status))
-    dp.add_handler(CommandHandler("broadcast", admin_broadcast))
-    dp.add_handler(CommandHandler("reboot", admin_reboot))
-    print("✅ Admin Tools initialized — /admin /broadcast /reboot active.")
+
+    dp.add_handler(CommandHandler("admin", admin_status), group=0)
+    dp.add_handler(CommandHandler("broadcast", admin_broadcast), group=0)
+    dp.add_handler(CommandHandler("reboot", admin_reboot), group=0)
+
+    print("✅ Admin Tools initialized — /admin /broadcast /reboot active (priority group=0).")
