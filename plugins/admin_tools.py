@@ -89,8 +89,12 @@ def admin_reboot(update: Update, context: CallbackContext):
 
 
 # ====== PLUGIN REGISTRATION ======
-def register_handlers(dp):
-    """Registers admin commands with the dispatcher."""
+def register(dp):
+    """Legacy + Modern Compatible Register Function"""
+    from telegram.ext import CommandHandler
+
     dp.add_handler(CommandHandler("admin", admin_status))
     dp.add_handler(CommandHandler("broadcast", admin_broadcast))
     dp.add_handler(CommandHandler("reboot", admin_reboot))
+
+    print("✅ Admin Tools initialized — /admin /broadcast /reboot ready.")
