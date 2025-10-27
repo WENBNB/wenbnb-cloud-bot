@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.6-ProStable (Fixed Build)
-# Unified Emotion + Analyzer + Context Sync — Render Safe
+# 💫 WENBNB Neural Engine v8.6.3-ProStable (AutoRecovery+)
+# Emotion Sync + AI Analyzer + Self-Healing Poll + Tone Engine
 # ============================================================
 
-import os, sys, time, logging, threading, requests
+import os, sys, time, logging, threading, requests, random, traceback
 from flask import Flask, jsonify
 from telegram import Update, ParseMode, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
@@ -14,8 +14,8 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.6-ProStable"
-CORE_VERSION = "v5.0"
+ENGINE_VERSION = "v8.6.3-ProStable"
+CORE_VERSION = "v5.1"
 BRAND_SIGNATURE = os.getenv(
     "BRAND_SIGNATURE",
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
@@ -34,6 +34,7 @@ logger = logging.getLogger("WENBNB")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 RENDER_APP_URL = os.getenv("RENDER_APP_URL", "")
 PORT = int(os.getenv("PORT", "10000"))
+
 if not TELEGRAM_TOKEN:
     raise SystemExit("❌ TELEGRAM_TOKEN missing. Exiting...")
 
@@ -52,10 +53,10 @@ def ping():
     })
 
 def _keep_alive_loop(ping_url: str, interval: int = 600):
-    logger.info(f"Keep-alive → pinging {ping_url} every {interval}s")
     while True:
         try:
             requests.get(ping_url, timeout=8)
+            logger.info("💓 KeepAlive Ping → OK")
         except Exception as e:
             logger.warning(f"KeepAlive error: {e}")
         time.sleep(interval)
@@ -63,6 +64,7 @@ def _keep_alive_loop(ping_url: str, interval: int = 600):
 def start_keep_alive():
     if RENDER_APP_URL:
         threading.Thread(target=_keep_alive_loop, args=(RENDER_APP_URL,), daemon=True).start()
+        logger.info("🩵 Keep-alive enabled (RenderSafe+)")
 
 # ===========================
 # 🧩 Plugin Manager Integration
@@ -82,23 +84,32 @@ def register_all_plugins(dispatcher):
 LOCK_FILE = "/tmp/wenbnb_lock"
 
 def check_single_instance():
+    """Prevents duplicate polling processes."""
     if os.path.exists(LOCK_FILE):
-        logger.error("⚠️ Another instance running — exiting.")
+        logger.error("⚠️ Another WENBNB instance already running — aborting startup.")
         raise SystemExit(1)
     with open(LOCK_FILE, "w") as f:
         f.write(str(os.getpid()))
     logger.info("🔒 Instance lock acquired.")
 
+def release_instance_lock():
+    if os.path.exists(LOCK_FILE):
+        os.remove(LOCK_FILE)
+        logger.info("🔓 Instance lock released.")
+
 # ===========================
 # 💬 Telegram Bot Setup
 # ===========================
+failure_count = 0
+
 def start_bot():
+    global failure_count
     check_single_instance()
 
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
 
-    logger.info("🔍 Loading all plugin modules...")
+    logger.info("🔍 Loading plugins...")
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
@@ -106,7 +117,7 @@ def start_bot():
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
         text = (
-            f"👋 Hello {user}!\n\n"
+            f"👋 Hey {user}!\n\n"
             f"Welcome to <b>WENBNB Neural Engine {ENGINE_VERSION}</b>\n\n"
             f"{BRAND_SIGNATURE}"
         )
@@ -134,22 +145,52 @@ def start_bot():
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
 
-    # === Load Analyzer & Emotion Sync ===
+    # === Load Emotion + Analyzer ===
     try:
         from plugins import aianalyze, ai_auto_reply
 
-        # 🔹 Priority: Analyzer before general text handler
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
         dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
 
-        logger.info("💬 Emotion-Sync + Analyzer loaded correctly.")
+        logger.info("💬 Emotion-Sync + AI Analyzer active (AutoRecovery+)")
     except Exception as e:
-        logger.warning(f"⚠️ Analyzer/Emotion module not loaded: {e}")
+        logger.warning(f"⚠️ Analyzer/Emotion module load failed: {e}")
 
-    # === Start Bot ===
-    updater.start_polling(clean=True)
-    logger.info("✅ Telegram polling started (Render-safe).")
-    updater.idle()
+    # === Heartbeat Thread ===
+    def heartbeat():
+        while True:
+            time.sleep(30)
+            try:
+                requests.get(f"{RENDER_APP_URL}/ping", timeout=5)
+                logger.info("💓 Poll heartbeat alive")
+            except:
+                logger.warning("⚠️ Poll heartbeat missed — restarting poller.")
+                release_instance_lock()
+                os._exit(1)
+
+    threading.Thread(target=heartbeat, daemon=True).start()
+
+    # === Polling with Self-Heal ===
+    try:
+        logger.info("🚀 Starting Telegram polling (RenderSafe+ AutoRecovery)...")
+        updater.start_polling(clean=True)
+        updater.idle()
+    except Exception as e:
+        if "Conflict" in str(e):
+            logger.warning("⚠️ Conflict detected — killing ghost instance & restarting...")
+            release_instance_lock()
+            os._exit(1)
+        else:
+            failure_count += 1
+            logger.error(f"❌ Polling crash ({failure_count}): {e}")
+            if failure_count >= 3:
+                logger.error("💥 Too many failures → Full auto reboot triggered.")
+                release_instance_lock()
+                os._exit(1)
+            else:
+                logger.info("🔁 Attempting recovery...")
+                time.sleep(5)
+                start_bot()
 
 # ===========================
 # 🧠 Entry Point
@@ -160,11 +201,9 @@ def main():
     try:
         start_bot()
     except Exception as e:
-        logger.error(f"❌ Fatal error: {e}")
+        logger.error(f"❌ Fatal error in main: {e}")
     finally:
-        if os.path.exists(LOCK_FILE):
-            os.remove(LOCK_FILE)
-            logger.info("🔓 Instance lock released.")
+        release_instance_lock()
 
 if __name__ == "__main__":
     main()
