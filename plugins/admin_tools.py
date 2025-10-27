@@ -1,65 +1,41 @@
-"""
-🧠 WENBNB Admin Tools v8.6.5-ProStable+
-────────────────────────────────────────────
-Neural Admin Control Suite — for internal bot monitoring & management.
-
-Features:
-• /admin → Core system performance + uptime check
-• /broadcast → Send message to all users (admin-only)
-• /reboot → Simulated soft reboot of the Neural Engine
-"""
-
-import os
-import psutil
-import time
+import os, psutil, time
 from datetime import datetime
 from telegram import Update, ParseMode
-from telegram.ext import CallbackContext, CommandHandler
+from telegram.ext import CallbackContext
 
-# ====== CONFIG ======
-ALLOWED_ADMINS = [5698007588]  # Your Telegram ID
-VERSION = "WENBNB Neural Engine v8.6.5-ProStable"
+# === Admin Auth ===
+ALLOWED_ADMINS = [5698007588]  # replace with your Telegram ID
+
+# === Branding ===
 BRAND_SIGNATURE = "🚀 Powered by WENBNB Neural Engine — Emotional Intelligence 24×7 ⚡"
+ENGINE_VERSION = "v8.6.5-ProStable"
 
-
-# ====== SECURITY ======
-def is_admin(user_id: int):
-    return user_id in ALLOWED_ADMINS
-
-
-# ====== STATS FUNCTION ======
+# === System Monitor ===
 def get_system_status():
-    """Returns system performance info."""
     cpu = psutil.cpu_percent()
-    memory = psutil.virtual_memory().percent
-    uptime_seconds = time.time() - psutil.boot_time()
-    uptime_str = time.strftime("%Hh %Mm %Ss", time.gmtime(uptime_seconds))
-    return f"🧠 System: {cpu}% CPU | {memory}% RAM | Uptime: {uptime_str}"
+    mem = psutil.virtual_memory().percent
+    uptime = time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - psutil.boot_time()))
+    return f"🧠 System: {cpu}% CPU | {mem}% RAM | Uptime: {uptime}"
 
-
-# ====== COMMAND: /admin ======
+# === Core Commands ===
 def admin_status(update: Update, context: CallbackContext):
-    """Displays bot status and system info."""
     user_id = update.effective_user.id
-    if not is_admin(user_id):
+    if user_id not in ALLOWED_ADMINS:
         update.message.reply_text("🚫 Unauthorized access.")
         return
 
-    status_msg = get_system_status()
-    update.message.reply_text(
-        f"✅ <b>{VERSION}</b>\n\n"
-        f"{status_msg}\n"
+    stats = get_system_status()
+    msg = (
+        f"✅ <b>WENBNB Neural Engine {ENGINE_VERSION}</b>\n"
+        f"{stats}\n"
         f"📡 Neural Core Online\n\n"
-        f"{BRAND_SIGNATURE}",
-        parse_mode=ParseMode.HTML
+        f"{BRAND_SIGNATURE}"
     )
+    update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 
-
-# ====== COMMAND: /broadcast ======
 def admin_broadcast(update: Update, context: CallbackContext):
-    """Broadcast message to all users (admin only)."""
     user_id = update.effective_user.id
-    if not is_admin(user_id):
+    if user_id not in ALLOWED_ADMINS:
         update.message.reply_text("🚫 Unauthorized access.")
         return
 
@@ -68,18 +44,11 @@ def admin_broadcast(update: Update, context: CallbackContext):
         return
 
     msg = " ".join(context.args)
-    try:
-        # Add your user loop here (e.g. user_db loop)
-        update.message.reply_text(f"📢 Broadcast sent:\n{msg}")
-    except Exception as e:
-        update.message.reply_text(f"❌ Broadcast error: {e}")
+    update.message.reply_text(f"📢 Broadcast sent:\n{msg}")
 
-
-# ====== COMMAND: /reboot ======
 def admin_reboot(update: Update, context: CallbackContext):
-    """Simulates bot reboot (soft restart message)."""
     user_id = update.effective_user.id
-    if not is_admin(user_id):
+    if user_id not in ALLOWED_ADMINS:
         update.message.reply_text("🚫 Unauthorized access.")
         return
 
@@ -87,14 +56,10 @@ def admin_reboot(update: Update, context: CallbackContext):
     time.sleep(2)
     update.message.reply_text("✅ WENBNB Neural Engine rebooted successfully ⚡")
 
-
-# ====== PLUGIN REGISTRATION ======
+# === Plugin Register Hook ===
 def register(dp):
-    """Legacy + Modern Compatible Register Function"""
     from telegram.ext import CommandHandler
-
     dp.add_handler(CommandHandler("admin", admin_status))
     dp.add_handler(CommandHandler("broadcast", admin_broadcast))
     dp.add_handler(CommandHandler("reboot", admin_reboot))
-
-    print("✅ Admin Tools initialized — /admin /broadcast /reboot ready.")
+    print("✅ Admin Tools initialized — /admin /broadcast /reboot active.")
