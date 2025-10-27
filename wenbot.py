@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.6.3-ProStable (AutoRecovery+)
-# Emotion Sync + AI Analyzer + Self-Healing Poll + Tone Engine
+# 💫 WENBNB Neural Engine v8.6.4-Diagnostic Build (AutoRecovery++)
+# Emotion Sync + AI Analyzer + Context Engine + Self-Healing Poll
 # ============================================================
 
 import os, sys, time, logging, threading, requests, random, traceback
@@ -14,7 +14,7 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.6.3-ProStable"
+ENGINE_VERSION = "v8.6.4-Diagnostic"
 CORE_VERSION = "v5.1"
 BRAND_SIGNATURE = os.getenv(
     "BRAND_SIGNATURE",
@@ -64,7 +64,7 @@ def _keep_alive_loop(ping_url: str, interval: int = 600):
 def start_keep_alive():
     if RENDER_APP_URL:
         threading.Thread(target=_keep_alive_loop, args=(RENDER_APP_URL,), daemon=True).start()
-        logger.info("🩵 Keep-alive enabled (RenderSafe+)")
+        logger.info("🩵 Keep-alive enabled (RenderSafe++)")
 
 # ===========================
 # 🧩 Plugin Manager Integration
@@ -84,7 +84,6 @@ def register_all_plugins(dispatcher):
 LOCK_FILE = "/tmp/wenbnb_lock"
 
 def check_single_instance():
-    """Prevents duplicate polling processes."""
     if os.path.exists(LOCK_FILE):
         logger.error("⚠️ Another WENBNB instance already running — aborting startup.")
         raise SystemExit(1)
@@ -148,13 +147,15 @@ def start_bot():
     # === Load Emotion + Analyzer ===
     try:
         from plugins import aianalyze, ai_auto_reply
+        logger.info("🧠 Import successful: aianalyze + ai_auto_reply")
 
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
         dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
 
-        logger.info("💬 Emotion-Sync + AI Analyzer active (AutoRecovery+)")
+        logger.info("💬 Emotion-Sync + AI Analyzer active (Diagnostic Mode)")
     except Exception as e:
         logger.warning(f"⚠️ Analyzer/Emotion module load failed: {e}")
+        traceback.print_exc()
 
     # === Heartbeat Thread ===
     def heartbeat():
@@ -172,7 +173,7 @@ def start_bot():
 
     # === Polling with Self-Heal ===
     try:
-        logger.info("🚀 Starting Telegram polling (RenderSafe+ AutoRecovery)...")
+        logger.info("🚀 Starting Telegram polling (RenderSafe++ Diagnostic)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
