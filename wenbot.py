@@ -167,11 +167,15 @@ def start_bot():
     # === Load Emotion + Analyzer Plugins ===
     try:
         from plugins import ai_auto_reply, aianalyze
-        aianalyze.register_handlers(dp)  # ✅ Register /aianalyze
+        from telegram.ext import CommandHandler, MessageHandler, Filters
+
+        # ✅ Register /aianalyze directly
+        dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
         dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
-        logger.info("💬 Emotion-Sync + AI Analyzer active.")
+
+        logger.info("💬 Emotion-Sync active + /aianalyze command registered successfully.")
     except Exception as e:
-        logger.warning(f"⚠️ Emotion/Analyzer not loaded: {e}")
+        logger.warning(f"⚠️ Emotion/Analyzer plugin not loaded: {e}")
 
     # === Start Bot ===
     updater.start_polling(clean=True)
