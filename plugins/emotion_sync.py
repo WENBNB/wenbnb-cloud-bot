@@ -12,6 +12,9 @@ Build: v8.3-Full (Pro Mode Ready)
 
 import json, os, random
 from datetime import datetime
+from telegram.ext import CommandHandler
+from telegram import Update
+from telegram.ext import CallbackContext
 
 # === File Configuration ===
 MEMORY_FILE = "emotion_sync.db"
@@ -101,7 +104,6 @@ def analyze_sentiment(text):
     sentiment = "Neutral 😐"
     tags = "#StayBased #CryptoFeels"
 
-    # Keyword sentiment map (expandable in future versions)
     bullish_words = ["moon", "pump", "up", "gain", "win", "green", "bull", "profit", "surge"]
     bearish_words = ["down", "dump", "red", "lose", "loss", "pain", "bear", "crash"]
     hype_words = ["ai", "meme", "trend", "viral", "crazy", "lit", "energy", "pump it"]
@@ -120,7 +122,6 @@ def analyze_sentiment(text):
         sentiment = "Calm 🌙"
         tags = "#ZenMode #StayBased #CryptoPeace"
 
-    # Random emotional twist (to keep replies fresh)
     mood_emojis = random.choice(["😎", "🤓", "🥱", "🤔", "💫", "😏", "🫡", "🔥"])
 
     return {
@@ -128,3 +129,17 @@ def analyze_sentiment(text):
         "tags": tags,
         "mood": mood_emojis
     }
+
+
+# ============================================================
+# ✅ Plugin Registration Entry Point
+# ============================================================
+
+def emotion_test(update: Update, context: CallbackContext):
+    """Simple test command to check emotion drift."""
+    emojis = sync_emotion(update.effective_user.id, update.message.text)
+    update.message.reply_text(f"Emotion synced: {emojis}")
+
+def register(dispatcher):
+    dispatcher.add_handler(CommandHandler("emotiontest", emotion_test))
+    print("💫 Emotion Sync Engine v8.3 registered successfully.")
