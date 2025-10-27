@@ -1,13 +1,14 @@
 """
-WENBNB AI Analyzer v8.5 — EmotionLink Prime
+WENBNB AI Analyzer v8.6-ProStable — EmotionLink Prime+
 ────────────────────────────────────────────
 Integrates:
  • Emotion Detection (TextBlob engine)
  • Memory Persistence (Unified Memory System)
  • Adaptive Human Tone — No 🤖 spam
+ • Render Debug-Safe Logging
 """
 
-import os, json, time, random, requests
+import os, json, time, random, requests, traceback
 from textblob import TextBlob
 from telegram import Update
 from telegram.ext import CommandHandler, MessageHandler, Filters, CallbackContext
@@ -34,11 +35,11 @@ def analyze_emotion(text):
     blob = TextBlob(text)
     p = blob.sentiment.polarity
     if p > 0.35:
-        return "Positive", "🌞 Tone registered as: Positive"
+        return "Positive", "🌞 Mood vibe detected → Positive"
     elif p < -0.35:
-        return "Negative", "🌧 Tone registered as: Reflective"
+        return "Negative", "🌧 Mood vibe detected → Reflective"
     else:
-        return "Balanced", "🌙 Tone registered as: Calm & Neutral"
+        return "Neutral", "🌙 Mood vibe detected → Calm & Balanced"
 
 # ==== AI Core Response ====
 
@@ -47,31 +48,43 @@ def ai_chat_response(prompt, emotion_hint=None):
         base_prompt = (
             "You are WENBNB AI — a warm, emotionally aware crypto companion. "
             "Your goal: sound like a thoughtful human, never robotic. "
-            "Use a conversational tone with emotional awareness.\n\n"
+            "Always blend insight with empathy.\n\n"
         )
-        if emotion_hint:
-            base_prompt += f"Current user mood context: {emotion_hint}\n\n"
 
-        full_prompt = f"{base_prompt}User: {prompt}"
+        if emotion_hint:
+            base_prompt += f"Current user emotional tone: {emotion_hint}\n\n"
+
+        payload = {
+            "model": "gpt-4o-mini",
+            "messages": [
+                {"role": "system", "content": base_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            "max_tokens": 200,
+            "temperature": 0.9,
+        }
 
         r = requests.post(
             "https://api.openai.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {AI_API_KEY}"},
-            json={
-                "model": "gpt-4o-mini",
-                "messages": [{"role": "user", "content": full_prompt}],
-                "max_tokens": 180,
-                "temperature": 0.9,
-            },
-            timeout=20,
+            json=payload,
+            timeout=25,
         )
+
         data = r.json()
-        if "choices" in data:
+
+        # Debug log for Render console
+        print("🧠 [AI RESPONSE DEBUG]:", json.dumps(data, indent=2)[:400])
+
+        if "choices" in data and data["choices"]:
             return data["choices"][0]["message"]["content"].strip()
+        elif "error" in data:
+            return f"⚠️ OpenAI Error: {data['error'].get('message', 'Unknown')}"
         else:
-            return "Neural link glitch — recalibrating emotional tone 💫"
+            return "💫 Neural silence — retrying emotional sync..."
     except Exception as e:
-        return f"⚠️ AI Core Error: {e}"
+        traceback.print_exc()
+        return f"⚠️ AI Core Exception: {e}"
 
 # ==== Update Memory Log ====
 
@@ -85,6 +98,8 @@ def update_memory(user_id, message, mood):
         "mood": mood,
         "time": time.strftime("%Y-%m-%d %H:%M:%S")
     })
+
+    # Limit memory to last 10 entries
     memory[str(user_id)]["entries"] = memory[str(user_id)]["entries"][-10:]
     save_memory(memory)
 
@@ -104,12 +119,7 @@ def aianalyze_cmd(update: Update, context: CallbackContext):
 
     update_memory(user.id, query, mood)
 
-    reply = (
-        f"{mood_line}\n\n"
-        f"{ai_reply}\n\n"
-        f"{BRAND_FOOTER}"
-    )
-
+    reply = f"{mood_line}\n\n{ai_reply}\n\n{BRAND_FOOTER}"
     update.message.reply_text(reply, parse_mode="HTML")
 
 # ==== Auto Chat ====
@@ -137,4 +147,4 @@ def auto_ai_chat(update: Update, context: CallbackContext):
 def register_handlers(dp):
     dp.add_handler(CommandHandler("aianalyze", aianalyze_cmd))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, auto_ai_chat))
-    print("✅ Loaded plugin: aianalyze.py v8.5 — EmotionLink Prime")
+    print("✅ Loaded plugin: aianalyze.py v8.6-ProStable — EmotionLink Prime+")
