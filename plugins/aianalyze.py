@@ -1,10 +1,11 @@
 """
-WENBNB AI Analyzer v8.6.3-ProStable+ — EmotionSync AutoRecovery
+WENBNB AI Analyzer v8.6.4-ProStable++ — EmotionSync Resilient Mode
 ───────────────────────────────────────────────────────────────
 • Emotion Detection (TextBlob)
-• Adaptive Human Tone (Casual fallback)
-• Auto-reconnect when OpenAI API fails
+• Adaptive Human Tone + Retry Logic
+• Auto-reconnect when OpenAI API lags or fails
 • Unified Memory System + Mood Tracking
+• Render Debug-Safe (no silent freeze)
 """
 
 import os, json, time, random, requests, traceback
@@ -38,62 +39,69 @@ def analyze_emotion(text):
     else:
         return "Balanced", "🌙 Mood vibe detected → Calm & Balanced"
 
-# === OpenAI Request Helper ===
+# === OpenAI Request (with Retry Protection) ===
 def call_openai(prompt, emotion_hint):
-    try:
-        base_prompt = (
-            "You are WENBNB AI — a warm, emotionally aware crypto companion. "
-            "Always reply naturally, with emotional balance and light wit.\n\n"
-            f"User mood context: {emotion_hint}\n\n"
-            f"User: {prompt}"
-        )
+    base_prompt = (
+        "You are WENBNB AI — a warm, emotionally aware crypto companion. "
+        "Always reply naturally, with empathy and balance.\n\n"
+        f"User mood context: {emotion_hint}\n\n"
+        f"User: {prompt}"
+    )
 
-        res = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {AI_API_KEY}"},
-            json={
-                "model": "gpt-4o-mini",
-                "messages": [{"role": "user", "content": base_prompt}],
-                "max_tokens": 200,
-                "temperature": 0.9,
-            },
-            timeout=20,
-        )
-        data = res.json()
-        if "choices" in data and data["choices"]:
-            return data["choices"][0]["message"]["content"].strip()
-        elif "error" in data:
-            raise RuntimeError(data["error"].get("message", "Unknown API error"))
-        else:
-            raise RuntimeError("Unexpected OpenAI response")
-    except Exception as e:
-        print(f"[AI ERROR] {e}")
-        return None
+    for attempt in range(3):  # Retry 3 times if it fails
+        try:
+            res = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {AI_API_KEY}"},
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": [{"role": "user", "content": base_prompt}],
+                    "max_tokens": 220,
+                    "temperature": 0.9,
+                },
+                timeout=25,
+            )
 
-# === AI Response Logic (with Fallback) ===
+            data = res.json()
+            print(f"[AI DEBUG] Attempt {attempt+1} → {data}")
+
+            if "choices" in data and data["choices"]:
+                return data["choices"][0]["message"]["content"].strip()
+
+            if "error" in data:
+                print(f"[AI ERROR] {data['error']}")
+                time.sleep(2)
+                continue
+
+        except requests.exceptions.Timeout:
+            print(f"⏳ Timeout on attempt {attempt+1}, retrying...")
+            time.sleep(2)
+        except Exception as e:
+            print(f"⚠️ Exception in call_openai(): {e}")
+            time.sleep(1.5)
+
+    return None
+
+# === AI Response Logic (with graceful fallback) ===
 def ai_chat_response(prompt, emotion_hint):
     reply = call_openai(prompt, emotion_hint)
     if reply:
         return reply
 
-    # Fallback if API fails
+    # Fallback (offline tone)
     fallback_lines = [
-        "Haha, looks like I lost connection to the neural cloud for a sec 😅 but here’s my take:",
-        "Neural static hit me mid-thought ⚡ — still, I’ve got a vibe on that:",
-        "AI signal blinked for a moment 🤖💫 but my emotional sensors say:",
-        "Timeout from HQ 🛰️... anyway, here’s my human side talking:"
+        "Haha, neural link flickered for a sec 😅 — still got my thoughts synced:",
+        "Hmm… cloud static interfered ⚡ but I caught the emotional wave:",
+        "HQ lagged out 🛰️, but your vibe came through clear:",
+        "Lost the OpenAI uplink for a moment 🤖 but here’s my pulse on that:"
     ]
-    tone = random.choice(fallback_lines)
-
-    # Soft casual continuation (makes it sound alive)
     casual_reply = random.choice([
-        "I’d say it’s all about balance and good timing.",
-        "Trust your instinct — the neural flow always finds its way.",
-        "That kind of energy? It’s definitely worth watching 👀",
-        "Honestly, feels like a momentum shift brewing ✨"
+        "Feels like a moment for patience and focus.",
+        "That energy you’re feeling? It’s shifting fast — stay tuned. ⚡",
+        "Always trust your internal signal — the markets follow mood.",
+        "Momentum’s building; I can sense it in your tone ✨"
     ])
-
-    return f"{tone}\n\n{casual_reply}"
+    return f"{random.choice(fallback_lines)}\n\n{casual_reply}"
 
 # === Memory Log ===
 def update_memory(user_id, message, mood):
@@ -120,7 +128,6 @@ def aianalyze_cmd(update: Update, context: CallbackContext):
     mood, mood_line = analyze_emotion(query)
     ai_reply = ai_chat_response(query, mood)
     update_memory(user.id, query, mood)
-
     update.message.reply_text(f"{mood_line}\n\n{ai_reply}\n\n{BRAND_FOOTER}", parse_mode="HTML")
 
 # === Auto Chat ===
@@ -140,4 +147,4 @@ def auto_ai_chat(update: Update, context: CallbackContext):
 def register_handlers(dp):
     dp.add_handler(CommandHandler("aianalyze", aianalyze_cmd))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, auto_ai_chat))
-    print("✅ Loaded plugin: aianalyze.py v8.6.3-ProStable+ (AutoRecovery Casual Mode)")
+    print("✅ Loaded plugin: aianalyze.py v8.6.4-ProStable++ (Resilient Mode)")
