@@ -2,6 +2,7 @@
 # ============================================================
 # 💫 WENBNB Neural Engine v8.6.4-Diagnostic Build (AutoRecovery++)
 # Emotion Sync + AI Analyzer + Context Engine + Self-Healing Poll
+# Includes Admin Panel Integration (v8.6.5-ProStable)
 # ============================================================
 
 import os, sys, time, logging, threading, requests, random, traceback
@@ -14,7 +15,7 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.6.4-Diagnostic"
+ENGINE_VERSION = "v8.6.5-ProStable"
 CORE_VERSION = "v5.1"
 BRAND_SIGNATURE = os.getenv(
     "BRAND_SIGNATURE",
@@ -79,6 +80,19 @@ def register_all_plugins(dispatcher):
         logger.error(f"❌ PluginManager failed: {e}")
 
 # ===========================
+# 🧠 Core Plugin Imports (Manual Bind)
+# ===========================
+try:
+    from plugins import (
+        aianalyze,
+        ai_auto_reply,
+        admin_tools
+    )
+    logger.info("🧠 Core modules loaded successfully (AI, Admin, Auto-Reply)")
+except Exception as e:
+    logger.warning(f"⚠️ Core plugin import failed: {e}")
+
+# ===========================
 # 🛡️ Instance Lock
 # ===========================
 LOCK_FILE = "/tmp/wenbnb_lock"
@@ -124,7 +138,7 @@ def start_bot():
             [KeyboardButton("/price"), KeyboardButton("/tokeninfo")],
             [KeyboardButton("/meme"), KeyboardButton("/aianalyze")],
             [KeyboardButton("/airdropcheck"), KeyboardButton("/airdropalert")],
-            [KeyboardButton("/web3"), KeyboardButton("/about")]
+            [KeyboardButton("/web3"), KeyboardButton("/about"), KeyboardButton("/admin")]
         ]
         update.message.reply_text(
             text,
@@ -144,17 +158,22 @@ def start_bot():
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
 
-    # === Load Emotion + Analyzer ===
+    # === Load Emotion + Analyzer + Admin ===
     try:
-        from plugins import aianalyze, ai_auto_reply
-        logger.info("🧠 Import successful: aianalyze + ai_auto_reply")
-
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
         dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
+        dp.add_handler(CommandHandler("admin", lambda u, c: admin_tools.admin_status(u, c, {
+            "version": ENGINE_VERSION,
+            "branding": {"footer": BRAND_SIGNATURE},
+            "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
+        })))
+        dp.add_handler(CommandHandler("reboot", lambda u, c: admin_tools.admin_reboot(u, c, {
+            "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
+        })))
 
-        logger.info("💬 Emotion-Sync + AI Analyzer active (Diagnostic Mode)")
+        logger.info("💬 EmotionSync + AI Analyzer + Admin tools active")
     except Exception as e:
-        logger.warning(f"⚠️ Analyzer/Emotion module load failed: {e}")
+        logger.warning(f"⚠️ Analyzer/Admin module load failed: {e}")
         traceback.print_exc()
 
     # === Heartbeat Thread ===
@@ -173,7 +192,7 @@ def start_bot():
 
     # === Polling with Self-Heal ===
     try:
-        logger.info("🚀 Starting Telegram polling (RenderSafe++ Diagnostic)...")
+        logger.info("🚀 Starting Telegram polling (RenderSafe++)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
