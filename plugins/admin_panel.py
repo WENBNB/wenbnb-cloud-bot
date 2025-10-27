@@ -8,7 +8,7 @@ from telegram import Update
 from telegram.ext import CommandHandler, CallbackContext
 import json, os, time
 
-ADMIN_IDS = [123456789, 987654321]  # 🔹 Replace with real admin Telegram IDs
+ADMIN_IDS = [5698007588, 987654321]  # 🔹 Replace with real admin Telegram IDs
 MEMORY_FILE = "user_memory.json"
 BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — AI Core Intelligence 24×7"
 
