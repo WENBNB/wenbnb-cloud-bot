@@ -1,44 +1,50 @@
 # ============================================================
-# 🧠 WENBNB Neural Engine v8.6.4-ProStable — Render Cloud Build
+# 💫 WENBNB Neural Engine v8.6.5-ProStable++ — Render Cloud Build
+# ============================================================
+#  Hybrid AI + Web3 Neural Assistant
+#  Emotion Sync • Memory Continuity • Adaptive Auto Reply
 # ============================================================
 
-# Telegram Bot Core
-python-telegram-bot==13.15
+# === 🤖 Telegram Bot Core ===
+python-telegram-bot==13.15    # Core Telegram interface for commands, replies, and plugins
 
-# Web Server & API
-Flask==3.0.3
-gunicorn==21.2.0
-requests==2.31.0
+# === 🌐 Web Server & API ===
+Flask==3.0.3                  # Keep-alive ping endpoint
+gunicorn==21.2.0              # Render-compatible WSGI runner
+requests==2.31.0              # API + OpenAI integration
 
-# AI / Neural Engine
-openai==1.42.0
-tiktoken==0.7.0
-textblob==0.18.0.post0   # 💫 Emotion detection for /aianalyze
+# === 🧠 AI / Neural Engine ===
+openai==1.42.0                # GPT-4o-mini integration for aianalyze + ai_auto_reply
+tiktoken==0.7.0               # Token counter (used internally by OpenAI)
+textblob==0.18.0.post0        # Emotion detection + sentiment analyzer
 
-# Web3 / Blockchain
-web3==6.13.0
-cryptography
+# Optional (safe NLP enhancement if needed)
+nltk==3.8.1                   # Only if TextBlob corpus missing (auto-downloads data)
 
-# Parsing, Utils & HTML
-beautifulsoup4==4.12.3
-pytz==2024.1
+# === 💰 Web3 / Blockchain Integration ===
+web3==6.13.0                  # Token & airdrop plugin support
+cryptography                  # Wallet + signature validation layer
 
-# Image, Meme & Media
-Pillow==10.3.0
-imgkit==1.2.3
+# === 🧩 Parsing, Utils & HTML ===
+beautifulsoup4==4.12.3        # HTML parsing for tokeninfo / web3 utils
+pytz==2024.1                  # Timezone consistency across modules
 
-# Cloud & Data Sync
-boto3==1.35.29
-botocore==1.35.29
+# === 🎨 Image, Meme & Media ===
+Pillow==10.3.0                # Meme / image module rendering
+imgkit==1.2.3                 # HTML → Image converter (for posts, charts, etc.)
 
-# System Monitoring & Performance
-psutil==5.9.8
-tenacity==8.2.3
-urllib3==2.2.3
+# === ☁️ Cloud & Data Sync ===
+boto3==1.35.29                # S3 or Render persistent storage (optional)
+botocore==1.35.29             # Core dependency for boto3
 
-# Optional Visualization (Dashboard)
-matplotlib==3.9.2
+# === ⚙️ System Monitoring & Performance ===
+psutil==5.9.8                 # Process lock + instance checker
+tenacity==8.2.3               # Retry logic for unstable APIs
+urllib3==2.2.3                # HTTP optimization layer
+
+# === 📊 Visualization (Optional Dashboard) ===
+matplotlib==3.9.2             # Token trend / insight graphing (optional)
 
 # ============================================================
-# ✅ Optimized and Verified for Render Cloud (WENBNB v8.6.4)
+# ✅ Verified & Optimized for Render Cloud (WENBNB v8.6.5++)
 # ============================================================
