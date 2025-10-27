@@ -9,6 +9,9 @@ WENBNB Emotion AI v8.4-Pro — Unified Emotion Engine
 
 import json, os, random
 from datetime import datetime, timedelta
+from telegram.ext import CommandHandler
+from telegram import Update
+from telegram.ext import CallbackContext
 
 SYNC_FILE = "emotion_sync.db"
 STABILIZER_FILE = "emotion_stabilizer.db"
@@ -84,8 +87,10 @@ def sync_emotion(user_id, message=""):
         try:
             dt = datetime.fromisoformat(last)
             if datetime.now() - dt > timedelta(minutes=30):
-                if score < 0: score += 1
-                elif score > 3: score -= 1
+                if score < 0:
+                    score += 1
+                elif score > 3:
+                    score -= 1
         except Exception:
             pass
     s_entry["emotion_score"] = score
@@ -127,7 +132,16 @@ def get_emotion_prefix(user_id, message):
     except Exception:
         return "🤖 emotional link stable."
 
-# === Direct Call (for debug) ===
-if __name__ == "__main__":
-    uid = 101
-    print(get_emotion_prefix(uid, "testing mood drift"))
+
+# ============================================================
+# ✅ Plugin Registration Entry Point
+# ============================================================
+
+def emotionai_test(update: Update, context: CallbackContext):
+    """Quick test to validate Emotion AI engine."""
+    emoji, label = sync_emotion(update.effective_user.id, update.message.text)
+    update.message.reply_text(f"🧠 Emotion AI synced: {emoji} → {label}")
+
+def register(dispatcher):
+    dispatcher.add_handler(CommandHandler("emotionai", emotionai_test))
+    print("🧠 Emotion AI Engine v8.4-Pro registered successfully.")
