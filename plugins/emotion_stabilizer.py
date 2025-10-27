@@ -12,6 +12,9 @@ File: emotion_stabilizer.db
 
 import json, os, re, random
 from datetime import datetime, timedelta
+from telegram.ext import CommandHandler
+from telegram import Update
+from telegram.ext import CallbackContext
 
 MEMORY_FILE = "emotion_stabilizer.db"
 
@@ -39,7 +42,6 @@ def _text_tone_score(text):
     Quick tone estimation based on message content.
     Returns an integer adjustment (-2 to +2)
     """
-
     text = text.lower()
 
     positive = ["great", "win", "moon", "love", "pumped", "bull", "happy", "🔥", "🚀"]
@@ -122,3 +124,17 @@ def get_stabilized_emotion(user_id, text=""):
         return stabilize_emotion(user_id, text)
     except Exception:
         return "🤖 neutral"
+
+
+# ============================================================
+# ✅ Plugin Registration Entry Point
+# ============================================================
+
+def emotion_stable_test(update: Update, context: CallbackContext):
+    """Manual test command to verify stabilizer balance."""
+    label = stabilize_emotion(update.effective_user.id, update.message.text)
+    update.message.reply_text(f"💫 Stabilized Emotion: {label}")
+
+def register(dispatcher):
+    dispatcher.add_handler(CommandHandler("emotionstable", emotion_stable_test))
+    print("💫 Emotion Stabilizer v8.3-Pro registered successfully.")
