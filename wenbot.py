@@ -1,25 +1,14 @@
 #!/usr/bin/env python3
 # ============================================================
-#  💫 WENBNB Neural Engine v8.6-ProStable
-#  Unified Emotion + Plugin Core + Auto-Healing Poll Protection
-#  Render-safe + Background JobQueue + Modular Plugin Loader
+# 💫 WENBNB Neural Engine v8.6-ProStable (Fixed Build)
+# Unified Emotion + Analyzer + Context Sync — Render Safe
 # ============================================================
 
-import os
-import sys
-import time
-import json
-import logging
-import threading
-import requests
+import os, sys, time, logging, threading, requests
 from flask import Flask, jsonify
 from telegram import Update, ParseMode, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
-    Updater,
-    CommandHandler,
-    MessageHandler,
-    Filters,
-    CallbackContext,
+    Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 )
 
 # ===========================
@@ -38,17 +27,13 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 logger = logging.getLogger("WENBNB")
-logger.info(f"🧠 Initializing WENBNB Neural Engine {ENGINE_VERSION} ...")
 
 # ===========================
 # 🔐 Environment Variables
 # ===========================
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-OWNER_ID = os.getenv("OWNER_ID")
-ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
 RENDER_APP_URL = os.getenv("RENDER_APP_URL", "")
 PORT = int(os.getenv("PORT", "10000"))
-
 if not TELEGRAM_TOKEN:
     raise SystemExit("❌ TELEGRAM_TOKEN missing. Exiting...")
 
@@ -66,12 +51,8 @@ def ping():
         "timestamp": int(time.time())
     })
 
-
-# ===========================
-# 🚀 Keep-Alive Pinger
-# ===========================
 def _keep_alive_loop(ping_url: str, interval: int = 600):
-    logger.info(f"Keep-alive thread active → pinging {ping_url} every {interval}s")
+    logger.info(f"Keep-alive → pinging {ping_url} every {interval}s")
     while True:
         try:
             requests.get(ping_url, timeout=8)
@@ -80,11 +61,8 @@ def _keep_alive_loop(ping_url: str, interval: int = 600):
         time.sleep(interval)
 
 def start_keep_alive():
-    if not RENDER_APP_URL:
-        logger.info("Skipping keep-alive — RENDER_APP_URL not set.")
-        return
-    threading.Thread(target=_keep_alive_loop, args=(RENDER_APP_URL,), daemon=True).start()
-
+    if RENDER_APP_URL:
+        threading.Thread(target=_keep_alive_loop, args=(RENDER_APP_URL,), daemon=True).start()
 
 # ===========================
 # 🧩 Plugin Manager Integration
@@ -98,22 +76,18 @@ def register_all_plugins(dispatcher):
     except Exception as e:
         logger.error(f"❌ PluginManager failed: {e}")
 
-
 # ===========================
-# 🛡️ Single Instance Lock
+# 🛡️ Instance Lock
 # ===========================
 LOCK_FILE = "/tmp/wenbnb_lock"
 
 def check_single_instance():
-    """Prevents duplicate polling instances."""
     if os.path.exists(LOCK_FILE):
-        logger.error("⚠️ Another bot instance is already running! Aborting startup.")
+        logger.error("⚠️ Another instance running — exiting.")
         raise SystemExit(1)
     with open(LOCK_FILE, "w") as f:
         f.write(str(os.getpid()))
     logger.info("🔒 Instance lock acquired.")
-    return True
-
 
 # ===========================
 # 💬 Telegram Bot Setup
@@ -121,15 +95,12 @@ def check_single_instance():
 def start_bot():
     check_single_instance()
 
-    logger.info("🚀 Initializing Telegram Updater...")
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
-    dp.job_queue = updater.job_queue  # ✅ Required for background tasks
 
-    # === Load Plugin Handlers ===
     logger.info("🔍 Loading all plugin modules...")
     register_all_plugins(dp)
-    logger.info("🧠 Plugin load sequence complete. Starting core commands...")
+    logger.info("🧠 Plugins loaded successfully.")
 
     # === Core Commands ===
     def start_cmd(update: Update, context: CallbackContext):
@@ -160,28 +131,25 @@ def start_bot():
             parse_mode=ParseMode.HTML
         )
 
-    # === Register Core Commands ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
 
-    # === Load Emotion + Analyzer Plugins ===
+    # === Load Analyzer & Emotion Sync ===
     try:
-        from plugins import ai_auto_reply, aianalyze
-        from telegram.ext import CommandHandler, MessageHandler, Filters
+        from plugins import aianalyze, ai_auto_reply
 
-        # ✅ Register /aianalyze directly
+        # 🔹 Priority: Analyzer before general text handler
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
         dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
 
-        logger.info("💬 Emotion-Sync active + /aianalyze command registered successfully.")
+        logger.info("💬 Emotion-Sync + Analyzer loaded correctly.")
     except Exception as e:
-        logger.warning(f"⚠️ Emotion/Analyzer plugin not loaded: {e}")
+        logger.warning(f"⚠️ Analyzer/Emotion module not loaded: {e}")
 
     # === Start Bot ===
     updater.start_polling(clean=True)
     logger.info("✅ Telegram polling started (Render-safe).")
     updater.idle()
-
 
 # ===========================
 # 🧠 Entry Point
@@ -192,12 +160,11 @@ def main():
     try:
         start_bot()
     except Exception as e:
-        logger.error(f"❌ Fatal error in main: {e}")
+        logger.error(f"❌ Fatal error: {e}")
     finally:
         if os.path.exists(LOCK_FILE):
             os.remove(LOCK_FILE)
             logger.info("🔓 Instance lock released.")
-
 
 if __name__ == "__main__":
     main()
