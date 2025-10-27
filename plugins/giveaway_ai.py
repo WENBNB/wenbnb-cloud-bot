@@ -1,11 +1,11 @@
 """
-WENBNB Smart Giveaway Manager v3.0.2-ProPolish+
+WENBNB Smart Giveaway Manager v3.0.3-ProPolish++
 ───────────────────────────────────────────────
 • Multi-Round Auto Giveaway
 • Round Timer (seconds-based)
 • Auto-Winner Selection per Round
 • Premium Bold + Emoji UI
-• Reward-Label Beautifier (Bold + Clean)
+• Smart Reward Auto Emoji Detection
 • Render-Safe Async Compatible
 """
 
@@ -33,29 +33,27 @@ def is_admin(user_id):
     return user_id in ADMIN_IDS
 
 
-# === Smart Reward Formatter (Bold + Clean + Future Ready) ===
+# === Smart Reward Formatter (Auto Emoji + Bold + Clean) ===
 def format_reward(raw_reward: str):
     """
-    Formats reward for premium look:
-    - Converts underscores to spaces
-    - Makes it bold
-    - Keeps flexible for future auto emoji detection
+    Auto-detects crypto type and adds matching emoji dynamically.
+    Keeps it bold, premium, and clean for Telegram rendering.
     """
     reward = raw_reward.strip().replace("_", " ")
+    reward_lower = reward.lower()
 
-    # 💎 Current Style (simple + bold)
-    return f"<b>{reward}</b>"
+    if "usdt" in reward_lower:
+        emoji = "💵"
+    elif "bnb" in reward_lower:
+        emoji = "🔶"
+    elif "wenbnb" in reward_lower:
+        emoji = "💎"
+    elif "eth" in reward_lower or "ethereum" in reward_lower:
+        emoji = "💠"
+    else:
+        emoji = "🎁"
 
-    # 🚀 Future Upgrade: Auto emoji detection
-    # reward_lower = reward.lower()
-    # if "usdt" in reward_lower:
-    #     return f"💵 <b>{reward.upper()}</b>"
-    # elif "bnb" in reward_lower:
-    #     return f"🔶 <b>{reward.upper()}</b>"
-    # elif "wenbnb" in reward_lower:
-    #     return f"💎 <b>{reward.upper()}</b>"
-    # else:
-    #     return f"🎁 <b>{reward}</b>"
+    return f"{emoji} <b>{reward.upper()}</b>"
 
 
 # === GIVEAWAY START ===
@@ -86,9 +84,9 @@ def giveaway_start(update: Update, context: CallbackContext):
 
     text = (
         f"✨ <b>WENBNB Multi-Round Giveaway Activated!</b>\n\n"
-        f"🎁 <b>Reward:</b> {reward}\n"
-        f"🔄 <b>Rounds:</b> {total_rounds}\n"
-        f"⏰ <b>Round Duration:</b> {round_time} seconds\n\n"
+        f"🏆 <b>Reward:</b> {reward}\n"
+        f"🔁 <b>Rounds:</b> {total_rounds}\n"
+        f"⏱️ <b>Round Duration:</b> {round_time} seconds\n\n"
         f"💫 <b>Join Now →</b> /join\n"
         f"Winners announced automatically at the end of each round!\n\n"
         f"{BRAND_FOOTER}"
@@ -141,7 +139,7 @@ def run_rounds(bot, chat_id):
             data["winners"].append(winner)
             bot.send_message(
                 chat_id,
-                f"🏆 <b>Round {current} Winner:</b> @{winner}\n🎁 <b>Reward:</b> {reward}",
+                f"🏆 <b>Round {current} Winner:</b> @{winner}\n💰 <b>Reward:</b> {reward}",
                 parse_mode="HTML"
             )
         else:
@@ -208,4 +206,4 @@ def register_handlers(dp):
     dp.add_handler(CommandHandler("join", join_giveaway))
     dp.add_handler(CommandHandler("giveaway_end", giveaway_end))
     dp.add_handler(CommandHandler("giveaway_info", giveaway_info))
-    print("✅ Loaded plugin: giveaway_ai.py v3.0.2-ProPolish+ (Bold Rewards + Premium UI)")
+    print("✅ Loaded plugin: giveaway_ai.py v3.0.3-ProPolish++ (Auto Emoji + Premium UI)")
