@@ -1,11 +1,11 @@
 """
-WENBNB Smart Giveaway Manager v3.0.1-ProStable++
+WENBNB Smart Giveaway Manager v3.0.2-ProPolish+
 ───────────────────────────────────────────────
 • Multi-Round Auto Giveaway
 • Round Timer (seconds-based)
 • Auto-Winner Selection per Round
 • Premium Bold + Emoji UI
-• Reward-Label System (Manual + Future AutoDetect Ready)
+• Reward-Label Beautifier (Bold + Clean)
 • Render-Safe Async Compatible
 """
 
@@ -16,6 +16,7 @@ from telegram.ext import CommandHandler, CallbackContext
 DATA_FILE = "giveaway_data.json"
 ADMIN_IDS = [5698007588]  # replace with your Telegram ID
 BRAND_FOOTER = "⚡ <b>Powered by WENBNB Neural Engine</b> — Emotionally Aware. Always Active."
+
 
 # === UTILITIES ===
 def load_data():
@@ -32,27 +33,29 @@ def is_admin(user_id):
     return user_id in ADMIN_IDS
 
 
-# === (Future-Ready) Smart Reward Formatter ===
+# === Smart Reward Formatter (Bold + Clean + Future Ready) ===
 def format_reward(raw_reward: str):
     """
-    Keeps manual reward labeling clean,
-    but ready for auto-detect upgrade when needed.
+    Formats reward for premium look:
+    - Converts underscores to spaces
+    - Makes it bold
+    - Keeps flexible for future auto emoji detection
     """
-    reward = raw_reward.strip()
+    reward = raw_reward.strip().replace("_", " ")
 
-    # 💤 Current Phase: Manual (use whatever text admin enters)
-    return reward
+    # 💎 Current Style (simple + bold)
+    return f"<b>{reward}</b>"
 
-    # 🚀 Future Upgrade (uncomment later)
+    # 🚀 Future Upgrade: Auto emoji detection
     # reward_lower = reward.lower()
     # if "usdt" in reward_lower:
-    #     return f"💵 {reward.upper()}"
+    #     return f"💵 <b>{reward.upper()}</b>"
     # elif "bnb" in reward_lower:
-    #     return f"🔶 {reward.upper()}"
+    #     return f"🔶 <b>{reward.upper()}</b>"
     # elif "wenbnb" in reward_lower:
-    #     return f"💎 {reward.upper()}"
+    #     return f"💎 <b>{reward.upper()}</b>"
     # else:
-    #     return f"🎁 {reward}"
+    #     return f"🎁 <b>{reward}</b>"
 
 
 # === GIVEAWAY START ===
@@ -110,7 +113,10 @@ def join_giveaway(update: Update, context: CallbackContext):
 
     data["participants"].append(user.username)
     save_data(data)
-    update.message.reply_text(f"🎯 @{user.username}, you’ve successfully joined the giveaway!\n\n{BRAND_FOOTER}", parse_mode="HTML")
+    update.message.reply_text(
+        f"🎯 @{user.username}, you’ve successfully joined the giveaway!\n\n{BRAND_FOOTER}",
+        parse_mode="HTML"
+    )
 
 
 # === AUTO ROUND LOGIC ===
@@ -121,7 +127,11 @@ def run_rounds(bot, chat_id):
     round_time = data.get("round_time", 60)
 
     for current in range(1, total + 1):
-        bot.send_message(chat_id, f"🔥 <b>Round {current} of {total} started!</b>\n💎 Reward: {reward}\n💬 /join to enter now!\n⏳ Closing in {round_time} seconds...", parse_mode="HTML")
+        bot.send_message(
+            chat_id,
+            f"🔥 <b>Round {current} of {total} started!</b>\n💎 <b>Reward:</b> {reward}\n💬 /join to enter now!\n⏳ Closing in {round_time} seconds...",
+            parse_mode="HTML"
+        )
         time.sleep(round_time)
 
         data = load_data()
@@ -129,7 +139,11 @@ def run_rounds(bot, chat_id):
         if participants:
             winner = random.choice(participants)
             data["winners"].append(winner)
-            bot.send_message(chat_id, f"🏆 <b>Round {current} Winner:</b> @{winner}\n🎁 Reward: {reward}", parse_mode="HTML")
+            bot.send_message(
+                chat_id,
+                f"🏆 <b>Round {current} Winner:</b> @{winner}\n🎁 <b>Reward:</b> {reward}",
+                parse_mode="HTML"
+            )
         else:
             bot.send_message(chat_id, f"😅 No participants in Round {current}.", parse_mode="HTML")
 
@@ -179,9 +193,9 @@ def giveaway_info(update: Update, context: CallbackContext):
 
     text = (
         f"🎉 <b>Active Giveaway</b>\n"
-        f"💰 Reward: <b>{data.get('reward')}</b>\n"
-        f"🔁 Rounds: <b>{data.get('round')} / {data.get('total_rounds')}</b>\n"
-        f"👥 Participants: <b>{len(data.get('participants', []))}</b>\n\n"
+        f"💰 <b>Reward:</b> {data.get('reward')}\n"
+        f"🔁 <b>Rounds:</b> {data.get('round')} / {data.get('total_rounds')}\n"
+        f"👥 <b>Participants:</b> {len(data.get('participants', []))}\n\n"
         f"🧠 Use /join to participate!\n\n"
         f"{BRAND_FOOTER}"
     )
@@ -194,4 +208,4 @@ def register_handlers(dp):
     dp.add_handler(CommandHandler("join", join_giveaway))
     dp.add_handler(CommandHandler("giveaway_end", giveaway_end))
     dp.add_handler(CommandHandler("giveaway_info", giveaway_info))
-    print("✅ Loaded plugin: giveaway_ai.py v3.0.1-ProStable++ (Reward Label System + Enhanced UI)")
+    print("✅ Loaded plugin: giveaway_ai.py v3.0.2-ProPolish+ (Bold Rewards + Premium UI)")
