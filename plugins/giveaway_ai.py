@@ -59,21 +59,21 @@ def bold(s: str) -> str:
     return f"<b>{s}</b>"
 
 def get_reward_emoji(reward: str) -> str:
-    r = reward.upper()
-    if "BNB" in r:
-        return "🔶"
-    elif "USDT" in r:
+    r = (reward or "").upper()
+    # order matters: check bigger tokens first
+    if "USDT" in r:
         return "💰"
-    elif "ETH" in r:
+    if "BNB" in r and "WENBNB" not in r:
+        return "🔶"
+    if "ETH" in r:
         return "💎"
-    elif "WENBNB" in r:
+    if "WENBNB" in r:
         return "🌀"
-    elif "POINT" in r:
+    if "POINT" in r or "POINTS" in r:
         return "🎁"
-    elif "BTC" in r:
+    if "BTC" in r or "BITCOIN" in r:
         return "🪙"
-    else:
-        return "🏆"
+    return "🏆"
 
 # -----------------------
 # Data Functions
@@ -104,7 +104,8 @@ def giveaway_start(update: Update, context: CallbackContext):
         update.message.reply_text("⚙️ Usage: /giveaway_start <reward> <rounds> <seconds>")
         return
 
-    reward = args[0].replace("_", " ")  # fix underscores
+    # convert underscores to spaces so display looks nice
+    reward = args[0].replace("_", " ")
     emoji = get_reward_emoji(reward)
 
     try:
@@ -119,7 +120,7 @@ def giveaway_start(update: Update, context: CallbackContext):
         "participants": [],
         "winners": [],
         "reward": reward,
-        "round": 1,
+        "round": 0,
         "total_rounds": rounds,
         "round_time": seconds,
         "started_at": datetime.datetime.utcnow().isoformat()
@@ -137,6 +138,7 @@ def giveaway_start(update: Update, context: CallbackContext):
     )
     update.message.reply_text(text, parse_mode="HTML")
 
+    # start background thread for rounds (Render-safe)
     threading.Thread(target=_run_rounds_thread, args=(context.bot, update.effective_chat.id), daemon=True).start()
 
 # -----------------------
@@ -181,7 +183,7 @@ def giveaway_info(update: Update, context: CallbackContext):
     update.message.reply_text(text, parse_mode="HTML")
 
 # -----------------------
-# Giveaway End
+# Giveaway End (Admin)
 # -----------------------
 def giveaway_end(update: Update, context: CallbackContext):
     user = update.effective_user
@@ -194,28 +196,83 @@ def giveaway_end(update: Update, context: CallbackContext):
         update.message.reply_text("❌ No active giveaway to end.")
         return
 
+    # set active false — background thread checks this frequently
     data["active"] = False
     save_data(data)
     update.message.reply_text("🧊 Giveaway force-ended by admin.", parse_mode="HTML")
 
+    # If all winners already claimed, clear claim list to keep clean
+    claimed = load_claimed()
+    if claimed:
+        # if every recorded claimed entry is marked claimed -> clear
+        if all(c.get("claimed", False) for c in claimed):
+            save_claimed([])
+            try:
+                context.bot.send_message(update.effective_chat.id, "🧾 All winners had already claimed — claim list auto-cleared ✅", parse_mode="HTML")
+            except:
+                pass
+
 # -----------------------
-# Round Logic
+# Wait helper (interruptible)
+# -----------------------
+def _wait_with_active_check(seconds: int) -> bool:
+    """Sleep in 1s steps and return False early if giveaway was force-ended."""
+    for _ in range(seconds):
+        data = load_data()
+        if not data.get("active"):
+            return False
+        time.sleep(1)
+    return True
+
+# -----------------------
+# Round Logic (background)
 # -----------------------
 def _run_rounds_thread(bot: Bot, chat_id: int):
+    # load fresh data each loop so admin updates are respected
     data = load_data()
     total = data.get("total_rounds", 1)
     reward = data.get("reward", "N/A")
     emoji = get_reward_emoji(reward)
-    round_time = data.get("round_time", 60)
 
     for current_round in range(1, total + 1):
+        # reload and check active before starting
+        data = load_data()
+        if not data.get("active"):
+            # giveaway was aborted
+            try:
+                bot.send_message(chat_id, "🛑 Giveaway stopped by admin. Cancelling remaining rounds.", parse_mode="HTML")
+            except:
+                pass
+            break
+
+        # update round number
         data["round"] = current_round
         save_data(data)
-        bot.send_message(chat_id, f"🔥 <b>Round {current_round} of {total} started!</b>\n💎 Reward: {emoji} {bold(reward)}\n💬 /join to enter now!\n⏳ Closing in {round_time} seconds...", parse_mode="HTML")
-        time.sleep(round_time)
 
+        round_time = data.get("round_time", 60)
+        bot.send_message(chat_id, f"🔥 <b>Round {current_round} of {total} started!</b>\n💎 Reward: {emoji} {bold(reward)}\n💬 /join to enter now!\n⏳ Closing in {round_time} seconds...", parse_mode="HTML")
+
+        # wait but allow admin to interrupt
+        still_active = _wait_with_active_check(round_time)
+        if not still_active:
+            # admin killed giveaway during waiting
+            try:
+                bot.send_message(chat_id, "🛑 Giveaway stopped by admin during a round. Aborting.", parse_mode="HTML")
+            except:
+                pass
+            break
+
+        # reload participants and data
         data = load_data()
-        participants = data.get("participants", [])
+        # it might have been deactivated while we processed
+        if not data.get("active"):
+            try:
+                bot.send_message(chat_id, "🛑 Giveaway was ended by admin. Stopping rounds.", parse_mode="HTML")
+            except:
+                pass
+            break
+
+        participants = data.get("participants", []) or []
         if participants:
             winner = random.choice(participants)
             winner_id = int(winner.get("id"))
@@ -228,17 +285,27 @@ def _run_rounds_thread(bot: Bot, chat_id: int):
                 "reward": reward,
                 "claimed": False
             }
-            data["winners"].append(winner_entry)
+
+            # append to winners and clear participants
+            data = load_data()
+            winners = data.get("winners", [])
+            winners.append(winner_entry)
+            data["winners"] = winners
             data["participants"] = []
             save_data(data)
 
+            # announce
             bot.send_message(chat_id, f"🏆 <b>Round {current_round} Winner:</b> @{winner_username}\n🎁 Reward: {emoji} {bold(reward)}\nWinner must DM /claim_reward.", parse_mode="HTML")
 
+            # try to DM and register pending claim
             try:
-                bot.send_message(chat_id=winner_id,
-                                 text=(f"🎉 Congratulations @{winner_username}! You were selected as the winner of Round {current_round}.\n\n"
-                                       f"🎁 Prize: {emoji} {bold(reward)}\nTo claim, send /claim_reward here.\n\n{BRAND_FOOTER}"),
-                                 parse_mode="HTML")
+                dm_text = (
+                    f"🎉 Congratulations @{winner_username}! You were selected as the winner of Round {current_round}.\n\n"
+                    f"🎁 Prize: {emoji} {bold(reward)}\n"
+                    f"To claim, send /claim_reward in this chat.\n\n"
+                    f"{BRAND_FOOTER}"
+                )
+                bot.send_message(chat_id=winner_id, text=dm_text, parse_mode="HTML")
                 claimed = load_claimed()
                 claimed.append({
                     "round": current_round,
@@ -250,24 +317,28 @@ def _run_rounds_thread(bot: Bot, chat_id: int):
                     "claimed_at": None
                 })
                 save_claimed(claimed)
-            except:
+            except Exception:
                 bot.send_message(chat_id, f"⚠️ Could not DM @{winner_username}. They must DM the bot to claim.", parse_mode="HTML")
         else:
             bot.send_message(chat_id, f"😅 No participants in Round {current_round}.", parse_mode="HTML")
 
+        # short break before next round (if any). Also allow admin kill during break.
         if current_round != total:
             bot.send_message(chat_id, "🕒 Next round begins in 10 seconds...", parse_mode="HTML")
-            time.sleep(10)
+            if not _wait_with_active_check(10):
+                bot.send_message(chat_id, "🛑 Giveaway stopped by admin during inter-round break. Aborting.", parse_mode="HTML")
+                break
 
-    # finalize giveaway
+    # finalize: set active false and publish summary
+    data = load_data()
     data["active"] = False
     save_data(data)
     winners = ", ".join(f"@{w['username']}" for w in data.get("winners", [])) or "No winners"
-    bot.send_message(chat_id, f"🏁 <b>Giveaway Complete!</b>\n\n💰 <b>Total Rounds:</b> {total}\n👑 <b>Winners:</b> {winners}\n\n{BRAND_FOOTER}", parse_mode="HTML")
+    bot.send_message(chat_id, f"🏁 <b>Giveaway Complete!</b>\n\n💰 <b>Total Rounds:</b> {data.get('total_rounds', 0)}\n👑 <b>Winners:</b> {winners}\n\n{BRAND_FOOTER}", parse_mode="HTML")
 
-    # auto-clear if all claimed
-    all_claimed = all(w.get("claimed", False) for w in data.get("winners", []))
-    if all_claimed:
+    # auto-clear claims if every recorded claim is claimed
+    claimed = load_claimed()
+    if claimed and all(c.get("claimed", False) for c in claimed):
         save_claimed([])
         bot.send_message(chat_id, "🧾 All winners have claimed their rewards — claim list auto-cleared ✅", parse_mode="HTML")
 
