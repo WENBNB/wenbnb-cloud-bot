@@ -1,5 +1,5 @@
 # ============================================================
-# 🧠 WENBNB Neural Engine v5.5 — Render Cloud Build
+# 🧠 WENBNB Neural Engine v8.6.4-ProStable — Render Cloud Build
 # ============================================================
 
 # Telegram Bot Core
@@ -13,6 +13,7 @@ requests==2.31.0
 # AI / Neural Engine
 openai==1.42.0
 tiktoken==0.7.0
+textblob==0.18.0.post0   # 💫 Emotion detection for /aianalyze
 
 # Web3 / Blockchain
 web3==6.13.0
@@ -39,6 +40,5 @@ urllib3==2.2.3
 matplotlib==3.9.2
 
 # ============================================================
-# ✅ Optimized and Verified for Render Cloud (WENBNB v5.5)
+# ✅ Optimized and Verified for Render Cloud (WENBNB v8.6.4)
 # ============================================================
-
