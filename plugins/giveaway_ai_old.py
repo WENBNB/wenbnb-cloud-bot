@@ -126,3 +126,4 @@ def register_handlers(dp):
     dp.add_handler(CommandHandler("join", join_giveaway))
     dp.add_handler(CommandHandler("giveaway_info", giveaway_info))
 
+
