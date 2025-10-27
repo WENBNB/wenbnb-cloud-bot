@@ -1,11 +1,11 @@
 """
-WENBNB AI Analyzer v8.6-ProStable — EmotionLink Prime+
+WENBNB AI Analyzer v8.6.1-ProStable+ — EmotionLink Prime+ (Render Debug Edition)
 ────────────────────────────────────────────
 Integrates:
  • Emotion Detection (TextBlob engine)
  • Memory Persistence (Unified Memory System)
  • Adaptive Human Tone — No 🤖 spam
- • Render Debug-Safe Logging
+ • Render Debug-Safe Logging + Auto-Retry
 """
 
 import os, json, time, random, requests, traceback
@@ -44,47 +44,51 @@ def analyze_emotion(text):
 # ==== AI Core Response ====
 
 def ai_chat_response(prompt, emotion_hint=None):
-    try:
-        base_prompt = (
-            "You are WENBNB AI — a warm, emotionally aware crypto companion. "
-            "Your goal: sound like a thoughtful human, never robotic. "
-            "Always blend insight with empathy.\n\n"
-        )
+    base_prompt = (
+        "You are WENBNB AI — a warm, emotionally aware crypto companion. "
+        "Your goal: sound like a thoughtful human, never robotic. "
+        "Always blend insight with empathy.\n\n"
+    )
 
-        if emotion_hint:
-            base_prompt += f"Current user emotional tone: {emotion_hint}\n\n"
+    if emotion_hint:
+        base_prompt += f"Current user emotional tone: {emotion_hint}\n\n"
 
-        payload = {
-            "model": "gpt-4o-mini",
-            "messages": [
-                {"role": "system", "content": base_prompt},
-                {"role": "user", "content": prompt}
-            ],
-            "max_tokens": 200,
-            "temperature": 0.9,
-        }
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": base_prompt},
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 200,
+        "temperature": 0.9,
+    }
 
-        r = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {AI_API_KEY}"},
-            json=payload,
-            timeout=25,
-        )
+    # === Safe API call with 1 retry ===
+    for attempt in range(2):
+        try:
+            print(f"🧩 [DEBUG] Sending OpenAI request (try {attempt+1}) → {prompt[:60]}...")
+            r = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {AI_API_KEY}"},
+                json=payload,
+                timeout=25,
+            )
+            data = r.json()
+            print("🧠 [DEBUG] Response:", json.dumps(data, indent=2)[:400])
 
-        data = r.json()
+            if "choices" in data and data["choices"]:
+                return data["choices"][0]["message"]["content"].strip()
+            elif "error" in data:
+                err_msg = data["error"].get("message", "Unknown OpenAI Error")
+                return f"⚠️ OpenAI Error: {err_msg}"
+        except requests.exceptions.Timeout:
+            print("⏳ [WARN] OpenAI timeout — retrying...")
+            time.sleep(1.5)
+        except Exception as e:
+            traceback.print_exc()
+            return f"⚠️ AI Core Exception: {e}"
 
-        # Debug log for Render console
-        print("🧠 [AI RESPONSE DEBUG]:", json.dumps(data, indent=2)[:400])
-
-        if "choices" in data and data["choices"]:
-            return data["choices"][0]["message"]["content"].strip()
-        elif "error" in data:
-            return f"⚠️ OpenAI Error: {data['error'].get('message', 'Unknown')}"
-        else:
-            return "💫 Neural silence — retrying emotional sync..."
-    except Exception as e:
-        traceback.print_exc()
-        return f"⚠️ AI Core Exception: {e}"
+    return "💫 Neural silence — emotional sync timed out, try again later."
 
 # ==== Update Memory Log ====
 
@@ -114,13 +118,15 @@ def aianalyze_cmd(update: Update, context: CallbackContext):
 
     context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
-    mood, mood_line = analyze_emotion(query)
-    ai_reply = ai_chat_response(query, mood)
-
-    update_memory(user.id, query, mood)
-
-    reply = f"{mood_line}\n\n{ai_reply}\n\n{BRAND_FOOTER}"
-    update.message.reply_text(reply, parse_mode="HTML")
+    try:
+        mood, mood_line = analyze_emotion(query)
+        ai_reply = ai_chat_response(query, mood)
+        update_memory(user.id, query, mood)
+        reply = f"{mood_line}\n\n{ai_reply}\n\n{BRAND_FOOTER}"
+        update.message.reply_text(reply, parse_mode="HTML")
+    except Exception as e:
+        traceback.print_exc()
+        update.message.reply_text(f"⚠️ Analyzer internal error: {e}")
 
 # ==== Auto Chat ====
 
@@ -132,19 +138,21 @@ def auto_ai_chat(update: Update, context: CallbackContext):
     context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     time.sleep(random.uniform(1.0, 1.6))
 
-    mood, mood_line = analyze_emotion(msg)
-    ai_reply = ai_chat_response(msg, mood)
-
-    update_memory(update.effective_user.id, msg, mood)
-
-    update.message.reply_text(
-        f"{mood_line}\n\n{ai_reply}\n\n{BRAND_FOOTER}",
-        parse_mode="HTML"
-    )
+    try:
+        mood, mood_line = analyze_emotion(msg)
+        ai_reply = ai_chat_response(msg, mood)
+        update_memory(update.effective_user.id, msg, mood)
+        update.message.reply_text(
+            f"{mood_line}\n\n{ai_reply}\n\n{BRAND_FOOTER}",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        traceback.print_exc()
+        update.message.reply_text(f"⚠️ Auto-chat error: {e}")
 
 # ==== Register ====
 
 def register_handlers(dp):
     dp.add_handler(CommandHandler("aianalyze", aianalyze_cmd))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, auto_ai_chat))
-    print("✅ Loaded plugin: aianalyze.py v8.6-ProStable — EmotionLink Prime+")
+    print("✅ Loaded plugin: aianalyze.py v8.6.1-ProStable+ — EmotionLink Prime+ (Debug Edition)")
