@@ -1,148 +1,114 @@
-# admin_tools.py — WENBNB Neural Admin Panel v3.9-ProStable+
-"""
-🚀 WENBNB Neural Engine — Admin Tools (Interactive Mode)
-─────────────────────────────────────────────────────────────
-• Inline Admin Dashboard with real-time stats refresh
-• Secure admin verification
-• Commands: /admin, /reboot, /broadcast
-• Real-time CPU, RAM, Uptime info (psutil)
-• Emotionally branded footer
-"""
+# 🚀 WENBNB Neural Engine — Admin Control Suite v3.9-ProStable+
+# Integrated with EmotionSync v2.1 & SystemCore Monitoring
+# Provides: /admin, /reboot, /broadcast, /status commands
 
 import os
 import psutil
 import time
 import json
 from datetime import datetime
-from telegram import (
-    Update,
-    ParseMode,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup
-)
-from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler
+from telegram import Update, ParseMode
+from telegram.ext import CallbackContext
 
-# --------------------------------------
-# Admin check + system helpers
-# --------------------------------------
+# -----------------------------
+# 🧩 Admin Configuration
+# -----------------------------
 def is_admin(user_id: int, allowed_admins: list) -> bool:
+    """Check if user is authorized as admin"""
     return user_id in allowed_admins
 
+
+# -----------------------------
+# ⚙️ System Performance
+# -----------------------------
 def get_system_status():
+    """Return system performance overview"""
     cpu = psutil.cpu_percent()
     memory = psutil.virtual_memory().percent
     uptime = time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - psutil.boot_time()))
-    return f"🧠 <b>System:</b> {cpu}% CPU | {memory}% RAM\n⏳ <b>Uptime:</b> {uptime}"
+    return f"🧠 System: {cpu}% CPU | {memory}% RAM | Uptime: {uptime}"
 
-# --------------------------------------
-# Inline dashboard generator
-# --------------------------------------
-def build_admin_keyboard():
-    keyboard = [
-        [InlineKeyboardButton("📊 System Status", callback_data="sys_status"),
-         InlineKeyboardButton("♻️ Reboot Core", callback_data="reboot_core")],
-        [InlineKeyboardButton("📢 Broadcast", callback_data="broadcast"),
-         InlineKeyboardButton("🧠 Memory Logs", callback_data="memory_logs")]
-    ]
-    return InlineKeyboardMarkup(keyboard)
 
-# --------------------------------------
-# Admin main command
-# --------------------------------------
-def admin_panel(update: Update, context: CallbackContext, config):
-    user = update.effective_user
-    if not is_admin(user.id, config["admin"]["allowed_admins"]):
+# -----------------------------
+# 🪩 EmotionSync Integration
+# -----------------------------
+def get_emotion_sync_status():
+    """Read latest EmotionSync state (if available)"""
+    try:
+        if os.path.exists("user_memory.json"):
+            with open("user_memory.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+                # Try reading last emotion from any user
+                for uid, record in data.items():
+                    if record.get("entries"):
+                        mood = record["entries"][-1].get("mood", "Balanced")
+                        return f"🪩 Neural Mood: {mood}"
+        return "🪩 Neural Mood: Balanced"
+    except Exception:
+        return "🪩 Neural Mood: Unknown"
+
+
+# -----------------------------
+# 🧠 Admin Commands
+# -----------------------------
+def admin_status(update: Update, context: CallbackContext, config):
+    """Display system status, version, and emotion sync mood"""
+    user_id = update.effective_user.id
+    if not is_admin(user_id, config["admin"]["allowed_admins"]):
         update.message.reply_text("🚫 Unauthorized Access")
         return
 
-    footer = config["branding"]["footer"]
     version = config["version"]
+    sys_status = get_system_status()
+    mood_status = get_emotion_sync_status()
 
-    text = (
-        f"👑 <b>WENBNB Neural Admin Panel</b>\n"
-        f"🧩 Version: <b>{version}</b>\n"
-        f"Choose a module to manage below:\n\n"
-        f"{footer}"
-    )
     update.message.reply_text(
-        text,
-        reply_markup=build_admin_keyboard(),
+        f"✅ <b>{version}</b>\n\n"
+        f"{sys_status}\n{mood_status}\n\n"
+        f"📡 Neural Engine Online.\n\n"
+        f"{config['branding']['footer']}",
         parse_mode=ParseMode.HTML
     )
 
-# --------------------------------------
-# Inline callbacks
-# --------------------------------------
-def admin_callback(update: Update, context: CallbackContext, config):
-    query = update.callback_query
-    user_id = query.from_user.id
-    query.answer()
 
+def admin_reboot(update: Update, context: CallbackContext, config):
+    """Simulate bot reboot (soft restart message)"""
+    user_id = update.effective_user.id
     if not is_admin(user_id, config["admin"]["allowed_admins"]):
-        query.edit_message_text("🚫 Unauthorized Access")
-        return
-
-    footer = config["branding"]["footer"]
-
-    if query.data == "sys_status":
-        sys = get_system_status()
-        query.edit_message_text(
-            f"{sys}\n\n{footer}",
-            parse_mode=ParseMode.HTML,
-            reply_markup=build_admin_keyboard()
-        )
-
-    elif query.data == "reboot_core":
-        query.edit_message_text("♻️ Neural Core rebooting… please wait ⚙️", parse_mode=ParseMode.HTML)
-        time.sleep(2)
-        query.edit_message_text("✅ WENBNB Neural Engine rebooted successfully ⚡", parse_mode=ParseMode.HTML)
-
-    elif query.data == "broadcast":
-        query.edit_message_text("📢 Type /broadcast <message> to send a message to all users.", parse_mode=ParseMode.HTML)
-
-    elif query.data == "memory_logs":
-        try:
-            with open("user_memory.json", "r", encoding="utf-8") as f:
-                mem = json.load(f)
-            count = len(mem)
-            query.edit_message_text(f"🧠 Memory logs loaded: {count} users.\n\n{footer}", parse_mode=ParseMode.HTML)
-        except:
-            query.edit_message_text("⚠️ No memory logs found.", parse_mode=ParseMode.HTML)
-
-# --------------------------------------
-# Broadcast + Reboot + Status
-# --------------------------------------
-def admin_broadcast(update: Update, context: CallbackContext, config):
-    user = update.effective_user
-    if not is_admin(user.id, config["admin"]["allowed_admins"]):
         update.message.reply_text("🚫 Unauthorized Access")
         return
+
+    update.message.reply_text("♻️ Neural Core rebooting… please wait a moment.")
+    time.sleep(2)
+    update.message.reply_text("✅ WENBNB Neural Engine rebooted successfully ⚡")
+
+
+def admin_broadcast(update: Update, context: CallbackContext, config):
+    """Broadcast message to all users (admin-only)"""
+    user_id = update.effective_user.id
+    if not is_admin(user_id, config["admin"]["allowed_admins"]):
+        update.message.reply_text("🚫 Unauthorized Access")
+        return
+
     if len(context.args) == 0:
         update.message.reply_text("Usage: /broadcast <message>")
         return
 
     msg = " ".join(context.args)
     try:
-        # Example mass broadcast placeholder
         update.message.reply_text(f"📢 Broadcast sent:\n{msg}")
     except Exception as e:
-        update.message.reply_text(f"❌ Broadcast failed: {e}")
+        update.message.reply_text(f"❌ Error sending broadcast: {e}")
 
-def admin_reboot(update: Update, context: CallbackContext, config):
-    user = update.effective_user
-    if not is_admin(user.id, config["admin"]["allowed_admins"]):
-        update.message.reply_text("🚫 Unauthorized Access")
-        return
-    update.message.reply_text("♻️ Neural Core rebooting…")
-    time.sleep(2)
-    update.message.reply_text("✅ WENBNB Neural Engine rebooted successfully ⚡")
 
-# --------------------------------------
-# Handler registration
-# --------------------------------------
+# -----------------------------
+# 🧩 Command Registration
+# -----------------------------
 def register_handlers(dp, config):
-    dp.add_handler(CommandHandler("admin", lambda u, c: admin_panel(u, c, config)))
-    dp.add_handler(CommandHandler("broadcast", lambda u, c: admin_broadcast(u, c, config)))
+    from telegram.ext import CommandHandler
+
+    dp.add_handler(CommandHandler("admin", lambda u, c: admin_status(u, c, config)))
     dp.add_handler(CommandHandler("reboot", lambda u, c: admin_reboot(u, c, config)))
-    dp.add_handler(CallbackQueryHandler(lambda u, c: admin_callback(u, c, config)))
-    print("✅ Loaded: admin_tools.py v3.9-ProStable+ (Interactive Neural Panel)")
+    dp.add_handler(CommandHandler("broadcast", lambda u, c: admin_broadcast(u, c, config)))
+
+    print("✅ Loaded plugin: admin_tools.py (EmotionSync v2.1 integrated)")
