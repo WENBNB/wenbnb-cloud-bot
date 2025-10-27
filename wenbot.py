@@ -29,7 +29,7 @@ ENGINE_VERSION = "v8.6-ProStable"
 CORE_VERSION = "v5.0"
 BRAND_SIGNATURE = os.getenv(
     "BRAND_SIGNATURE",
-    "💫 <b>Powered by WENBNB Neural Engine</b> — Modular Intelligence 24×7 ⚡"
+    "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
 )
 
 logging.basicConfig(
@@ -124,7 +124,7 @@ def start_bot():
     logger.info("🚀 Initializing Telegram Updater...")
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
-    dp.job_queue = updater.job_queue  # ✅ Required for background airdrop scans
+    dp.job_queue = updater.job_queue  # ✅ Required for background tasks
 
     # === Load Plugin Handlers ===
     logger.info("🔍 Loading all plugin modules...")
@@ -160,16 +160,18 @@ def start_bot():
             parse_mode=ParseMode.HTML
         )
 
+    # === Register Core Commands ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
 
-    # === Emotion-Aware Chat Handler ===
+    # === Load Emotion + Analyzer Plugins ===
     try:
-        from plugins.ai_auto_reply import ai_auto_reply
-        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply))
-        logger.info("💬 Emotion-Sync auto reply active.")
+        from plugins import ai_auto_reply, aianalyze
+        aianalyze.register_handlers(dp)  # ✅ Register /aianalyze
+        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
+        logger.info("💬 Emotion-Sync + AI Analyzer active.")
     except Exception as e:
-        logger.warning(f"⚠️ Emotion AI not loaded: {e}")
+        logger.warning(f"⚠️ Emotion/Analyzer not loaded: {e}")
 
     # === Start Bot ===
     updater.start_polling(clean=True)
