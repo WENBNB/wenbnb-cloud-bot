@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.7.5-ProStable++ (Emotion Sync Edition)
-# EmotionHuman+ MemoryContext++ + Admin Integration + Auto-Heal Core
+# 💫 WENBNB Neural Engine v8.7.6-FixStable (Emotion Sync Patch)
+# EmotionHuman+ MemoryContext++ + Smart Keyboard Integration
 # ============================================================
 
-import os, sys, time, logging, threading, requests, random, traceback
+import os, sys, time, logging, threading, requests, traceback
 from flask import Flask, jsonify
-from telegram import Update, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
+from telegram import Update, ParseMode, ReplyKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.7.5-ProStable++"
+ENGINE_VERSION = "v8.7.6-FixStable"
 CORE_VERSION = "v5.2"
 BRAND_SIGNATURE = os.getenv(
     "BRAND_SIGNATURE",
@@ -123,71 +123,76 @@ def start_bot():
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
-    # === /start Command — Inline Fancy Command Buttons ===
+    # === /start Command — Smart Keyboard Integration ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
 
+        # Map button labels to real commands
+        button_map = {
+            "💰 Price": "/price",
+            "📊 Token Info": "/tokeninfo",
+            "😂 Meme": "/meme",
+            "🧠 AI Analyze": "/aianalyze",
+            "🎁 Airdrop Check": "/airdropcheck",
+            "🚨 Airdrop Alert": "/airdropalert",
+            "🌐 Web3": "/web3",
+            "ℹ️ About": "/about",
+            "⚙️ Admin": "/admin"
+        }
+        context.user_data["button_map"] = button_map
+
         keyboard = [
-            [
-                InlineKeyboardButton("💰 Price", callback_data="/price"),
-                InlineKeyboardButton("📊 Token Info", callback_data="/tokeninfo")
-            ],
-            [
-                InlineKeyboardButton("😂 Meme", callback_data="/meme"),
-                InlineKeyboardButton("🧠 AI Analyze", callback_data="/aianalyze")
-            ],
-            [
-                InlineKeyboardButton("🎁 Airdrop Check", callback_data="/airdropcheck"),
-                InlineKeyboardButton("🚨 Airdrop Alert", callback_data="/airdropalert")
-            ],
-            [
-                InlineKeyboardButton("🌐 Web3", callback_data="/web3"),
-                InlineKeyboardButton("ℹ️ About", callback_data="/about"),
-                InlineKeyboardButton("⚙️ Admin", callback_data="/admin")
-            ]
+            ["💰 Price", "📊 Token Info"],
+            ["😂 Meme", "🧠 AI Analyze"],
+            ["🎁 Airdrop Check", "🚨 Airdrop Alert"],
+            ["🌐 Web3", "ℹ️ About", "⚙️ Admin"]
         ]
 
         text = (
-            f"👋 <b>Hey {user}!</b>\n\n"
+            f"👋 Hey <b>{user}</b>!\n\n"
             f"✨ Neural Core synced and online.\n"
             f"⚡ <b>WENBNB Neural Engine {ENGINE_VERSION}</b> — running in ProStable Mode.\n\n"
-            f"<i>All modules operational — choose your next move CrypTechKing™👑</i>\n\n"
+            f"<i>All modules operational — choose your next move!</i>\n\n"
             f"{BRAND_SIGNATURE}"
         )
 
         update.message.reply_text(
             text,
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Button Callback Handler (Executes Commands Silently) ===
+    # === Button Handler (Executes Backend Commands) ===
     def button_handler(update: Update, context: CallbackContext):
-        query = update.callback_query
-        cmd = query.data
-        query.answer()
+        label = update.message.text.strip()
+        button_map = context.user_data.get("button_map", {})
+        cmd = button_map.get(label)
 
-        # Simulate internal command execution
-        fake_update = Update(update.update_id, message=query.message)
-        fake_update.message.text = cmd
-        context.dispatcher.process_update(fake_update)
+        if cmd:
+            # Execute internal command as if typed manually
+            fake_update = Update(update.update_id, message=update.message)
+            fake_update.message.text = cmd
+            context.dispatcher.process_update(fake_update)
+        else:
+            update.message.reply_text("⚙️ Neural Interface didn’t recognize that option.")
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
         text = (
             f"🌐 <b>About WENBNB</b>\n\n"
-            f"Hybrid AI + Web3 Neural Assistant — blending emotion with machine precision.\n"
+            f"Hybrid AI + Web3 Neural Assistant — blending emotion with precision.\n"
             f"Currently running <b>WENBNB Neural Engine {ENGINE_VERSION}</b>.\n\n"
             f"💫 Always learning, always adapting.\n\n"
             f"{BRAND_SIGNATURE}"
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-    # === Handlers Registration ===
+    # === Register Handlers ===
     dp.add_handler(CommandHandler("start", start_cmd))
-    dp.add_handler(CallbackQueryHandler(button_handler))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
     dp.add_handler(CommandHandler("about", about_cmd))
 
+    # === AI + Admin Integration ===
     try:
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
         dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
@@ -225,14 +230,14 @@ def start_bot():
         updater.idle()
     except Exception as e:
         if "Conflict" in str(e):
-            logger.warning("⚠️ Conflict detected — killing ghost instance & restarting...")
+            logger.warning("⚠️ Conflict detected — restarting...")
             release_instance_lock()
             os._exit(1)
         else:
             failure_count += 1
             logger.error(f"❌ Polling crash ({failure_count}): {e}")
             if failure_count >= 3:
-                logger.error("💥 Too many failures → Full auto reboot triggered.")
+                logger.error("💥 Too many failures → Full reboot.")
                 release_instance_lock()
                 os._exit(1)
             else:
