@@ -1,22 +1,19 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.6.4-Diagnostic Build (AutoRecovery++)
-# Emotion Sync + AI Analyzer + Context Engine + Self-Healing Poll
-# Includes Admin Panel Integration (v8.6.5-ProStable)
+# 💫 WENBNB Neural Engine v8.7.5-ProStable++ (Emotion Sync Edition)
+# EmotionHuman+ MemoryContext++ + Admin Integration + Auto-Heal Core
 # ============================================================
 
 import os, sys, time, logging, threading, requests, random, traceback
 from flask import Flask, jsonify
 from telegram import Update, ParseMode, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import (
-    Updater, CommandHandler, MessageHandler, Filters, CallbackContext
-)
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.6.5-ProStable"
-CORE_VERSION = "v5.1"
+ENGINE_VERSION = "v8.7.5-ProStable++"
+CORE_VERSION = "v5.2"
 BRAND_SIGNATURE = os.getenv(
     "BRAND_SIGNATURE",
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
@@ -80,7 +77,7 @@ def register_all_plugins(dispatcher):
         logger.error(f"❌ PluginManager failed: {e}")
 
 # ===========================
-# 🧠 Core Plugin Imports (Manual Bind)
+# 🧠 Core Plugin Imports
 # ===========================
 try:
     from plugins import (
@@ -126,39 +123,80 @@ def start_bot():
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
-    # === Core Commands ===
+    # === /start Command — Emotion Sync Edition ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
+        loaded_plugins = []
+        try:
+            if hasattr(plugin_manager, "ACTIVE_PLUGINS"):
+                loaded_plugins = list(plugin_manager.ACTIVE_PLUGINS.keys())
+        except Exception:
+            loaded_plugins = []
+
+        # 🌟 Smart Button Builder
+        def btn(label, emoji, cmd):
+            return KeyboardButton(f"{cmd} {emoji}")
+
+        keyboard = []
+
+        # 💰 Market Info
+        if any(k in loaded_plugins for k in ["price", "tokeninfo"]):
+            keyboard.append([
+                btn("Price", "💰", "/price"),
+                btn("Token Info", "📊", "/tokeninfo")
+            ])
+
+        # 😜 Meme + AI
+        if any(k in loaded_plugins for k in ["meme", "aianalyze"]):
+            keyboard.append([
+                btn("Meme", "😜", "/meme"),
+                btn("AI Analyze", "🤖", "/aianalyze")
+            ])
+
+        # 🎁 Airdrop
+        if any(k in loaded_plugins for k in ["airdropcheck", "airdropalert"]):
+            keyboard.append([
+                btn("Airdrop Check", "🎁", "/airdropcheck"),
+                btn("Airdrop Alert", "🚨", "/airdropalert")
+            ])
+
+        # 🌐 Web3 / About / Admin (Always available)
+        keyboard.append([
+            btn("Web3", "🌐", "/web3"),
+            btn("About", "ℹ️", "/about"),
+            btn("Admin", "⚙️", "/admin")
+        ])
+
+        # ✨ Premium Feel Welcome Message
         text = (
-            f"👋 Hey {user}!\n\n"
-            f"Welcome to <b>WENBNB Neural Engine {ENGINE_VERSION}</b>\n\n"
+            f"👋 Hey <b>{user}</b>!\n\n"
+            f"✨ Neural Core synced and online.\n"
+            f"⚡ <b>WENBNB Neural Engine {ENGINE_VERSION}</b> — running in ProStable Mode.\n\n"
+            f"<i>Synced & ready — choose your next move CrypTechKing™👑</i>\n\n"
             f"{BRAND_SIGNATURE}"
         )
-        keyboard = [
-            [KeyboardButton("/price"), KeyboardButton("/tokeninfo")],
-            [KeyboardButton("/meme"), KeyboardButton("/aianalyze")],
-            [KeyboardButton("/airdropcheck"), KeyboardButton("/airdropalert")],
-            [KeyboardButton("/web3"), KeyboardButton("/about"), KeyboardButton("/admin")]
-        ]
+
         update.message.reply_text(
             text,
             parse_mode=ParseMode.HTML,
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
+    # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
-        update.message.reply_text(
+        text = (
             f"🌐 <b>About WENBNB</b>\n\n"
-            f"Hybrid AI + Web3 Neural Assistant.\n"
-            f"Now running <b>Neural Engine {ENGINE_VERSION}</b>.\n\n"
-            f"{BRAND_SIGNATURE}",
-            parse_mode=ParseMode.HTML
+            f"Hybrid AI + Web3 Neural Assistant — blending human emotion with machine precision.\n"
+            f"Currently running <b>WENBNB Neural Engine {ENGINE_VERSION}</b>.\n\n"
+            f"💫 Always learning, always adapting.\n\n"
+            f"{BRAND_SIGNATURE}"
         )
+        update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
+    # === Handlers Registration ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
 
-    # === Load Emotion + Analyzer + Admin ===
     try:
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
         dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
@@ -170,7 +208,6 @@ def start_bot():
         dp.add_handler(CommandHandler("reboot", lambda u, c: admin_tools.admin_reboot(u, c, {
             "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
         })))
-
         logger.info("💬 EmotionSync + AI Analyzer + Admin tools active")
     except Exception as e:
         logger.warning(f"⚠️ Analyzer/Admin module load failed: {e}")
@@ -190,7 +227,7 @@ def start_bot():
 
     threading.Thread(target=heartbeat, daemon=True).start()
 
-    # === Polling with Self-Heal ===
+    # === Polling with Auto-Heal ===
     try:
         logger.info("🚀 Starting Telegram polling (RenderSafe++)...")
         updater.start_polling(clean=True)
