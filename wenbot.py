@@ -123,56 +123,37 @@ def start_bot():
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
-    # === /start Command — Emotion Sync Edition ===
+    # === /start Command — ProStable Emotion UI ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
-        loaded_plugins = []
-        try:
-            if hasattr(plugin_manager, "ACTIVE_PLUGINS"):
-                loaded_plugins = list(plugin_manager.ACTIVE_PLUGINS.keys())
-        except Exception:
-            loaded_plugins = []
 
-        # 🌟 Smart Button Builder
-        def btn(label, emoji, cmd):
-            return KeyboardButton(f"{cmd} {emoji}")
+        # 💎 Clean visible labels + internal command mapping
+        button_map = {
+            "💰 Price": "/price",
+            "📊 Token Info": "/tokeninfo",
+            "😂 Meme Studio": "/meme",
+            "🧠 AI Analyze": "/aianalyze",
+            "🎁 Airdrop Check": "/airdropcheck",
+            "🚨 Airdrop Alert": "/airdropalert",
+            "🌐 Web3 Connect": "/web3",
+            "ℹ️ About WENBNB": "/about",
+            "⚙️ Admin Tools": "/admin",
+        }
 
-        keyboard = []
+        keyboard = [
+            [KeyboardButton("💰 Price"), KeyboardButton("📊 Token Info")],
+            [KeyboardButton("😂 Meme Studio"), KeyboardButton("🧠 AI Analyze")],
+            [KeyboardButton("🎁 Airdrop Check"), KeyboardButton("🚨 Airdrop Alert")],
+            [KeyboardButton("🌐 Web3 Connect"), KeyboardButton("ℹ️ About WENBNB"), KeyboardButton("⚙️ Admin Tools")]
+        ]
 
-        # 💰 Market Info
-        if any(k in loaded_plugins for k in ["price", "tokeninfo"]):
-            keyboard.append([
-                btn("Price", "💰", "/price"),
-                btn("Token Info", "📊", "/tokeninfo")
-            ])
+        context.user_data["button_map"] = button_map
 
-        # 😜 Meme + AI
-        if any(k in loaded_plugins for k in ["meme", "aianalyze"]):
-            keyboard.append([
-                btn("Meme", "😜", "/meme"),
-                btn("AI Analyze", "🤖", "/aianalyze")
-            ])
-
-        # 🎁 Airdrop
-        if any(k in loaded_plugins for k in ["airdropcheck", "airdropalert"]):
-            keyboard.append([
-                btn("Airdrop Check", "🎁", "/airdropcheck"),
-                btn("Airdrop Alert", "🚨", "/airdropalert")
-            ])
-
-        # 🌐 Web3 / About / Admin (Always available)
-        keyboard.append([
-            btn("Web3", "🌐", "/web3"),
-            btn("About", "ℹ️", "/about"),
-            btn("Admin", "⚙️", "/admin")
-        ])
-
-        # ✨ Premium Feel Welcome Message
         text = (
-            f"👋 Hey <b>{user}</b>!\n\n"
+            f"👋 <b>Hey {user}!</b>\n\n"
             f"✨ Neural Core synced and online.\n"
             f"⚡ <b>WENBNB Neural Engine {ENGINE_VERSION}</b> — running in ProStable Mode.\n\n"
-            f"<i>Synced & ready — choose your next move CrypTechKing™👑</i>\n\n"
+            f"<i>Emotion circuits ready. Choose your next move, CrypTechKing™👑</i>\n\n"
             f"{BRAND_SIGNATURE}"
         )
 
@@ -182,11 +163,20 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
+    # === Handle Button Presses (No visible slash) ===
+    def handle_button(update: Update, context: CallbackContext):
+        label = update.message.text.strip()
+        cmd = context.user_data.get("button_map", {}).get(label)
+        if cmd:
+            update.message.text = cmd
+            update.message.entities = []
+            context.dispatcher.process_update(update)
+
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
         text = (
             f"🌐 <b>About WENBNB</b>\n\n"
-            f"Hybrid AI + Web3 Neural Assistant — blending human emotion with machine precision.\n"
+            f"Hybrid AI + Web3 Neural Assistant — blending emotion with machine precision.\n"
             f"Currently running <b>WENBNB Neural Engine {ENGINE_VERSION}</b>.\n\n"
             f"💫 Always learning, always adapting.\n\n"
             f"{BRAND_SIGNATURE}"
@@ -196,6 +186,7 @@ def start_bot():
     # === Handlers Registration ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_button))
 
     try:
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
