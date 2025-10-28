@@ -1,16 +1,17 @@
 """
-WENBNB Plugin Manager v8.6.2-ProStable++ — Emotion Sync + Admin Fix Edition
+WENBNB Plugin Manager v8.7.5-ProStable++ — Emotion Context Reload Edition
 ──────────────────────────────────────────────────────────────────────────────
 Improvements:
-• Supports register_handlers(dp, config=None) with backward compatibility.
-• Ensures /aianalyze & ai_auto_reply load last (no circular conflict)
-• Logs skipped / failed plugins neatly with colored diagnostics.
-• AdminTools plugin now loads perfectly (no silent fail).
+• Ensures EmotionHuman+ MemoryContext++ auto-replies persist after reload.
+• Supports register_handlers(dp, config=None) (new) & legacy register().
+• Rechecks aianalyze + emotion_sync after every reload.
+• Logs failed / invalid plugins with clean colored output.
+• Emotion modules always load last for stability.
 """
 
 import importlib, os, sys, traceback, time
 from telegram import Update
-from telegram.ext import CommandHandler, CallbackContext
+from telegram.ext import CommandHandler, MessageHandler, CallbackContext, Filters
 
 PLUGIN_DIR = "plugins"
 ACTIVE_PLUGINS, FAILED_PLUGINS = {}, {}
@@ -18,7 +19,7 @@ ADMIN_IDS = [5698007588]
 BRAND_TAG = "💫 WENBNB Neural Engine — Modular Intelligence 24×7 ⚡"
 
 # === COLOR LOGGING ===
-def color_text(text, code): 
+def color_text(text, code):
     return f"\033[{code}m{text}\033[0m"
 
 def log(msg, status="INFO"):
@@ -29,11 +30,9 @@ def log(msg, status="INFO"):
 # === LOAD ALL PLUGINS ===
 def load_all_plugins(dispatcher):
     loaded, failed = [], []
-
     log("🧠 Neural Plugin Loader initialized...", "INFO")
-    files = [f for f in os.listdir(PLUGIN_DIR) if f.endswith(".py") and not f.startswith("__")]
 
-    # Emotion modules load last for safety
+    files = [f for f in os.listdir(PLUGIN_DIR) if f.endswith(".py") and not f.startswith("__")]
     emotion_priority = ["aianalyze", "ai_auto_reply", "emotion_sync"]
     files.sort(key=lambda x: (x[:-3] not in emotion_priority, x))
 
@@ -46,7 +45,7 @@ def load_all_plugins(dispatcher):
                 del sys.modules[module_path]
             module = importlib.import_module(module_path)
 
-            # ✅ Updated compatibility for config parameter
+            # Register handlers
             if hasattr(module, "register_handlers"):
                 try:
                     module.register_handlers(dispatcher, config=None)
@@ -73,6 +72,7 @@ def load_all_plugins(dispatcher):
 
     validate_plugin_integrity()
     recheck_emotion_plugins(dispatcher)
+    reattach_auto_reply(dispatcher)
     log(f"📦 Total Loaded: {len(loaded)} | ❌ Failed: {len(failed)}", "INFO")
 
     if failed:
@@ -80,10 +80,9 @@ def load_all_plugins(dispatcher):
 
     return loaded, failed
 
-# === RECHECK EMOTION MODULES ===
+# === EMOTION PLUGIN RECHECK ===
 def recheck_emotion_plugins(dispatcher):
-    """Ensures Emotion Sync + /aianalyze command registered"""
-    from telegram.ext import CommandHandler, MessageHandler, Filters
+    """Ensures Emotion Sync & aianalyze command remain attached"""
     handlers = [h for h in dispatcher.handlers.get(0, []) if isinstance(h, CommandHandler)]
     commands = [h.command for h in handlers]
 
@@ -91,17 +90,19 @@ def recheck_emotion_plugins(dispatcher):
         try:
             from plugins import aianalyze
             dispatcher.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
-            log("💫 Reattached /aianalyze command successfully.", "OK")
+            log("💫 /aianalyze reattached successfully.", "OK")
         except Exception as e:
             log(f"⚠️ Emotion analyzer reload failed: {e}", "WARN")
 
-    if "ai_auto_reply" not in ACTIVE_PLUGINS:
-        try:
-            from plugins import ai_auto_reply
-            dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
-            log("💬 Emotion auto-reply synced again.", "OK")
-        except Exception as e:
-            log(f"⚠️ Emotion reply reattach failed: {e}", "WARN")
+# === AUTO-REPLY FAILSAFE ===
+def reattach_auto_reply(dispatcher):
+    """Ensures EmotionHuman+ MemoryContext++ stays active after reload"""
+    try:
+        from plugins import ai_auto_reply
+        dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
+        log("💬 MemoryContext++ Auto-Reply reattached successfully.", "OK")
+    except Exception as e:
+        log(f"⚠️ Auto-reply reattach failed: {e}", "WARN")
 
 # === VALIDATION ===
 def validate_plugin_integrity():
@@ -142,4 +143,4 @@ def reload_plugins(update: Update, context: CallbackContext):
 def register_handlers(dp):
     dp.add_handler(CommandHandler("modules", modules_status))
     dp.add_handler(CommandHandler("reload", reload_plugins))
-    log("💫 PluginManager v8.6.2-ProStable++ initialized (Emotion+Admin Ready).", "OK")
+    log("💫 PluginManager v8.7.5-ProStable++ initialized (Emotion Context Ready).", "OK")
