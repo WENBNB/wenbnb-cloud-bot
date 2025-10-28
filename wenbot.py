@@ -123,37 +123,23 @@ def start_bot():
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
-    # === /start Command — ProStable Emotion UI ===
+    # === /start Command — Emotion Sync + Real Command Buttons ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
 
-        # 💎 Clean visible labels + internal command mapping
-        button_map = {
-            "💰 Price": "/price",
-            "📊 Token Info": "/tokeninfo",
-            "😂 Meme Studio": "/meme",
-            "🧠 AI Analyze": "/aianalyze",
-            "🎁 Airdrop Check": "/airdropcheck",
-            "🚨 Airdrop Alert": "/airdropalert",
-            "🌐 Web3 Connect": "/web3",
-            "ℹ️ About WENBNB": "/about",
-            "⚙️ Admin Tools": "/admin",
-        }
-
+        # Inline-style command buttons (emoji look, real command trigger)
         keyboard = [
-            [KeyboardButton("💰 Price"), KeyboardButton("📊 Token Info")],
-            [KeyboardButton("😂 Meme Studio"), KeyboardButton("🧠 AI Analyze")],
-            [KeyboardButton("🎁 Airdrop Check"), KeyboardButton("🚨 Airdrop Alert")],
-            [KeyboardButton("🌐 Web3 Connect"), KeyboardButton("ℹ️ About WENBNB"), KeyboardButton("⚙️ Admin Tools")]
+            [KeyboardButton("/price 💰"), KeyboardButton("/tokeninfo 📊")],
+            [KeyboardButton("/meme 😂"), KeyboardButton("/aianalyze 🧠")],
+            [KeyboardButton("/airdropcheck 🎁"), KeyboardButton("/airdropalert 🚨")],
+            [KeyboardButton("/web3 🌐"), KeyboardButton("/about ℹ️"), KeyboardButton("/admin ⚙️")]
         ]
-
-        context.user_data["button_map"] = button_map
 
         text = (
             f"👋 <b>Hey {user}!</b>\n\n"
             f"✨ Neural Core synced and online.\n"
             f"⚡ <b>WENBNB Neural Engine {ENGINE_VERSION}</b> — running in ProStable Mode.\n\n"
-            f"<i>Emotion circuits ready. Choose your next move, CrypTechKing™👑</i>\n\n"
+            f"<i>All modules operational — choose your next move CrypTechKing™👑</i>\n\n"
             f"{BRAND_SIGNATURE}"
         )
 
@@ -255,3 +241,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
