@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.7.9-PureSync (Final Inline Command Build)
-# Emotion Sync + Inline Smart Buttons + Memory Clean Integration
+# 💫 WENBNB Neural Engine v8.8.0-PureInlineFix (Keyboard Flush Build)
+# Emotion Sync + Inline Smart Buttons + Keyboard Memory Reset
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
 from flask import Flask, jsonify
-from telegram import Update, ParseMode, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import (
+    Update, ParseMode, InlineKeyboardMarkup, InlineKeyboardButton,
+    ReplyKeyboardRemove
+)
 from telegram.ext import (
     Updater, CommandHandler, CallbackQueryHandler, MessageHandler,
     Filters, CallbackContext
@@ -15,7 +18,7 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.7.9-PureSync"
+ENGINE_VERSION = "v8.8.0-PureInlineFix"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = os.getenv(
     "BRAND_SIGNATURE",
@@ -122,17 +125,18 @@ def start_bot():
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
 
-    # 💥 Clear all old handlers before fresh load
     dp.handlers.clear()
-    logger.info("🧹 Cleared previous handlers to prevent keyboard conflicts")
+    logger.info("🧹 Old handlers cleared to prevent keyboard conflicts")
 
-    logger.info("🔍 Loading plugins...")
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
-    # === /start Command — Inline Smart Buttons ===
+    # === /start Command — Inline Only + Keyboard Flush ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
+
+        # Flush any persistent ReplyKeyboard
+        update.message.reply_text("🧠 Syncing neural interface...", reply_markup=ReplyKeyboardRemove())
 
         keyboard = [
             [
@@ -168,7 +172,7 @@ def start_bot():
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    # === Inline Callback Handler — Silent Command Execution ===
+    # === Inline Callback Handler — Executes Command Silently ===
     def callback_handler(update: Update, context: CallbackContext):
         query = update.callback_query
         data = query.data
@@ -202,7 +206,6 @@ def start_bot():
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-    # === Register Handlers (Clean List) ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
     dp.add_handler(CallbackQueryHandler(callback_handler))
@@ -238,7 +241,6 @@ def start_bot():
 
     threading.Thread(target=heartbeat, daemon=True).start()
 
-    # === Polling with Auto-Heal ===
     try:
         logger.info("🚀 Starting Telegram polling (RenderSafe++)...")
         updater.start_polling(clean=True)
