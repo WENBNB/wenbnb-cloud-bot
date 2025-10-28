@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.8.2-ChatKeyboardProTrigger
-# Emotion Sync + Chat Keyboard + Real Dispatcher Trigger Fix
+# 💫 WENBNB Neural Engine v8.8.3-ChatKeyboardStable
+# Real Chat Keyboard • Fixed Button → Command trigger • Clean Start
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
 from flask import Flask, jsonify
-from telegram import (
-    Update, ParseMode, ReplyKeyboardMarkup, ReplyKeyboardRemove, Message
-)
+from telegram import Update, ParseMode, ReplyKeyboardMarkup, Message
 from telegram.ext import (
     Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 )
@@ -16,9 +14,12 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.8.2-ChatKeyboardProTrigger"
+ENGINE_VERSION = "v8.8.3-ChatKeyboardStable"
 CORE_VERSION = "v5.3"
-BRAND_SIGNATURE = "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
+BRAND_SIGNATURE = os.getenv(
+    "BRAND_SIGNATURE",
+    "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
+)
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s",
@@ -120,13 +121,14 @@ def start_bot():
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
 
+    # Clear handlers early to avoid stale keyboards/handlers collisions
     dp.handlers.clear()
     logger.info("🧹 Old handlers cleared to prevent keyboard conflicts")
 
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
-    # === Keyboard Layout
+    # --- Chat Keyboard layout (real keyboard buttons)
     keyboard = [
         ["💰 Price", "📊 Token Info"],
         ["😂 Meme", "🧠 AI Analyze"],
@@ -134,6 +136,7 @@ def start_bot():
         ["🌐 Web3", "ℹ️ About", "⚙️ Admin"]
     ]
 
+    # Map the visible label -> command name (without leading slash)
     button_map = {
         "💰 Price": "price",
         "📊 Token Info": "tokeninfo",
@@ -146,7 +149,7 @@ def start_bot():
         "⚙️ Admin": "admin"
     }
 
-    # === /start Command ===
+    # === /start Command (no extra loading message)
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
         text = (
@@ -162,33 +165,56 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Button Handler (Real Trigger Fix)
+    # === Button Handler — reliable (search across all handler groups and call handler)
     def button_handler(update: Update, context: CallbackContext):
-        label = update.message.text.strip()
-        cmd = button_map.get(label)
-        if not cmd:
+        label = (update.message.text or "").strip()
+        cmd_name = button_map.get(label)
+        if not cmd_name:
+            # ignore unknown labels (user may type text)
             return
 
         try:
-            logger.info(f"⚡ Chat button pressed: {label} → /{cmd}")
-            # Create fake command message
-            fake_message = Message(
-                message_id=update.message.message_id + 1,
-                date=update.message.date,
-                chat=update.effective_chat,
-                text=f"/{cmd}",
-                from_user=update.effective_user
-            )
-            fake_update = Update(update.update_id + 1, message=fake_message)
+            logger.info(f"⚡ Chat keyboard pressed: {label} → /{cmd_name}")
 
-            # ✅ This method guarantees real command execution
-            dp.process_update(fake_update)
+            # Find the CommandHandler for the command across all handler groups
+            found_handler = None
+            for group_key, handlers in getattr(dp, "handlers", {}).items():
+                for h in handlers:
+                    if isinstance(h, CommandHandler) and h.command:
+                        # CommandHandler.command may be list or tuple
+                        handler_cmd = h.command[0] if isinstance(h.command, (list, tuple)) else h.command
+                        if handler_cmd == cmd_name:
+                            found_handler = h
+                            break
+                if found_handler:
+                    break
+
+            if not found_handler:
+                # fallback: maybe plugin registered as function in plugin_manager; respond politely
+                logger.warning(f"No active handler for /{cmd_name}")
+                update.message.reply_text("🤖 That module isn't active right now.")
+                return
+
+            # Set update.message.text to the command (so handler code sees it if it inspects message.text)
+            original_text = update.message.text
+            update.message.text = f"/{cmd_name}"
+
+            # Call the handler callback directly - this runs the command handler logic
+            # Handler callback signature is usually (update, context)
+            try:
+                found_handler.callback(update, context)
+            finally:
+                # restore original text to avoid side-effects
+                update.message.text = original_text
 
         except Exception as e:
-            logger.error(f"❌ Error triggering command /{cmd}: {e}")
-            update.message.reply_text(f"⚠️ Error running /{cmd}: {e}")
+            logger.exception(f"❌ Error triggering /{cmd_name}: {e}")
+            try:
+                update.message.reply_text(f"⚠️ Error running /{cmd_name}: {e}")
+            except:
+                pass
 
-    # === /about Command ===
+    # === /about Command
     def about_cmd(update: Update, context: CallbackContext):
         text = (
             f"🌐 <b>About WENBNB</b>\n\n"
@@ -199,11 +225,12 @@ def start_bot():
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
+    # Register core handlers
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
 
-    # === AI + Admin Integration ===
+    # === AI + Admin Integration (plugin-provided handlers)
     try:
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
         dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
@@ -225,7 +252,8 @@ def start_bot():
         while True:
             time.sleep(30)
             try:
-                requests.get(f"{RENDER_APP_URL}/ping", timeout=5)
+                if RENDER_APP_URL:
+                    requests.get(f"{RENDER_APP_URL}/ping", timeout=5)
                 logger.info("💓 Poll heartbeat alive")
             except:
                 logger.warning("⚠️ Poll heartbeat missed — restarting poller.")
@@ -234,8 +262,9 @@ def start_bot():
 
     threading.Thread(target=heartbeat, daemon=True).start()
 
+    # === Start polling
     try:
-        logger.info("🚀 Starting Telegram polling (ChatKeyboardProTrigger)...")
+        logger.info("🚀 Starting Telegram polling (ChatKeyboardStable)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
