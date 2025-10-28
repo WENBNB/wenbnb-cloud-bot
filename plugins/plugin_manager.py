@@ -1,12 +1,12 @@
 """
-WENBNB Plugin Manager v8.7.5-ProStable++ — Emotion Context Reload Edition
+WENBNB Plugin Manager v8.7.6 — EmotionHandler+ Fix Edition
 ──────────────────────────────────────────────────────────────────────────────
-Improvements:
-• Ensures EmotionHuman+ MemoryContext++ auto-replies persist after reload.
-• Supports register_handlers(dp, config=None) (new) & legacy register().
-• Rechecks aianalyze + emotion_sync after every reload.
-• Logs failed / invalid plugins with clean colored output.
-• Emotion modules always load last for stability.
+Purpose:
+• Auto-checks EmotionHuman+ MemoryContext++ handler on reload.
+• Prevents duplicate ai_auto_reply bindings.
+• Supports both register_handlers(dp, config=None) and legacy register().
+• Prioritizes emotion modules to load last for stability.
+• Clean logging with colored output + live diagnostics.
 """
 
 import importlib, os, sys, traceback, time
@@ -73,8 +73,8 @@ def load_all_plugins(dispatcher):
     validate_plugin_integrity()
     recheck_emotion_plugins(dispatcher)
     reattach_auto_reply(dispatcher)
-    log(f"📦 Total Loaded: {len(loaded)} | ❌ Failed: {len(failed)}", "INFO")
 
+    log(f"📦 Total Loaded: {len(loaded)} | ❌ Failed: {len(failed)}", "INFO")
     if failed:
         log(f"⚠️ Failed: {', '.join([x[0] for x in failed])}", "WARN")
 
@@ -94,13 +94,24 @@ def recheck_emotion_plugins(dispatcher):
         except Exception as e:
             log(f"⚠️ Emotion analyzer reload failed: {e}", "WARN")
 
-# === AUTO-REPLY FAILSAFE ===
+# === AUTO-REPLY FAILSAFE (Smart Check) ===
 def reattach_auto_reply(dispatcher):
-    """Ensures EmotionHuman+ MemoryContext++ stays active after reload"""
+    """Ensures EmotionHuman+ MemoryContext++ stays active after reload (no duplicates)."""
     try:
+        from telegram.ext import MessageHandler, Filters
         from plugins import ai_auto_reply
+
+        # Check if already attached
+        existing = [str(h.callback) for h in dispatcher.handlers.get(0, [])]
+        if "ai_auto_reply.ai_auto_chat" in str(existing):
+            log("💬 Auto-Reply already active (skipping duplicate bind).", "INFO")
+            return
+
+        # Attach again safely
         dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
-        log("💬 MemoryContext++ Auto-Reply reattached successfully.", "OK")
+        ACTIVE_PLUGINS["ai_auto_reply"] = "✅ Auto-Reply Reattached (Post-MemorySync)"
+        log("💬 EmotionHuman+ Auto-Reply linked successfully after reload.", "OK")
+
     except Exception as e:
         log(f"⚠️ Auto-reply reattach failed: {e}", "WARN")
 
@@ -143,4 +154,4 @@ def reload_plugins(update: Update, context: CallbackContext):
 def register_handlers(dp):
     dp.add_handler(CommandHandler("modules", modules_status))
     dp.add_handler(CommandHandler("reload", reload_plugins))
-    log("💫 PluginManager v8.7.5-ProStable++ initialized (Emotion Context Ready).", "OK")
+    log("💫 PluginManager v8.7.6 EmotionHandler+ Fix Edition initialized.", "OK")
