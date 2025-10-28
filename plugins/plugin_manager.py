@@ -1,12 +1,10 @@
 """
-WENBNB Plugin Manager v8.7.7 — EmotionHandler++ MemoryContext Fix Edition
+WENBNB Plugin Manager v8.7.8 — Self-Healing EmotionContext Edition
 ──────────────────────────────────────────────────────────────────────────────
-Purpose:
-• Fully fixes ai_auto_reply silence after reload (self-healing dispatcher hook)
-• Prevents duplicate handlers and circular re-registration
-• Ensures Emotion Sync + MemoryContext++ load order consistency
-• Clean console logs with colored diagnostics
-• 100% compatible with v8.0.5 – v8.7.5 Neural Engine builds
+• Keeps ai_auto_reply active even after reload.
+• Rechecks aianalyze + emotion_sync modules automatically.
+• Adds final failsafe rebind layer to dispatcher root.
+• Works with both register() and register_handlers().
 """
 
 import importlib, os, sys, time
@@ -27,9 +25,9 @@ def log(msg, status="INFO"):
     colors = {"OK": "92", "WARN": "93", "FAIL": "91", "INFO": "96"}
     print(color_text(f"[{ts}] {msg}", colors.get(status, "0")))
 
-# === AUTO REPAIR HOOK FOR ai_auto_reply ===
+# === AUTO REPAIR HOOK ===
 def ensure_auto_reply(dispatcher):
-    """Checks and restores ai_auto_reply handler if missing (post-load safety net)."""
+    """Checks and restores ai_auto_reply handler if missing."""
     try:
         from telegram.ext import MessageHandler, Filters
         from plugins import ai_auto_reply
@@ -38,10 +36,9 @@ def ensure_auto_reply(dispatcher):
         if "ai_auto_reply.ai_auto_chat" not in str(existing):
             dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
             ACTIVE_PLUGINS["ai_auto_reply"] = "✅ Restored via ensure_auto_reply()"
-            log("💬 Auto-Reply handler restored (final check).", "OK")
+            log("💬 Auto-Reply handler restored (ensure_auto_reply).", "OK")
         else:
-            log("💬 Auto-Reply handler verified active (no restore needed).", "INFO")
-
+            log("💬 Auto-Reply handler verified active.", "INFO")
     except Exception as e:
         log(f"⚠️ ensure_auto_reply() failed: {e}", "WARN")
 
@@ -63,7 +60,6 @@ def load_all_plugins(dispatcher):
                 del sys.modules[module_path]
             module = importlib.import_module(module_path)
 
-            # Register handlers
             if hasattr(module, "register_handlers"):
                 try:
                     module.register_handlers(dispatcher, config=None)
@@ -91,7 +87,7 @@ def load_all_plugins(dispatcher):
     validate_plugin_integrity()
     recheck_emotion_plugins(dispatcher)
     reattach_auto_reply(dispatcher)
-    ensure_auto_reply(dispatcher)   # 🔧 new self-heal layer
+    ensure_auto_reply(dispatcher)
 
     log(f"📦 Total Loaded: {len(loaded)} | ❌ Failed: {len(failed)}", "INFO")
     if failed:
@@ -99,9 +95,9 @@ def load_all_plugins(dispatcher):
 
     return loaded, failed
 
-# === EMOTION PLUGIN RECHECK ===
+# === EMOTION MODULE RECHECK ===
 def recheck_emotion_plugins(dispatcher):
-    """Ensures Emotion Sync & aianalyze command remain attached"""
+    """Ensures Emotion Sync & aianalyze command remain attached."""
     handlers = [h for h in dispatcher.handlers.get(0, []) if isinstance(h, CommandHandler)]
     commands = [h.command for h in handlers]
 
@@ -113,24 +109,23 @@ def recheck_emotion_plugins(dispatcher):
         except Exception as e:
             log(f"⚠️ Emotion analyzer reload failed: {e}", "WARN")
 
-# === AUTO-REPLY FAILSAFE (Smart Check) ===
+# === AUTO-REPLY FAILSAFE ===
 def reattach_auto_reply(dispatcher):
-    """Ensures EmotionHuman+ MemoryContext++ stays active after reload (no duplicates)."""
+    """Ensures ai_auto_reply stays active after reload."""
     try:
         from telegram.ext import MessageHandler, Filters
         from plugins import ai_auto_reply
 
         existing = [str(h.callback) for h in dispatcher.handlers.get(0, [])]
         if "ai_auto_reply.ai_auto_chat" in str(existing):
-            log("💬 Auto-Reply already active (skipping duplicate bind).", "INFO")
+            log("💬 Auto-Reply already active (skipping duplicate).", "INFO")
             return
 
         dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
-        ACTIVE_PLUGINS["ai_auto_reply"] = "✅ Auto-Reply Reattached (Post-MemorySync)"
-        log("💬 EmotionHuman+ Auto-Reply linked successfully after reload.", "OK")
-
+        ACTIVE_PLUGINS["ai_auto_reply"] = "✅ Auto-Reply Reattached"
+        log("💬 Auto-Reply linked successfully.", "OK")
     except Exception as e:
-        log(f"⚠️ Auto-reply reattach failed: {e}", "WARN")
+        log(f"⚠️ Auto-Reply reattach failed: {e}", "WARN")
 
 # === VALIDATION ===
 def validate_plugin_integrity():
@@ -146,7 +141,6 @@ def validate_plugin_integrity():
 def modules_status(update: Update, context: CallbackContext):
     if update.effective_user.id not in ADMIN_IDS:
         return update.message.reply_text("🚫 Only admin can check module status.")
-
     text = "🧩 <b>WENBNB Plugin Status — Neural Edition</b>\n\n"
     for name, status in ACTIVE_PLUGINS.items():
         text += f"• <b>{name}</b>: {status}\n"
@@ -164,6 +158,15 @@ def reload_plugins(update: Update, context: CallbackContext):
     update.message.reply_text("🔄 Reloading all plugins...", parse_mode="HTML")
 
     loaded, failed = load_all_plugins(dp)
+
+    # === Final Failsafe: Ensure Text Listener Active ===
+    try:
+        from plugins import ai_auto_reply
+        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
+        log("💬 Final Failsafe: ai_auto_reply handler reattached after reload.", "OK")
+    except Exception as e:
+        log(f"⚠️ Failsafe handler attach failed: {e}", "WARN")
+
     summary = f"✅ Loaded: {len(loaded)} | ❌ Failed: {len(failed)}\n\n{BRAND_TAG}"
     update.message.reply_text(summary, parse_mode="HTML")
 
@@ -171,4 +174,4 @@ def reload_plugins(update: Update, context: CallbackContext):
 def register_handlers(dp):
     dp.add_handler(CommandHandler("modules", modules_status))
     dp.add_handler(CommandHandler("reload", reload_plugins))
-    log("💫 PluginManager v8.7.7 EmotionHandler++ Fix Edition initialized.", "OK")
+    log("💫 PluginManager v8.7.8 Self-Healing Edition initialized.", "OK")
