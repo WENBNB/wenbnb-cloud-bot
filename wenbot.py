@@ -164,7 +164,7 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Chat Button Handler — Real /command Trigger (UltraStable) ===
+    # === Chat Button Handler — v13 UltraStable Trigger ===
     def button_handler(update: Update, context: CallbackContext):
         try:
             if not update.message or not update.message.text:
@@ -173,31 +173,32 @@ def start_bot():
             label = update.message.text.strip()
             cmd_name = button_map.get(label)
             if not cmd_name:
-                return  # let ai_auto_reply handle unknown text
+                return  # let AI auto-reply handle unknown text
 
             logger.info(f"⚡ Chat Button Pressed → /{cmd_name}")
 
-            # Create a new fake message object instead of reusing update.message
-            fake_message = type(update.message)(
-                message_id=update.message.message_id + 9999,
+            # --- build a synthetic /command message ---
+            from telegram import Message, Chat
+            fake_message = Message(
+                message_id=update.message.message_id + 9000,
                 date=update.message.date,
                 chat=update.message.chat,
+                from_user=update.message.from_user,
                 text=f"/{cmd_name}",
-                from_user=update.message.from_user
+                bot=context.bot
             )
 
-            # Wrap it inside a new Update
-            fake_update = Update(update.update_id + 9999, message=fake_message)
+            fake_update = Update(update.update_id + 9000, message=fake_message)
 
-            # Pass it to the dispatcher so it hits the normal command flow
+            # --- feed it into the dispatcher just like a real /command ---
             context.dispatcher.process_update(fake_update)
-            logger.info(f"✅ Command triggered → /{cmd_name}")
+            logger.info(f"✅ Triggered → /{cmd_name}")
 
         except Exception as e:
             logger.error(f"❌ Error executing /{cmd_name}: {e}")
             traceback.print_exc()
             try:
-                update.message.reply_text("⚠️ Neural signal failed to execute.")
+                update.message.reply_text("⚠️ Neural misfire while executing command.")
             except Exception:
                 pass
 
@@ -272,5 +273,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
