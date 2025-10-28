@@ -6,8 +6,8 @@
 
 import os, sys, time, logging, threading, requests, random, traceback
 from flask import Flask, jsonify
-from telegram import Update, ParseMode, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram import Update, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
 
 # ===========================
 # ⚙️ Engine & Branding
@@ -123,16 +123,28 @@ def start_bot():
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
-    # === /start Command — Emotion Sync + Real Command Buttons ===
+    # === /start Command — Inline Fancy Command Buttons ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
 
-        # Inline-style command buttons (emoji look, real command trigger)
         keyboard = [
-            [KeyboardButton("/price 💰"), KeyboardButton("/tokeninfo 📊")],
-            [KeyboardButton("/meme 😂"), KeyboardButton("/aianalyze 🧠")],
-            [KeyboardButton("/airdropcheck 🎁"), KeyboardButton("/airdropalert 🚨")],
-            [KeyboardButton("/web3 🌐"), KeyboardButton("/about ℹ️"), KeyboardButton("/admin ⚙️")]
+            [
+                InlineKeyboardButton("💰 Price", callback_data="/price"),
+                InlineKeyboardButton("📊 Token Info", callback_data="/tokeninfo")
+            ],
+            [
+                InlineKeyboardButton("😂 Meme", callback_data="/meme"),
+                InlineKeyboardButton("🧠 AI Analyze", callback_data="/aianalyze")
+            ],
+            [
+                InlineKeyboardButton("🎁 Airdrop Check", callback_data="/airdropcheck"),
+                InlineKeyboardButton("🚨 Airdrop Alert", callback_data="/airdropalert")
+            ],
+            [
+                InlineKeyboardButton("🌐 Web3", callback_data="/web3"),
+                InlineKeyboardButton("ℹ️ About", callback_data="/about"),
+                InlineKeyboardButton("⚙️ Admin", callback_data="/admin")
+            ]
         ]
 
         text = (
@@ -146,17 +158,19 @@ def start_bot():
         update.message.reply_text(
             text,
             parse_mode=ParseMode.HTML,
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    # === Handle Button Presses (No visible slash) ===
-    def handle_button(update: Update, context: CallbackContext):
-        label = update.message.text.strip()
-        cmd = context.user_data.get("button_map", {}).get(label)
-        if cmd:
-            update.message.text = cmd
-            update.message.entities = []
-            context.dispatcher.process_update(update)
+    # === Button Callback Handler (Executes Commands Silently) ===
+    def button_handler(update: Update, context: CallbackContext):
+        query = update.callback_query
+        cmd = query.data
+        query.answer()
+
+        # Simulate internal command execution
+        fake_update = Update(update.update_id, message=query.message)
+        fake_update.message.text = cmd
+        context.dispatcher.process_update(fake_update)
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -171,8 +185,8 @@ def start_bot():
 
     # === Handlers Registration ===
     dp.add_handler(CommandHandler("start", start_cmd))
+    dp.add_handler(CallbackQueryHandler(button_handler))
     dp.add_handler(CommandHandler("about", about_cmd))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_button))
 
     try:
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
@@ -241,4 +255,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
