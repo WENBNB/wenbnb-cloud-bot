@@ -1,16 +1,15 @@
-# plugins/ai_auto_reply.py
 """
-AI Auto-Reply — EmotionHuman+ Harmonizer Build (v8.6.9-ProStable++)
+AI Auto-Reply — EmotionHuman v8.7.5-ProStable++ (MemoryContext++ Build)
 ───────────────────────────────────────────────────────────────────────────────
-• Smart Greeting Harmonizer (no duplicate names or robotic tone)
-• Context-adaptive greetings: playful, reflective, chill
-• Emotion-synced emoji, no spam
-• Hinglish + English hybrid detection
-• Memory continuity via user_memory.json
-• Render/OpenAI safe
+• Combines EmotionHuman+ Personal Touch + MemoryContext++ engine
+• Remembers username usage (prevents over-greeting)
+• Tracks conversational topics + recalls last 3–5 chat contexts
+• Adaptive Hinglish/English tone (auto-detect)
+• Emotion memory continuity (uses user_memory.json)
+• Fully Render-safe + OpenAI proxy compatible
 """
 
-import os, json, random, requests, traceback
+import os, json, random, requests, traceback, re
 from datetime import datetime
 from telegram import Update, ParseMode
 from telegram.ext import CallbackContext
@@ -45,23 +44,44 @@ def last_user_mood(uid):
     mood = last.get("mood", "Balanced")
     return mood, MOOD_ICON.get(mood, "🙂")
 
-def contains_devanagari(t):  # Hindi check
+def contains_devanagari(t):
     return any("\u0900" <= ch <= "\u097F" for ch in t)
 
+# ------------------- Topic Detector -------------------
+def detect_topic(text: str):
+    topics = {
+        "market": ["bnb", "btc", "crypto", "token", "coin", "chart", "pump", "dump"],
+        "airdrop": ["airdrop", "claim", "reward", "points", "task"],
+        "life": ["sleep", "love", "work", "tired", "busy", "time"],
+        "fun": ["meme", "joke", "haha", "funny", "lol"],
+        "web3": ["wallet", "connect", "metamask", "gas", "contract"]
+    }
+    text = text.lower()
+    for k, vals in topics.items():
+        if any(v in text for v in vals):
+            return k
+    return "general"
+
 # ------------------- System Prompt -------------------
-def build_prompt(user_name, mood, hinglish):
-    p = ("You are WENBNB AI — a warm, witty, emotionally-aware companion. "
-         "Keep replies short (1-4 sentences), human-like, and slightly playful. ")
+def build_prompt(user_name, mood, hinglish, memory_context):
+    p = (
+        "You are WENBNB AI — a warm, human-like, emotionally aware companion. "
+        "Keep replies natural, short (1–4 sentences), and slightly playful. "
+        "Remember past chat context to sound continuous, not robotic. "
+    )
     if hinglish:
-        p += "If user writes in Hindi or Hinglish, reply naturally in Hinglish (Hindi + English mix). "
-    p += (f"User name: {user_name}. Mood: {mood}. "
-          "Avoid repeating greetings or usernames twice. "
-          "Use at most one emoji inline, no emoji at start unless natural.")
+        p += "If the user writes in Hindi or Hinglish, reply casually in Hinglish (Hindi + English mix). "
+    if memory_context:
+        p += f"Recently, you and {user_name} talked about {', '.join(memory_context)}. Try to stay consistent with that vibe. "
+    p += (
+        f"User name: {user_name}. Current mood: {mood}. "
+        "Use 1 emoji inline only if it feels natural, not forced."
+    )
     return p
 
-# ------------------- OpenAI Call -------------------
-def call_ai(prompt, user_name, mood, hinglish):
-    sys = build_prompt(user_name, mood, hinglish)
+# ------------------- OpenAI / Proxy Call -------------------
+def call_ai(prompt, user_name, mood, hinglish, memory_context):
+    sys = build_prompt(user_name, mood, hinglish, memory_context)
     body = {
         "model": "gpt-4o-mini",
         "messages": [
@@ -87,29 +107,39 @@ def footer(mood):
     if mood == "Reflective": return "<b>✨ WENBNB Neural Engine</b> — Calm & Thoughtful"
     return "<b>🚀 WENBNB Neural Engine</b> — Emotional Intelligence 24×7"
 
-# ------------------- Greeting Harmonizer -------------------
-def smart_greeting(name, hinglish, mood):
+# ------------------- Greeting System -------------------
+def smart_greeting(user_id, name, hinglish, mood, mem):
+    """Greets naturally but avoids repeating name every time."""
+    user_data = mem.get(str(user_id), {})
+    last_used_name = user_data.get("last_name_used", False)
+
     vibe = "chill"
     if mood in ["Positive", "Excited"]: vibe = "playful"
     elif mood in ["Reflective", "Sad"]: vibe = "gentle"
 
-    if random.random() < 0.4:  # 40 % messages greet
+    greet = ""
+    if not last_used_name and random.random() < 0.8:
         if hinglish:
             opts = {
                 "playful": [f"Are {name} 😄,", f"{name} yaar,", f"Sun na {name},"],
-                "gentle":  [f"{name} bhai,", f"{name},", f"Arey {name},"],
-                "chill":   [f"Bas vibe dekh {name},", f"{name},", f"Yo {name},"]
+                "gentle": [f"{name} bhai,", f"Arey {name},", f"{name},"],
+                "chill": [f"Bas vibe dekh {name},", f"{name},", f"Yo {name},"]
             }
         else:
             opts = {
                 "playful": [f"Hey {name} 👋,", f"Yo {name},", f"{name}, good to see you!"],
-                "gentle":  [f"Hey {name},", f"{name},", f"Hello {name},"],
-                "chill":   [f"Yo {name},", f"Sup {name},", f"{name},"]
+                "gentle": [f"Hey {name},", f"{name},", f"Hello {name},"],
+                "chill": [f"Yo {name},", f"Sup {name},", f"{name},"]
             }
-        return random.choice(opts[vibe]) + " "
-    return ""
+        greet = random.choice(opts[vibe]) + " "
+        user_data["last_name_used"] = True
+    else:
+        user_data["last_name_used"] = False
 
-# ------------------- Main -------------------
+    mem[str(user_id)] = user_data
+    return greet, mem
+
+# ------------------- Main Chat Logic -------------------
 def ai_auto_chat(update: Update, context: CallbackContext):
     msg = update.message
     if not msg or not msg.text or msg.text.startswith("/"): return
@@ -121,29 +151,33 @@ def ai_auto_chat(update: Update, context: CallbackContext):
 
     mood, icon = last_user_mood(user.id)
     hinglish = contains_devanagari(text) or any(w in text.lower() for w in ["bhai","yaar","kya","acha","nahi","haan","bolo"])
+    topic = detect_topic(text)
 
-    reply = call_ai(text, name, mood, hinglish)
+    mem = load_memory()
+    uid = str(user.id)
+    context_list = [e.get("topic") for e in mem.get(uid, {}).get("entries", []) if e.get("topic")]
+    recent_topics = list(dict.fromkeys(context_list[-4:]))  # last 4 unique topics
+
+    reply = call_ai(text, name, mood, hinglish, recent_topics)
     if not reply:
         reply = random.choice([
-            "Hmm, thoda glitch hua lagta hai — but I caught the vibe:",
-            "Signal blinked 😅 but here’s what I feel:",
-            "AI thoda confuse hua — still, intuition bolta hai:"
+            "Lagta hai thoda AI glitch hua 😅 but I caught your vibe:",
+            "Signal blinked 🤖 but emotion sync still on point:",
+            "Hmm... thoda static aaya neural link me — still feeling this:"
         ]) + "\n\n" + random.choice([
-            "Trust your instinct.", "Patience always pays.", "Keep your vibe strong."
+            "Patience always pays.", "Energy high rakh baby 🔥", "Keep the vibe steady 💫"
         ])
 
-    greet = smart_greeting(name, hinglish, mood)
+    greet, mem = smart_greeting(user.id, name, hinglish, mood, mem)
     final = f"{icon} {greet}{reply.strip().capitalize()}\n\n{footer(mood)}"
 
-    # --- memory ---
-    try:
-        mem = load_memory()
-        uid = str(user.id)
-        mem.setdefault(uid, {"entries": []})
-        mem[uid]["entries"].append({"text": text, "reply": reply, "mood": mood, "time": datetime.now().isoformat()})
-        mem[uid]["entries"] = mem[uid]["entries"][-12:]
-        save_memory(mem)
-    except Exception as e: print("[Memory]", e)
+    # --- Memory Save ---
+    mem.setdefault(uid, {"entries": []})
+    mem[uid]["entries"].append({
+        "text": text, "reply": reply, "mood": mood, "topic": topic, "time": datetime.now().isoformat()
+    })
+    mem[uid]["entries"] = mem[uid]["entries"][-15:]
+    save_memory(mem)
 
     try: msg.reply_text(final, parse_mode=ParseMode.HTML)
     except: msg.reply_text(final)
@@ -152,4 +186,4 @@ def ai_auto_chat(update: Update, context: CallbackContext):
 def register_handlers(dp):
     from telegram.ext import MessageHandler, Filters
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_chat))
-    print("✅ Loaded plugin: ai_auto_reply.py v8.6.9-ProStable++ (EmotionHuman+ Harmonizer Build)")
+    print("✅ Loaded plugin: ai_auto_reply.py v8.7.5-ProStable++ (MemoryContext++ Build)")
