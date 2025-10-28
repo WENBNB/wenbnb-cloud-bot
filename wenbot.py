@@ -164,7 +164,7 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Chat Button Handler — Runs Real Commands ===
+    # === Chat Button Handler — Triggers Commands Reliably ===
     def button_handler(update: Update, context: CallbackContext):
         try:
             if not update.message or not update.message.text:
@@ -173,27 +173,26 @@ def start_bot():
             label = update.message.text.strip()
             cmd_name = button_map.get(label)
             if not cmd_name:
-                return  # Let ai_auto_reply handle non-command messages
+                return  # Let ai_auto_reply handle unknown text
 
             logger.info(f"⚡ Chat Button Pressed → /{cmd_name}")
 
-            # Execute registered command handler if found
-            found = False
-            for group in list(dp.handlers.values()):
-                for handler in group:
-                    if isinstance(handler, CommandHandler):
-                        commands = handler.command if isinstance(handler.command, (list, tuple)) else [handler.command]
-                        if cmd_name in commands:
-                            logger.info(f"🧠 Triggering handler for /{cmd_name}")
-                            handler.callback(update, context)
-                            found = True
-                            return
-            if not found:
-                update.message.reply_text(f"🤖 Command /{cmd_name} not available right now.")
+            # Create a fake message update (simulate user typing /command)
+            fake_message = update.message
+            fake_message.text = f"/{cmd_name}"
+            fake_update = Update(update.update_id, message=fake_message)
+
+            # Process it through dispatcher (so original handlers trigger normally)
+            context.dispatcher.process_update(fake_update)
+            logger.info(f"🧠 Command injected → /{cmd_name}")
+
         except Exception as e:
-            logger.error(f"❌ Error running command: {e}")
+            logger.error(f"❌ Error running button command {cmd_name}: {e}")
             traceback.print_exc()
-            update.message.reply_text("⚠️ Internal error executing command.")
+            try:
+                update.message.reply_text("⚠️ Neural glitch while running that command.")
+            except Exception:
+                pass
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -266,3 +265,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
