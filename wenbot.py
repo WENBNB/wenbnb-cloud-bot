@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.7.7-ProReactive (Final Stable)
-# Emotion Sync + Inline Smart Buttons + Silent Command Execution
+# 💫 WENBNB Neural Engine v8.7.8-UltraReactive (InlineFix Final)
+# Emotion Sync + Inline Smart Buttons + Silent Command Trigger
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
 from flask import Flask, jsonify
 from telegram import Update, ParseMode, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
-    Updater, CommandHandler, MessageHandler,
-    CallbackQueryHandler, Filters, CallbackContext
+    Updater, CommandHandler, CallbackQueryHandler,
+    MessageHandler, Filters, CallbackContext
 )
 
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.7.7-ProReactive"
+ENGINE_VERSION = "v8.7.8-UltraReactive"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = os.getenv(
     "BRAND_SIGNATURE",
@@ -126,7 +126,7 @@ def start_bot():
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
-    # === /start Command — Emotion Sync + Inline Smart Buttons ===
+    # === /start Command — Inline Smart Command Buttons ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
 
@@ -178,6 +178,7 @@ def start_bot():
             )
 
             if handler:
+                logger.info(f"Executing inline command → /{data}")
                 fake_update = Update(update.update_id, message=query.message)
                 fake_update.message.text = f"/{data}"
                 handler.callback(fake_update, context)
