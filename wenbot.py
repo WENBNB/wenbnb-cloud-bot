@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.7.6-FixStable (Emotion Sync Patch)
-# EmotionHuman+ MemoryContext++ + Smart Keyboard Integration
+# 💫 WENBNB Neural Engine v8.7.7-ProReactive (Final Stable)
+# Emotion Sync + Inline Smart Buttons + Silent Command Execution
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
 from flask import Flask, jsonify
-from telegram import Update, ParseMode, ReplyKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram import Update, ParseMode, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import (
+    Updater, CommandHandler, MessageHandler,
+    CallbackQueryHandler, Filters, CallbackContext
+)
 
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.7.6-FixStable"
-CORE_VERSION = "v5.2"
+ENGINE_VERSION = "v8.7.7-ProReactive"
+CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = os.getenv(
     "BRAND_SIGNATURE",
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
@@ -123,29 +126,28 @@ def start_bot():
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
-    # === /start Command — Emotion Sync + Real Command Trigger ===
+    # === /start Command — Emotion Sync + Inline Smart Buttons ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
 
-        # Map buttons to commands
-        button_map = {
-            "💰 Price": "price",
-            "📊 Token Info": "tokeninfo",
-            "😂 Meme": "meme",
-            "🧠 AI Analyze": "aianalyze",
-            "🎁 Airdrop Check": "airdropcheck",
-            "🚨 Airdrop Alert": "airdropalert",
-            "🌐 Web3": "web3",
-            "ℹ️ About": "about",
-            "⚙️ Admin": "admin"
-        }
-        context.user_data["button_map"] = button_map
-
         keyboard = [
-            ["💰 Price", "📊 Token Info"],
-            ["😂 Meme", "🧠 AI Analyze"],
-            ["🎁 Airdrop Check", "🚨 Airdrop Alert"],
-            ["🌐 Web3", "ℹ️ About", "⚙️ Admin"]
+            [
+                InlineKeyboardButton("💰 Price", callback_data="price"),
+                InlineKeyboardButton("📊 Token Info", callback_data="tokeninfo")
+            ],
+            [
+                InlineKeyboardButton("😂 Meme", callback_data="meme"),
+                InlineKeyboardButton("🧠 AI Analyze", callback_data="aianalyze")
+            ],
+            [
+                InlineKeyboardButton("🎁 Airdrop Check", callback_data="airdropcheck"),
+                InlineKeyboardButton("🚨 Airdrop Alert", callback_data="airdropalert")
+            ],
+            [
+                InlineKeyboardButton("🌐 Web3", callback_data="web3"),
+                InlineKeyboardButton("ℹ️ About", callback_data="about"),
+                InlineKeyboardButton("⚙️ Admin", callback_data="admin")
+            ]
         ]
 
         text = (
@@ -159,36 +161,30 @@ def start_bot():
         update.message.reply_text(
             text,
             parse_mode=ParseMode.HTML,
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    # === Button Handler — Executes Real Commands ===
-    def button_handler(update: Update, context: CallbackContext):
-        label = update.message.text.strip()
-        button_map = context.user_data.get("button_map", {})
-        cmd_name = button_map.get(label)
-
-        if not cmd_name:
-            update.message.reply_text("⚙️ Neural Interface didn’t recognize that option.")
-            return
+    # === Inline Callback Handler (Silent Command Execution) ===
+    def callback_handler(update: Update, context: CallbackContext):
+        query = update.callback_query
+        data = query.data
+        query.answer("⚡ Neural signal sent...")
 
         try:
-            # ⚡ EmotionPulse animation
-            pulse = update.message.reply_text("⚡ Neural signal sent... Processing 🔄")
-            time.sleep(1.2)
-            context.bot.delete_message(chat_id=update.message.chat_id, message_id=pulse.message_id)
-
-            # ✅ Run the matched command handler manually
-            handler = next((h for h in context.dispatcher.handlers[0]
-                            if isinstance(h, CommandHandler) and h.command[0] == cmd_name), None)
+            handler = next(
+                (h for h in context.dispatcher.handlers[0]
+                 if isinstance(h, CommandHandler) and h.command[0] == data),
+                None
+            )
 
             if handler:
-                logger.info(f"Executing command via button → /{cmd_name}")
-                handler.callback(update, context)
+                fake_update = Update(update.update_id, message=query.message)
+                fake_update.message.text = f"/{data}"
+                handler.callback(fake_update, context)
             else:
-                update.message.reply_text("🤖 That module isn’t active right now.")
+                query.message.reply_text("🤖 That neural module isn’t active right now.")
         except Exception as e:
-            update.message.reply_text(f"⚠️ Error running /{cmd_name}: {e}")
+            query.message.reply_text(f"⚠️ Error running /{data}: {e}")
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -203,8 +199,8 @@ def start_bot():
 
     # === Register Handlers ===
     dp.add_handler(CommandHandler("start", start_cmd))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
     dp.add_handler(CommandHandler("about", about_cmd))
+    dp.add_handler(CallbackQueryHandler(callback_handler))
 
     # === AI + Admin Integration ===
     try:
@@ -274,4 +270,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
