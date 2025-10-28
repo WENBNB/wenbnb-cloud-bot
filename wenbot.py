@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.8.3-PureConsole
-# Real Command Keyboard • Emotion Sync • Clean Start
+# 💫 WENBNB Neural Engine v8.8.4-ProConsoleStable++
+# Real Command Keyboard • Emotion Sync • Plugin Safe Execution
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
@@ -12,7 +12,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.8.3-PureConsole"
+ENGINE_VERSION = "v8.8.4-ProConsoleStable++"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
 
@@ -66,7 +66,7 @@ def start_bot():
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
 
-    # --- Plugin Imports
+    # --- Core Plugin Imports
     from plugins import (
         aianalyze,
         ai_auto_reply,
@@ -74,6 +74,7 @@ def start_bot():
         plugin_manager
     )
 
+    # --- Load Plugins
     try:
         plugin_manager.load_all_plugins(dp)
         logger.info("✅ Plugins loaded successfully.")
@@ -104,7 +105,6 @@ def start_bot():
     # --- /start Command
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
-
         text = (
             f"👋 Hey <b>{user}</b>!\n\n"
             f"✨ Neural Core synced and online.\n"
@@ -112,20 +112,37 @@ def start_bot():
             f"<i>All modules operational — choose your next move!</i>\n\n"
             f"{BRAND_SIGNATURE}"
         )
-
         update.message.reply_text(
             text,
             parse_mode=ParseMode.HTML,
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # --- Button Handler (Silent Command Execution)
+    # --- /about Command
+    def about_cmd(update: Update, context: CallbackContext):
+        update.message.reply_text(
+            f"🌐 <b>About WENBNB</b>\n\n"
+            f"AI + Web3 Neural Assistant\n"
+            f"Currently running <b>{ENGINE_VERSION}</b>\n\n"
+            f"{BRAND_SIGNATURE}",
+            parse_mode=ParseMode.HTML
+        )
+
+    # --- /reload Command (for plugin refresh)
+    def reload_cmd(update: Update, context: CallbackContext):
+        update.message.reply_text("🔁 Reloading all plugins...")
+        try:
+            plugin_manager.load_all_plugins(dp)
+            update.message.reply_text("✅ Plugins reloaded successfully.")
+        except Exception as e:
+            update.message.reply_text(f"❌ Reload failed: {e}")
+
+    # --- Button Handler (Executes Commands)
     def button_handler(update: Update, context: CallbackContext):
         label = update.message.text.strip()
         cmd_name = button_map.get(label)
-
         if not cmd_name:
-            return  # Ignore unknown buttons silently
+            return
 
         try:
             handler = next(
@@ -138,22 +155,15 @@ def start_bot():
                 fake_update = Update(update.update_id, message=update.message)
                 fake_update.message.text = f"/{cmd_name}"
                 handler.callback(fake_update, context)
+            else:
+                update.message.reply_text(f"⚠️ Module /{cmd_name} not found or inactive.")
         except Exception as e:
             logger.error(f"⚠️ Error executing /{cmd_name}: {e}")
-
-    # --- /about Command
-    def about_cmd(update: Update, context: CallbackContext):
-        update.message.reply_text(
-            f"🌐 <b>About WENBNB</b>\n\n"
-            f"AI + Web3 Neural Assistant\n"
-            f"Currently running <b>{ENGINE_VERSION}</b>\n\n"
-            f"{BRAND_SIGNATURE}",
-            parse_mode=ParseMode.HTML
-        )
 
     # --- Register Handlers
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
+    dp.add_handler(CommandHandler("reload", reload_cmd))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
 
     # --- Plugin Integrations
