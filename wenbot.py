@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.8.3-ChatKeyboardStable
-# Real Chat Keyboard • Fixed Button → Command trigger • Clean Start
+# 💫 WENBNB Neural Engine v8.8.5-ChatKeyboardProStable
+# Emotion Sync + Chat Keyboard + Real Command Execution
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
 from flask import Flask, jsonify
-from telegram import Update, ParseMode, ReplyKeyboardMarkup, Message
+from telegram import (
+    Update, ParseMode, ReplyKeyboardMarkup, ReplyKeyboardRemove
+)
 from telegram.ext import (
     Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 )
@@ -14,7 +16,7 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.8.3-ChatKeyboardStable"
+ENGINE_VERSION = "v8.8.5-ChatKeyboardProStable"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = os.getenv(
     "BRAND_SIGNATURE",
@@ -29,7 +31,7 @@ logging.basicConfig(
 logger = logging.getLogger("WENBNB")
 
 # ===========================
-# 🔐 Environment Variables
+# 🔐 Environment
 # ===========================
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 RENDER_APP_URL = os.getenv("RENDER_APP_URL", "")
@@ -39,7 +41,7 @@ if not TELEGRAM_TOKEN:
     raise SystemExit("❌ TELEGRAM_TOKEN missing. Exiting...")
 
 # ===========================
-# 🌐 Flask Keep-Alive Server
+# 🌐 Flask Keep-Alive
 # ===========================
 app = Flask(__name__)
 
@@ -67,10 +69,9 @@ def start_keep_alive():
         logger.info("🩵 Keep-alive enabled (RenderSafe++)")
 
 # ===========================
-# 🧩 Plugin Manager Integration
+# 🧩 Plugins
 # ===========================
 from plugins import plugin_manager
-
 def register_all_plugins(dispatcher):
     try:
         plugin_manager.load_all_plugins(dispatcher)
@@ -79,7 +80,7 @@ def register_all_plugins(dispatcher):
         logger.error(f"❌ PluginManager failed: {e}")
 
 # ===========================
-# 🧠 Core Plugin Imports
+# 🧠 Core Modules
 # ===========================
 try:
     from plugins import (
@@ -120,15 +121,13 @@ def start_bot():
 
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
-
-    # Clear handlers early to avoid stale keyboards/handlers collisions
     dp.handlers.clear()
     logger.info("🧹 Old handlers cleared to prevent keyboard conflicts")
 
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
-    # --- Chat Keyboard layout (real keyboard buttons)
+    # === Chat Keyboard Layout ===
     keyboard = [
         ["💰 Price", "📊 Token Info"],
         ["😂 Meme", "🧠 AI Analyze"],
@@ -136,7 +135,6 @@ def start_bot():
         ["🌐 Web3", "ℹ️ About", "⚙️ Admin"]
     ]
 
-    # Map the visible label -> command name (without leading slash)
     button_map = {
         "💰 Price": "price",
         "📊 Token Info": "tokeninfo",
@@ -149,7 +147,7 @@ def start_bot():
         "⚙️ Admin": "admin"
     }
 
-    # === /start Command (no extra loading message)
+    # === /start ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
         text = (
@@ -165,72 +163,47 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Button Handler — reliable (search across all handler groups and call handler)
+    # === Chat Button → Command Execution ===
     def button_handler(update: Update, context: CallbackContext):
-        label = (update.message.text or "").strip()
+        label = update.message.text.strip()
         cmd_name = button_map.get(label)
         if not cmd_name:
-            # ignore unknown labels (user may type text)
             return
 
-        try:
-            logger.info(f"⚡ Chat keyboard pressed: {label} → /{cmd_name}")
+        logger.info(f"⚡ Chat Button Pressed → /{cmd_name}")
 
-            # Find the CommandHandler for the command across all handler groups
-            found_handler = None
-            for group_key, handlers in getattr(dp, "handlers", {}).items():
-                for h in handlers:
-                    if isinstance(h, CommandHandler) and h.command:
-                        # CommandHandler.command may be list or tuple
-                        handler_cmd = h.command[0] if isinstance(h.command, (list, tuple)) else h.command
-                        if handler_cmd == cmd_name:
-                            found_handler = h
-                            break
-                if found_handler:
-                    break
+        # Search all handlers
+        for group, handlers in dp.handlers.items():
+            for h in handlers:
+                if isinstance(h, CommandHandler):
+                    cmds = h.command if isinstance(h.command, (list, tuple)) else [h.command]
+                    if cmd_name in cmds:
+                        try:
+                            logger.info(f"🧩 Executing handler for /{cmd_name}")
+                            dp.run_async(h.callback, update, context)
+                            return
+                        except Exception as e:
+                            logger.error(f"❌ Error executing /{cmd_name}: {e}")
+                            traceback.print_exc()
+                            update.message.reply_text(f"⚠️ Error running /{cmd_name}")
+                            return
+        update.message.reply_text(f"🤖 Command /{cmd_name} not found.")
 
-            if not found_handler:
-                # fallback: maybe plugin registered as function in plugin_manager; respond politely
-                logger.warning(f"No active handler for /{cmd_name}")
-                update.message.reply_text("🤖 That module isn't active right now.")
-                return
-
-            # Set update.message.text to the command (so handler code sees it if it inspects message.text)
-            original_text = update.message.text
-            update.message.text = f"/{cmd_name}"
-
-            # Call the handler callback directly - this runs the command handler logic
-            # Handler callback signature is usually (update, context)
-            try:
-                found_handler.callback(update, context)
-            finally:
-                # restore original text to avoid side-effects
-                update.message.text = original_text
-
-        except Exception as e:
-            logger.exception(f"❌ Error triggering /{cmd_name}: {e}")
-            try:
-                update.message.reply_text(f"⚠️ Error running /{cmd_name}: {e}")
-            except:
-                pass
-
-    # === /about Command
+    # === /about ===
     def about_cmd(update: Update, context: CallbackContext):
         text = (
             f"🌐 <b>About WENBNB</b>\n\n"
-            f"Hybrid AI + Web3 Neural Assistant — blending emotion with precision.\n"
+            f"Hybrid AI + Web3 Neural Assistant.\n"
             f"Currently running <b>WENBNB Neural Engine {ENGINE_VERSION}</b>.\n\n"
-            f"💫 Always learning, always adapting.\n\n"
             f"{BRAND_SIGNATURE}"
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-    # Register core handlers
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
 
-    # === AI + Admin Integration (plugin-provided handlers)
+    # === Plugins ===
     try:
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
         dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
@@ -262,9 +235,8 @@ def start_bot():
 
     threading.Thread(target=heartbeat, daemon=True).start()
 
-    # === Start polling
     try:
-        logger.info("🚀 Starting Telegram polling (ChatKeyboardStable)...")
+        logger.info("🚀 Starting Telegram polling (ChatKeyboardProStable)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
