@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.8.1-ChatKeyboardStable
-# Emotion Sync + Chat Keyboard + Real Command Trigger Fix
+# 💫 WENBNB Neural Engine v8.8.2-ChatKeyboardProTrigger
+# Emotion Sync + Chat Keyboard + Real Dispatcher Trigger Fix
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
 from flask import Flask, jsonify
 from telegram import (
-    Update, ParseMode, ReplyKeyboardMarkup, ReplyKeyboardRemove
+    Update, ParseMode, ReplyKeyboardMarkup, ReplyKeyboardRemove, Message
 )
 from telegram.ext import (
     Updater, CommandHandler, MessageHandler, Filters, CallbackContext
@@ -16,7 +16,7 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.8.1-ChatKeyboardStable"
+ENGINE_VERSION = "v8.8.2-ChatKeyboardProTrigger"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
 
@@ -146,7 +146,7 @@ def start_bot():
         "⚙️ Admin": "admin"
     }
 
-    # === /start Command
+    # === /start Command ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
         text = (
@@ -162,7 +162,7 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Button Handler — Executes Real Commands
+    # === Button Handler (Real Trigger Fix)
     def button_handler(update: Update, context: CallbackContext):
         label = update.message.text.strip()
         cmd = button_map.get(label)
@@ -170,22 +170,23 @@ def start_bot():
             return
 
         try:
-            handler = next(
-                (h for h in dp.handlers[0] if isinstance(h, CommandHandler) and h.command[0] == cmd),
-                None
+            logger.info(f"⚡ Chat button pressed: {label} → /{cmd}")
+            # Create fake command message
+            fake_message = Message(
+                message_id=update.message.message_id + 1,
+                date=update.message.date,
+                chat=update.effective_chat,
+                text=f"/{cmd}",
+                from_user=update.effective_user
             )
+            fake_update = Update(update.update_id + 1, message=fake_message)
 
-            if handler:
-                logger.info(f"⚡ Triggering /{cmd} via Chat Keyboard")
-                # create a fake command message
-                fake_update = Update(update.update_id, message=update.message)
-                fake_update.message.text = f"/{cmd}"
-                handler.callback(fake_update, context)
-            else:
-                update.message.reply_text(f"⚠️ Module /{cmd} not found or inactive.")
+            # ✅ This method guarantees real command execution
+            dp.process_update(fake_update)
+
         except Exception as e:
+            logger.error(f"❌ Error triggering command /{cmd}: {e}")
             update.message.reply_text(f"⚠️ Error running /{cmd}: {e}")
-            traceback.print_exc()
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -198,7 +199,6 @@ def start_bot():
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-    # === Register Handlers ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
@@ -235,7 +235,7 @@ def start_bot():
     threading.Thread(target=heartbeat, daemon=True).start()
 
     try:
-        logger.info("🚀 Starting Telegram polling (ChatKeyboardStable)...")
+        logger.info("🚀 Starting Telegram polling (ChatKeyboardProTrigger)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
