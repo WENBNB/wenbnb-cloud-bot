@@ -1,24 +1,24 @@
 """
-AI Auto-Reply — EmotionHuman v8.7.5-ProStable++ (MemoryContext++ Build)
+AI Auto-Reply — EmotionHuman v8.7.9-ProStable++ (Self-Healing MemoryContext Edition)
 ───────────────────────────────────────────────────────────────────────────────
-• Combines EmotionHuman+ Personal Touch + MemoryContext++ engine
-• Remembers username usage (prevents over-greeting)
-• Tracks conversational topics + recalls last 3–5 chat contexts
-• Adaptive Hinglish/English tone (auto-detect)
-• Emotion memory continuity (uses user_memory.json)
-• Fully Render-safe + OpenAI proxy compatible
+• Fully reload-proof via internal handler rebind.
+• Retains context & emotion memory continuity (MemoryContext++).
+• Smart greeting deduplication (no overuse of names).
+• Topic recall for last 4 unique contexts.
+• Auto Hinglish/English tone detection.
+• Emotion-safe, OpenAI proxy compatible.
 """
 
-import os, json, random, requests, traceback, re
+import os, json, random, requests, traceback
 from datetime import datetime
 from telegram import Update, ParseMode
-from telegram.ext import CallbackContext
+from telegram.ext import CallbackContext, MessageHandler, Filters
 
 AI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 AI_PROXY_URL = os.getenv("AI_PROXY_URL", "")
 MEMORY_FILE = "user_memory.json"
 
-# ------------------- Memory -------------------
+# ===================== MEMORY SYSTEM =====================
 def load_memory():
     if os.path.exists(MEMORY_FILE):
         with open(MEMORY_FILE, "r", encoding="utf-8") as f:
@@ -30,7 +30,7 @@ def save_memory(data):
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-# ------------------- Mood / Emoji -------------------
+# ===================== MOOD ENGINE =====================
 MOOD_ICON = {
     "Positive": "🔥", "Reflective": "✨", "Balanced": "🙂",
     "Angry": "😠", "Sad": "😔", "Excited": "🤩"
@@ -44,10 +44,10 @@ def last_user_mood(uid):
     mood = last.get("mood", "Balanced")
     return mood, MOOD_ICON.get(mood, "🙂")
 
-def contains_devanagari(t):
+def contains_devanagari(t):  # Hindi detection
     return any("\u0900" <= ch <= "\u097F" for ch in t)
 
-# ------------------- Topic Detector -------------------
+# ===================== TOPIC DETECTOR =====================
 def detect_topic(text: str):
     topics = {
         "market": ["bnb", "btc", "crypto", "token", "coin", "chart", "pump", "dump"],
@@ -62,24 +62,21 @@ def detect_topic(text: str):
             return k
     return "general"
 
-# ------------------- System Prompt -------------------
+# ===================== PROMPT BUILDER =====================
 def build_prompt(user_name, mood, hinglish, memory_context):
     p = (
-        "You are WENBNB AI — a warm, human-like, emotionally aware companion. "
-        "Keep replies natural, short (1–4 sentences), and slightly playful. "
-        "Remember past chat context to sound continuous, not robotic. "
+        "You are WENBNB AI — a warm, emotionally intelligent companion. "
+        "Keep your replies short (1–4 sentences), natural, and a little playful. "
+        "Avoid robotic or repetitive phrasing. "
     )
     if hinglish:
-        p += "If the user writes in Hindi or Hinglish, reply casually in Hinglish (Hindi + English mix). "
+        p += "If the user writes in Hinglish or Hindi, respond naturally in a mix of Hindi + English. "
     if memory_context:
-        p += f"Recently, you and {user_name} talked about {', '.join(memory_context)}. Try to stay consistent with that vibe. "
-    p += (
-        f"User name: {user_name}. Current mood: {mood}. "
-        "Use 1 emoji inline only if it feels natural, not forced."
-    )
+        p += f"You and {user_name} recently discussed {', '.join(memory_context)}. Keep continuity with that tone. "
+    p += f"User: {user_name}. Mood: {mood}. Use emojis only if they feel natural."
     return p
 
-# ------------------- OpenAI / Proxy Call -------------------
+# ===================== AI CALL =====================
 def call_ai(prompt, user_name, mood, hinglish, memory_context):
     sys = build_prompt(user_name, mood, hinglish, memory_context)
     body = {
@@ -92,33 +89,34 @@ def call_ai(prompt, user_name, mood, hinglish, memory_context):
     }
     url = AI_PROXY_URL or "https://api.openai.com/v1/chat/completions"
     headers = {"Content-Type": "application/json"}
-    if not AI_PROXY_URL: headers["Authorization"] = f"Bearer {AI_API_KEY}"
+    if not AI_PROXY_URL:
+        headers["Authorization"] = f"Bearer {AI_API_KEY}"
     try:
         r = requests.post(url, headers=headers, json=body, timeout=20).json()
         if "choices" in r and r["choices"]:
             return r["choices"][0]["message"]["content"].strip()
     except Exception as e:
-        print("[AI Auto-Reply]", e); traceback.print_exc(limit=1)
+        print("[AI Auto-Reply]", e)
+        traceback.print_exc(limit=1)
     return None
 
-# ------------------- Footer -------------------
+# ===================== FOOTER =====================
 def footer(mood):
     if mood == "Positive": return "<b>🔥 WENBNB Neural Engine</b> — Synced at Peak Vibes"
     if mood == "Reflective": return "<b>✨ WENBNB Neural Engine</b> — Calm & Thoughtful"
     return "<b>🚀 WENBNB Neural Engine</b> — Emotional Intelligence 24×7"
 
-# ------------------- Greeting System -------------------
+# ===================== GREETING ENGINE =====================
 def smart_greeting(user_id, name, hinglish, mood, mem):
-    """Greets naturally but avoids repeating name every time."""
+    """Avoids repeating name/greeting too often."""
     user_data = mem.get(str(user_id), {})
-    last_used_name = user_data.get("last_name_used", False)
-
+    last_used = user_data.get("last_name_used", False)
     vibe = "chill"
     if mood in ["Positive", "Excited"]: vibe = "playful"
     elif mood in ["Reflective", "Sad"]: vibe = "gentle"
-
     greet = ""
-    if not last_used_name and random.random() < 0.8:
+
+    if not last_used and random.random() < 0.7:
         if hinglish:
             opts = {
                 "playful": [f"Are {name} 😄,", f"{name} yaar,", f"Sun na {name},"],
@@ -139,39 +137,40 @@ def smart_greeting(user_id, name, hinglish, mood, mem):
     mem[str(user_id)] = user_data
     return greet, mem
 
-# ------------------- Main Chat Logic -------------------
+# ===================== MAIN REPLY =====================
 def ai_auto_chat(update: Update, context: CallbackContext):
     msg = update.message
-    if not msg or not msg.text or msg.text.startswith("/"): return
+    if not msg or not msg.text or msg.text.startswith("/"):
+        return
     user, text = update.effective_user, msg.text.strip()
     chat_id, name = update.effective_chat.id, (user.first_name or user.username or "friend")
 
-    try: context.bot.send_chat_action(chat_id=chat_id, action="typing")
-    except: pass
+    try:
+        context.bot.send_chat_action(chat_id=chat_id, action="typing")
+    except:
+        pass
 
     mood, icon = last_user_mood(user.id)
-    hinglish = contains_devanagari(text) or any(w in text.lower() for w in ["bhai","yaar","kya","acha","nahi","haan","bolo"])
+    hinglish = contains_devanagari(text) or any(w in text.lower() for w in ["bhai", "yaar", "kya", "acha", "nahi", "haan", "bolo"])
     topic = detect_topic(text)
-
     mem = load_memory()
     uid = str(user.id)
     context_list = [e.get("topic") for e in mem.get(uid, {}).get("entries", []) if e.get("topic")]
-    recent_topics = list(dict.fromkeys(context_list[-4:]))  # last 4 unique topics
+    recent_topics = list(dict.fromkeys(context_list[-4:]))
 
     reply = call_ai(text, name, mood, hinglish, recent_topics)
     if not reply:
         reply = random.choice([
-            "Lagta hai thoda AI glitch hua 😅 but I caught your vibe:",
-            "Signal blinked 🤖 but emotion sync still on point:",
-            "Hmm... thoda static aaya neural link me — still feeling this:"
+            "Neural link thoda blink hua 😅 but I caught your vibe:",
+            "Signal glitch 🤖 but emotion sync stable:",
+            "Hmm, AI soch raha hai — par feel kar raha hai:"
         ]) + "\n\n" + random.choice([
-            "Patience always pays.", "Energy high rakh baby 🔥", "Keep the vibe steady 💫"
+            "Patience pays off 💫", "Energy high rakh baby 🔥", "Keep vibing steady 🚀"
         ])
 
     greet, mem = smart_greeting(user.id, name, hinglish, mood, mem)
     final = f"{icon} {greet}{reply.strip().capitalize()}\n\n{footer(mood)}"
 
-    # --- Memory Save ---
     mem.setdefault(uid, {"entries": []})
     mem[uid]["entries"].append({
         "text": text, "reply": reply, "mood": mood, "topic": topic, "time": datetime.now().isoformat()
@@ -179,11 +178,20 @@ def ai_auto_chat(update: Update, context: CallbackContext):
     mem[uid]["entries"] = mem[uid]["entries"][-15:]
     save_memory(mem)
 
-    try: msg.reply_text(final, parse_mode=ParseMode.HTML)
-    except: msg.reply_text(final)
+    try:
+        msg.reply_text(final, parse_mode=ParseMode.HTML)
+    except:
+        msg.reply_text(final)
 
-# ------------------- Register -------------------
+# ===================== REGISTER (SELF-HEALING) =====================
 def register_handlers(dp):
-    from telegram.ext import MessageHandler, Filters
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_chat))
-    print("✅ Loaded plugin: ai_auto_reply.py v8.7.5-ProStable++ (MemoryContext++ Build)")
+    """Registers handler and makes sure reload doesn’t break binding."""
+    try:
+        # remove old handlers before adding new
+        for h in list(dp.handlers.get(0, [])):
+            if hasattr(h, "callback") and h.callback == ai_auto_chat:
+                dp.remove_handler(h)
+        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_chat))
+        print("✅ Loaded plugin: ai_auto_reply.py v8.7.9-ProStable++ (Self-Healing MemoryContext Edition)")
+    except Exception as e:
+        print(f"⚠️ ai_auto_reply register_handlers failed: {e}")
