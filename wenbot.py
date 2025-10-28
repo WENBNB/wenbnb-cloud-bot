@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.8.0-ChatKeyboardFix
-# Emotion Sync + Chat Keyboard + Full Plugin Integration
+# 💫 WENBNB Neural Engine v8.8.1-ChatKeyboardStable
+# Emotion Sync + Chat Keyboard + Real Command Trigger Fix
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
@@ -16,12 +16,9 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.8.0-ChatKeyboardFix"
+ENGINE_VERSION = "v8.8.1-ChatKeyboardStable"
 CORE_VERSION = "v5.3"
-BRAND_SIGNATURE = os.getenv(
-    "BRAND_SIGNATURE",
-    "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
-)
+BRAND_SIGNATURE = "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s",
@@ -129,7 +126,7 @@ def start_bot():
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
-    # === Keyboard Layout (Chat Style)
+    # === Keyboard Layout
     keyboard = [
         ["💰 Price", "📊 Token Info"],
         ["😂 Meme", "🧠 AI Analyze"],
@@ -138,24 +135,20 @@ def start_bot():
     ]
 
     button_map = {
-        "💰 Price": "/price",
-        "📊 Token Info": "/tokeninfo",
-        "😂 Meme": "/meme",
-        "🧠 AI Analyze": "/aianalyze",
-        "🎁 Airdrop Check": "/airdropcheck",
-        "🚨 Airdrop Alert": "/airdropalert",
-        "🌐 Web3": "/web3",
-        "ℹ️ About": "/about",
-        "⚙️ Admin": "/admin"
+        "💰 Price": "price",
+        "📊 Token Info": "tokeninfo",
+        "😂 Meme": "meme",
+        "🧠 AI Analyze": "aianalyze",
+        "🎁 Airdrop Check": "airdropcheck",
+        "🚨 Airdrop Alert": "airdropalert",
+        "🌐 Web3": "web3",
+        "ℹ️ About": "about",
+        "⚙️ Admin": "admin"
     }
 
-    # === /start Command (Chat Keyboard)
+    # === /start Command
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
-
-        # Remove old inline keyboards (if any)
-        update.message.reply_text("🧹 Loading Neural Console...", reply_markup=ReplyKeyboardRemove())
-
         text = (
             f"👋 Hey <b>{user}</b>!\n\n"
             f"✨ Neural Core synced and online.\n"
@@ -163,34 +156,36 @@ def start_bot():
             f"<i>All modules operational — choose your next move!</i>\n\n"
             f"{BRAND_SIGNATURE}"
         )
-
         update.message.reply_text(
             text,
             parse_mode=ParseMode.HTML,
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Button Handler — Executes Command Silently
+    # === Button Handler — Executes Real Commands
     def button_handler(update: Update, context: CallbackContext):
         label = update.message.text.strip()
         cmd = button_map.get(label)
         if not cmd:
             return
+
         try:
             handler = next(
-                (h for h in context.dispatcher.handlers[0]
-                 if isinstance(h, CommandHandler) and h.command[0] == cmd),
+                (h for h in dp.handlers[0] if isinstance(h, CommandHandler) and h.command[0] == cmd),
                 None
             )
+
             if handler:
-                logger.info(f"Executing /{cmd} from Chat Keyboard")
+                logger.info(f"⚡ Triggering /{cmd} via Chat Keyboard")
+                # create a fake command message
                 fake_update = Update(update.update_id, message=update.message)
                 fake_update.message.text = f"/{cmd}"
                 handler.callback(fake_update, context)
             else:
-                update.message.reply_text(f"⚠️ Module /{cmd} not active.")
+                update.message.reply_text(f"⚠️ Module /{cmd} not found or inactive.")
         except Exception as e:
             update.message.reply_text(f"⚠️ Error running /{cmd}: {e}")
+            traceback.print_exc()
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -203,6 +198,7 @@ def start_bot():
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
+    # === Register Handlers ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
@@ -239,7 +235,7 @@ def start_bot():
     threading.Thread(target=heartbeat, daemon=True).start()
 
     try:
-        logger.info("🚀 Starting Telegram polling (ChatKeyboardFix)...")
+        logger.info("🚀 Starting Telegram polling (ChatKeyboardStable)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
@@ -274,4 +270,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
