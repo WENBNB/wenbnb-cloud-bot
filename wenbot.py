@@ -123,21 +123,21 @@ def start_bot():
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
-    # === /start Command — Smart Keyboard Integration ===
+    # === /start Command — Emotion Sync + Real Command Trigger ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
 
-        # Map button labels to real commands
+        # Map buttons to commands
         button_map = {
-            "💰 Price": "/price",
-            "📊 Token Info": "/tokeninfo",
-            "😂 Meme": "/meme",
-            "🧠 AI Analyze": "/aianalyze",
-            "🎁 Airdrop Check": "/airdropcheck",
-            "🚨 Airdrop Alert": "/airdropalert",
-            "🌐 Web3": "/web3",
-            "ℹ️ About": "/about",
-            "⚙️ Admin": "/admin"
+            "💰 Price": "price",
+            "📊 Token Info": "tokeninfo",
+            "😂 Meme": "meme",
+            "🧠 AI Analyze": "aianalyze",
+            "🎁 Airdrop Check": "airdropcheck",
+            "🚨 Airdrop Alert": "airdropalert",
+            "🌐 Web3": "web3",
+            "ℹ️ About": "about",
+            "⚙️ Admin": "admin"
         }
         context.user_data["button_map"] = button_map
 
@@ -162,19 +162,33 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Button Handler (Executes Backend Commands) ===
+    # === Button Handler — Executes Real Commands ===
     def button_handler(update: Update, context: CallbackContext):
         label = update.message.text.strip()
         button_map = context.user_data.get("button_map", {})
-        cmd = button_map.get(label)
+        cmd_name = button_map.get(label)
 
-        if cmd:
-            # Execute internal command as if typed manually
-            fake_update = Update(update.update_id, message=update.message)
-            fake_update.message.text = cmd
-            context.dispatcher.process_update(fake_update)
-        else:
+        if not cmd_name:
             update.message.reply_text("⚙️ Neural Interface didn’t recognize that option.")
+            return
+
+        try:
+            # ⚡ EmotionPulse animation
+            pulse = update.message.reply_text("⚡ Neural signal sent... Processing 🔄")
+            time.sleep(1.2)
+            context.bot.delete_message(chat_id=update.message.chat_id, message_id=pulse.message_id)
+
+            # ✅ Run the matched command handler manually
+            handler = next((h for h in context.dispatcher.handlers[0]
+                            if isinstance(h, CommandHandler) and h.command[0] == cmd_name), None)
+
+            if handler:
+                logger.info(f"Executing command via button → /{cmd_name}")
+                handler.callback(update, context)
+            else:
+                update.message.reply_text("🤖 That module isn’t active right now.")
+        except Exception as e:
+            update.message.reply_text(f"⚠️ Error running /{cmd_name}: {e}")
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -260,3 +274,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
