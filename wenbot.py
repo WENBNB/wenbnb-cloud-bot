@@ -138,15 +138,15 @@ def start_bot():
     ]
 
     button_map = {
-        "💰 Price": "price",
-        "📊 Token Info": "tokeninfo",
-        "😂 Meme": "meme",
-        "🧠 AI Analyze": "aianalyze",
-        "🎁 Airdrop Check": "airdropcheck",
-        "🚨 Airdrop Alert": "airdropalert",
-        "🌐 Web3": "web3",
-        "ℹ️ About": "about",
-        "⚙️ Admin": "admin"
+        "💰 Price": "/price",
+        "📊 Token Info": "/tokeninfo",
+        "😂 Meme": "/meme",
+        "🧠 AI Analyze": "/aianalyze",
+        "🎁 Airdrop Check": "/airdropcheck",
+        "🚨 Airdrop Alert": "/airdropalert",
+        "🌐 Web3": "/web3",
+        "ℹ️ About": "/about",
+        "⚙️ Admin": "/admin"
     }
 
     # === /start Command (Chat Keyboard)
@@ -274,3 +274,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
