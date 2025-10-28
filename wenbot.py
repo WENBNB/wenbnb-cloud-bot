@@ -136,15 +136,15 @@ def start_bot():
     ]
 
     button_map = {
-        "💰 Price": "price",
-        "📊 Token Info": "tokeninfo",
-        "😂 Meme": "meme",
-        "🧠 AI Analyze": "aianalyze",
-        "🎁 Airdrop Check": "airdropcheck",
-        "🚨 Airdrop Alert": "airdropalert",
-        "🌐 Web3": "web3",
-        "ℹ️ About": "about",
-        "⚙️ Admin": "admin"
+        "/price",
+        "/tokeninfo",
+        "/meme",
+        "/aianalyze",
+        "/airdropcheck",
+        "/airdropalert",
+        "/web3",
+        "/about",
+        "/admin"
     }
 
     # === /start ===
@@ -270,5 +270,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
