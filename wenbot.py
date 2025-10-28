@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.7.8-UltraReactive (InlineFix Final)
-# Emotion Sync + Inline Smart Buttons + Silent Command Trigger
+# 💫 WENBNB Neural Engine v8.7.9-PureSync (Final Inline Command Build)
+# Emotion Sync + Inline Smart Buttons + Memory Clean Integration
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
 from flask import Flask, jsonify
 from telegram import Update, ParseMode, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
-    Updater, CommandHandler, CallbackQueryHandler,
-    MessageHandler, Filters, CallbackContext
+    Updater, CommandHandler, CallbackQueryHandler, MessageHandler,
+    Filters, CallbackContext
 )
 
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.7.8-UltraReactive"
+ENGINE_VERSION = "v8.7.9-PureSync"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = os.getenv(
     "BRAND_SIGNATURE",
@@ -122,11 +122,15 @@ def start_bot():
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
 
+    # 💥 Clear all old handlers before fresh load
+    dp.handlers.clear()
+    logger.info("🧹 Cleared previous handlers to prevent keyboard conflicts")
+
     logger.info("🔍 Loading plugins...")
     register_all_plugins(dp)
     logger.info("🧠 Plugins loaded successfully.")
 
-    # === /start Command — Inline Smart Command Buttons ===
+    # === /start Command — Inline Smart Buttons ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
 
@@ -164,7 +168,7 @@ def start_bot():
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-    # === Inline Callback Handler (Silent Command Execution) ===
+    # === Inline Callback Handler — Silent Command Execution ===
     def callback_handler(update: Update, context: CallbackContext):
         query = update.callback_query
         data = query.data
@@ -198,7 +202,7 @@ def start_bot():
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-    # === Register Handlers ===
+    # === Register Handlers (Clean List) ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
     dp.add_handler(CallbackQueryHandler(callback_handler))
