@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.8.9-ChatKeyboardFinal
-# Real Chat Keyboard • Direct Command Trigger • Stable
+# 💫 WENBNB Neural Engine v8.9.0–ChatKeyboardUltraStable
+# Emotion Sync + Real Chat Keyboard + Full Plugin Integration
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
@@ -14,10 +14,9 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.8.9-ChatKeyboardFinal"
+ENGINE_VERSION = "v8.9.0–ChatKeyboardUltraStable"
 CORE_VERSION = "v5.3"
-BRAND_SIGNATURE = os.getenv(
-    "BRAND_SIGNATURE",
+BRAND_SIGNATURE = (
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
 )
 
@@ -121,26 +120,14 @@ def start_bot():
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
 
-    # Clear old handlers (keeps consistent order)
     try:
         dp.handlers.clear()
-        logger.info("🧹 Old handlers cleared to prevent keyboard conflicts")
     except Exception:
-        # older versions: dp.handlers may be dict; ignore if not available
         pass
 
-    # Register plugins (they may add command handlers)
     register_all_plugins(dp)
 
-    # ----- Chat keyboard layout (labels shown to users) -----
-    keyboard = [
-        ["💰 Price", "📊 Token Info"],
-        ["😂 Meme", "🧠 AI Analyze"],
-        ["🎁 Airdrop Check", "🚨 Airdrop Alert"],
-        ["🌐 Web3", "ℹ️ About", "⚙️ Admin"]
-    ]
-
-    # Map visible button label -> underlying command name (no leading slash)
+    # --- Button Label → Command Mapping ---
     button_map = {
         "💰 Price": "price",
         "📊 Token Info": "tokeninfo",
@@ -153,9 +140,17 @@ def start_bot():
         "⚙️ Admin": "admin"
     }
 
-    # === /start command (shows chat keyboard) ===
+    # --- Keyboard Layout ---
+    keyboard = [
+        ["💰 Price", "📊 Token Info"],
+        ["😂 Meme", "🧠 AI Analyze"],
+        ["🎁 Airdrop Check", "🚨 Airdrop Alert"],
+        ["🌐 Web3", "ℹ️ About", "⚙️ Admin"]
+    ]
+
+    # === /start Command ===
     def start_cmd(update: Update, context: CallbackContext):
-        user = (update.effective_user.first_name or "friend")
+        user = update.effective_user.first_name or "friend"
         text = (
             f"👋 Hey <b>{user}</b>!\n\n"
             f"✨ Neural Core synced and online.\n"
@@ -163,96 +158,63 @@ def start_bot():
             f"<i>All modules operational — choose your next move!</i>\n\n"
             f"{BRAND_SIGNATURE}"
         )
-        # send only the main welcome message with ReplyKeyboard
         update.message.reply_text(
             text,
             parse_mode=ParseMode.HTML,
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Chat button handler — DIRECTLY executes matched command handler ===
+    # === Chat Button Handler — Runs Real Commands ===
     def button_handler(update: Update, context: CallbackContext):
         try:
-            # sanity
             if not update.message or not update.message.text:
                 return
 
             label = update.message.text.strip()
             cmd_name = button_map.get(label)
             if not cmd_name:
-                # unknown chat text — ignore so other handlers (ai_auto_reply) can respond
-                return
+                return  # Let ai_auto_reply handle non-command messages
 
             logger.info(f"⚡ Chat Button Pressed → /{cmd_name}")
 
-            # Search registered handlers (all groups) and directly call matching CommandHandler callback
+            # Execute registered command handler if found
             found = False
-            # dp.handlers is a dict group_index -> [handlers]
-            handlers_collections = []
-            # safe access
-            try:
-                handlers_collections = dp.handlers.values()
-            except Exception:
-                # fallback: dp.handlers might be a list-like in some versions
-                handlers_collections = [dp.handlers] if dp.handlers else []
-
-            for handlers_list in handlers_collections:
-                for h in handlers_list:
-                    # check CommandHandler
-                    try:
-                        from telegram.ext import CommandHandler as _CH
-                        if isinstance(h, _CH):
-                            cmds = h.command if isinstance(h.command, (list, tuple)) else [h.command]
-                            # make sure cmd_name matches any (strings)
-                            if cmd_name in cmds:
-                                logger.info(f"🧠 Running handler directly for /{cmd_name}")
-                                # call callback directly
-                                try:
-                                    h.callback(update, context)
-                                except TypeError:
-                                    # some handlers expect (update, context) signature — try calling with two args
-                                    h.callback(update, context)
-                                found = True
-                                return  # stop after executing
-                    except Exception:
-                        # ignore handler inspection errors and continue
-                        continue
-
+            for group in list(dp.handlers.values()):
+                for handler in group:
+                    if isinstance(handler, CommandHandler):
+                        commands = handler.command if isinstance(handler.command, (list, tuple)) else [handler.command]
+                        if cmd_name in commands:
+                            logger.info(f"🧠 Triggering handler for /{cmd_name}")
+                            handler.callback(update, context)
+                            found = True
+                            return
             if not found:
-                logger.warning(f"🤖 Command /{cmd_name} not found among registered handlers")
                 update.message.reply_text(f"🤖 Command /{cmd_name} not available right now.")
         except Exception as e:
-            logger.error(f"❌ Error in button_handler: {e}")
+            logger.error(f"❌ Error running command: {e}")
             traceback.print_exc()
-            try:
-                update.message.reply_text("⚠️ Internal error running that command.")
-            except Exception:
-                pass
+            update.message.reply_text("⚠️ Internal error executing command.")
 
-    # === /about command (example) ===
+    # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
         text = (
             f"🌐 <b>About WENBNB</b>\n\n"
             f"Hybrid AI + Web3 Neural Assistant — blending emotion with precision.\n"
-            f"Currently running <b>WENBNB Neural Engine {ENGINE_VERSION}</b>.\n\n"
+            f"Currently running <b>{ENGINE_VERSION}</b>.\n\n"
             f"💫 Always learning, always adapting.\n\n"
             f"{BRAND_SIGNATURE}"
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-    # Register core handlers first (so button_handler runs before ai_auto_reply)
+    # === Register Handlers ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
-    # button_handler should be BEFORE the ai_auto_reply message handler
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
 
-    # === Plugin command handlers (these rely on plugin modules) ===
+    # === Plugin Command Handlers ===
     try:
-        # plugin-provided commands
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
-        # ai_auto_reply should come AFTER button_handler; it handles general messages
         dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
-        # admin commands
         dp.add_handler(CommandHandler("admin", lambda u, c: admin_tools.admin_status(u, c, {
             "version": ENGINE_VERSION,
             "branding": {"footer": BRAND_SIGNATURE},
@@ -261,12 +223,12 @@ def start_bot():
         dp.add_handler(CommandHandler("reboot", lambda u, c: admin_tools.admin_reboot(u, c, {
             "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
         })))
-        logger.info("💬 Plugin command handlers registered")
+        logger.info("💬 Plugin command handlers active")
     except Exception as e:
-        logger.warning(f"⚠️ Plugin handler registration issue: {e}")
+        logger.warning(f"⚠️ Plugin load issue: {e}")
         traceback.print_exc()
 
-    # === Heartbeat Thread ===
+    # === Heartbeat ===
     def heartbeat():
         while True:
             time.sleep(30)
@@ -275,32 +237,18 @@ def start_bot():
                     requests.get(f"{RENDER_APP_URL}/ping", timeout=5)
                 logger.info("💓 Poll heartbeat alive")
             except Exception:
-                logger.warning("⚠️ Poll heartbeat missed — continuing")
+                logger.warning("⚠️ Heartbeat missed")
 
     threading.Thread(target=heartbeat, daemon=True).start()
 
-    # === Start polling ===
+    # === Start Polling ===
     try:
-        logger.info("🚀 Starting Telegram polling (ChatKeyboardFinal)...")
+        logger.info("🚀 Starting Telegram polling (ChatKeyboardUltraStable)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
-        if "Conflict" in str(e):
-            logger.warning("⚠️ Conflict detected — restarting...")
-            release_instance_lock()
-            os._exit(1)
-        else:
-            failure_count += 1
-            logger.error(f"❌ Polling crash ({failure_count}): {e}")
-            traceback.print_exc()
-            if failure_count >= 3:
-                logger.error("💥 Too many failures → Full reboot.")
-                release_instance_lock()
-                os._exit(1)
-            else:
-                logger.info("🔁 Attempting recovery...")
-                time.sleep(5)
-                start_bot()
+        logger.error(f"❌ Polling error: {e}")
+        traceback.print_exc()
 
 # ===========================
 # 🧠 Entry Point
