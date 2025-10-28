@@ -163,7 +163,7 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Chat Button → Command Execution ===
+    # === Chat Button → Real Command Trigger ===
     def button_handler(update: Update, context: CallbackContext):
         label = update.message.text.strip()
         cmd_name = button_map.get(label)
@@ -172,22 +172,18 @@ def start_bot():
 
         logger.info(f"⚡ Chat Button Pressed → /{cmd_name}")
 
-        # Search all handlers
-        for group, handlers in dp.handlers.items():
-            for h in handlers:
-                if isinstance(h, CommandHandler):
-                    cmds = h.command if isinstance(h.command, (list, tuple)) else [h.command]
-                    if cmd_name in cmds:
-                        try:
-                            logger.info(f"🧩 Executing handler for /{cmd_name}")
-                            dp.run_async(h.callback, update, context)
-                            return
-                        except Exception as e:
-                            logger.error(f"❌ Error executing /{cmd_name}: {e}")
-                            traceback.print_exc()
-                            update.message.reply_text(f"⚠️ Error running /{cmd_name}")
-                            return
-        update.message.reply_text(f"🤖 Command /{cmd_name} not found.")
+        try:
+            # Create a fake command update that looks like user typed "/price"
+            fake_message = update.message
+            fake_message.text = f"/{cmd_name}"
+            fake_update = Update(update.update_id, message=fake_message)
+
+            # Feed the fake update back into dispatcher
+            context.dispatcher.process_update(fake_update)
+            logger.info(f"🧠 Command injected → /{cmd_name}")
+        except Exception as e:
+            logger.error(f"❌ Trigger failed for /{cmd_name}: {e}")
+            update.message.reply_text(f"⚠️ Could not run /{cmd_name}. Check logs.")
 
     # === /about ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -271,3 +267,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
