@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.9.5 – ChatKeyboardStableFinal
+# 💫 WENBNB Neural Engine v8.9.5 – ChatKeyboardStableFinal (Fixed)
 # Emotion Sync + Chat Keyboard (Command Text Trigger)
 # ============================================================
 
@@ -136,18 +136,6 @@ def start_bot():
         ["⚙️ Admin"]
     ]
 
-    button_to_command = {
-        "💰 Price": "/price",
-        "📊 Token Info": "/tokeninfo",
-        "😂 Meme": "/meme",
-        "🧠 AI Analyze": "/aianalyze",
-        "🎁 Airdrop Check": "/airdropcheck",
-        "🚨 Airdrop Alert": "/airdropalert",
-        "🌐 Web3": "/web3",
-        "ℹ️ About": "/about",
-        "⚙️ Admin": "/admin"
-    }
-
     # === /start Command ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
@@ -164,30 +152,28 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-# === Chat Button Handler — Sends /command text cleanly ===
-def button_handler(update: Update, context: CallbackContext):
-    user_input = update.message.text.strip()
-    button_to_command = {
-        "💰 Price": "/price",
-        "📊 Token Info": "/tokeninfo",
-        "😂 Meme": "/meme",
-        "🧠 AI Analyze": "/aianalyze",
-        "🎁 Airdrop Check": "/airdropcheck",
-        "🚨 Airdrop Alert": "/airdropalert",
-        "🌐 Web3": "/web3",
-        "ℹ️ About": "/about",
-        "⚙️ Admin": "/admin"
-    }
+    # === Chat Button Handler — Sends /command text cleanly ===
+    def button_handler(update: Update, context: CallbackContext):
+        user_input = update.message.text.strip()
+        button_to_command = {
+            "💰 Price": "/price",
+            "📊 Token Info": "/tokeninfo",
+            "😂 Meme": "/meme",
+            "🧠 AI Analyze": "/aianalyze",
+            "🎁 Airdrop Check": "/airdropcheck",
+            "🚨 Airdrop Alert": "/airdropalert",
+            "🌐 Web3": "/web3",
+            "ℹ️ About": "/about",
+            "⚙️ Admin": "/admin"
+        }
 
-    if user_input in button_to_command:
-        command = button_to_command[user_input]
-        # Delete the raw button message so only /command shows
-        try:
-            context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
-        except:
-            pass
-        # Send mapped /command like user typed it
-        context.bot.send_message(chat_id=update.effective_chat.id, text=command)
+        if user_input in button_to_command:
+            command = button_to_command[user_input]
+            try:
+                context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
+            except:
+                pass
+            context.bot.send_message(chat_id=update.effective_chat.id, text=command)
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -260,4 +246,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
