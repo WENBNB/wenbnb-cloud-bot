@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.9.0–ChatKeyboardUltraStable
-# Emotion Sync + Real Chat Keyboard + Full Plugin Integration
-# (Chat keyboard fixed: single trigger + AI auto-reply excluded)
+# 💫 WENBNB Neural Engine v9.0.0 — ChatKeyboardForceTriggerStable
+# Ready-to-paste fixed chat keyboard (single-trigger, AI muted for buttons)
 # ============================================================
 
 import os
@@ -12,8 +11,8 @@ import logging
 import threading
 import requests
 import traceback
-from flask import Flask, jsonify
 
+from flask import Flask, jsonify
 from telegram import Update, ParseMode, ReplyKeyboardMarkup
 from telegram.ext import (
     Updater, CommandHandler, MessageHandler, Filters, CallbackContext
@@ -22,7 +21,7 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.9.0–ChatKeyboardUltraStable"
+ENGINE_VERSION = "v9.0.0-ChatKeyboardForceTriggerStable"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = (
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
@@ -36,10 +35,11 @@ logging.basicConfig(
 logger = logging.getLogger("WENBNB")
 
 # ===========================
-# 🔐 Environment Variables
+# 🔐 Environment & Render URL (set to your Render app)
 # ===========================
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-RENDER_APP_URL = os.getenv("RENDER_APP_URL", "")
+# Using the Render URL you provided so keep-alive works out of the box:
+RENDER_APP_URL = os.getenv("RENDER_APP_URL", "https://wenbnb-neural-engine.onrender.com")
 PORT = int(os.getenv("PORT", "10000"))
 
 if not TELEGRAM_TOKEN:
@@ -128,16 +128,25 @@ def start_bot():
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
 
+    # clear old handlers if any (keeps consistent order)
     try:
-        # Clear old handlers (keeps consistent order)
         dp.handlers.clear()
         logger.info("🧹 Old handlers cleared to prevent keyboard conflicts")
     except Exception:
         pass
 
+    # load plugins (they may register command handlers)
     register_all_plugins(dp)
 
-    # --- Button Label → Command Mapping ---
+    # ----- Chat keyboard layout (labels shown to users) -----
+    keyboard = [
+        ["💰 Price", "📊 Token Info"],
+        ["😂 Meme", "🧠 AI Analyze"],
+        ["🎁 Airdrop Check", "🚨 Airdrop Alert"],
+        ["🌐 Web3", "ℹ️ About", "⚙️ Admin"]
+    ]
+
+    # Map visible button label -> underlying command name (no leading slash)
     button_map = {
         "💰 Price": "price",
         "📊 Token Info": "tokeninfo",
@@ -150,17 +159,9 @@ def start_bot():
         "⚙️ Admin": "admin"
     }
 
-    # --- Keyboard Layout ---
-    keyboard = [
-        ["💰 Price", "📊 Token Info"],
-        ["😂 Meme", "🧠 AI Analyze"],
-        ["🎁 Airdrop Check", "🚨 Airdrop Alert"],
-        ["🌐 Web3", "ℹ️ About", "⚙️ Admin"]
-    ]
-
-    # === /start Command ===
+    # === /start command (shows chat keyboard) ===
     def start_cmd(update: Update, context: CallbackContext):
-        user = update.effective_user.first_name or "friend"
+        user = (update.effective_user.first_name or "friend")
         text = (
             f"👋 Hey <b>{user}</b>!\n\n"
             f"✨ Neural Core synced and online.\n"
@@ -174,89 +175,84 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === /about Command ===
-    def about_cmd(update: Update, context: CallbackContext):
-        text = (
-            f"🌐 <b>About WENBNB</b>\n\n"
-            f"Hybrid AI + Web3 Neural Assistant — blending emotion with precision.\n"
-            f"Currently running <b>{ENGINE_VERSION}</b>.\n\n"
-            f"💫 Always learning, always adapting.\n\n"
-            f"{BRAND_SIGNATURE}"
-        )
-        update.message.reply_text(text, parse_mode=ParseMode.HTML)
-
-    # === Chat Button Handler — Manual Command Execution (single trigger) ===
+    # === Chat button handler — guaranteed single-trigger command execution ===
     def button_handler(update: Update, context: CallbackContext):
+        """
+        When a reply-keyboard button is pressed we:
+         - map its visible label to the command name
+         - create a synthetic command message (text starts with '/')
+         - feed it into dispatcher.process_update(...) so CommandHandlers run normally
+        This avoids AI auto-reply (ai_auto_reply uses Filters.text & ~Filters.command),
+        prevents double-execution, and preserves plugin behavior.
+        """
         try:
-            # sanity check
+            # sanity-check
             if not update.message or not update.message.text:
                 return
 
             label = update.message.text.strip()
             cmd_name = button_map.get(label)
             if not cmd_name:
-                return  # normal chat - let other handlers handle it
-
-            logger.info(f"⚡ Button Pressed → /{cmd_name}")
-
-            # mapping: plugin module -> function name
-            commands = {
-                "price": ("plugins.price", "price_cmd"),
-                "tokeninfo": ("plugins.tokeninfo", "tokeninfo_cmd"),
-                "meme": ("plugins.meme", "meme_cmd"),
-                "aianalyze": ("plugins.aianalyze", "aianalyze_cmd"),
-                "airdropcheck": ("plugins.airdropcheck", "airdropcheck_cmd"),
-                "airdropalert": ("plugins.airdropalert", "airdropalert_cmd"),
-                "web3": ("plugins.web3", "web3_cmd"),
-                "about": (__name__, "about_cmd"),
-                "admin": ("plugins.admin_tools", "admin_status")
-            }
-
-            if cmd_name not in commands:
-                logger.warning(f"⚠️ No command mapping for /{cmd_name}")
-                update.message.reply_text(f"🤖 Command /{cmd_name} not available right now.")
+                # not one of our keyboard buttons — let other handlers run
                 return
 
-            module_name, func_name = commands[cmd_name]
+            logger.info(f"⚡ Chat Button Pressed → /{cmd_name}")
 
-            # dynamic import - safe and keeps file small
-            mod = __import__(module_name, fromlist=[func_name])
-            func = getattr(mod, func_name)
+            # Build a synthetic message by cloning the original message but with text -> "/cmd"
+            # Modifying a shallow copy of message object to avoid creating complex Message from scratch.
+            # IMPORTANT: making a small local copy for process_update only.
+            original_msg = update.message
 
-            # admin has special signature in many plugins
-            if cmd_name == "admin":
-                func(update, context, {
-                    "version": ENGINE_VERSION,
-                    "branding": {"footer": BRAND_SIGNATURE},
-                    "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
-                })
-            else:
-                # Call the plugin command function synchronously
-                func(update, context)
+            # create a minimal fake update object that will be routed as a command
+            # we reuse the same message object but temporarily set text to a command
+            # keep original_text to restore later (to avoid visible mutation side-effects)
+            original_text = getattr(original_msg, "text", None)
+            try:
+                original_msg.text = f"/{cmd_name}"
+                fake_update = Update(update.update_id, message=original_msg)
+                # feed it into dispatcher synchronously — this triggers CommandHandlers only
+                context.dispatcher.process_update(fake_update)
+                logger.info(f"✅ Triggered command handler → /{cmd_name}")
+            finally:
+                # restore original message text so nothing is permanently modified
+                original_msg.text = original_text
 
-            # IMPORTANT: stop here — do not let AI auto-reply respond to this exact button text.
-            # We rely on registering ai_auto_reply with a filter that excludes button labels.
-            logger.info(f"✅ Executed → /{cmd_name}")
+            # done — prevent other non-command handlers from producing replies (function returns)
+            return
 
         except Exception as e:
-            logger.error(f"❌ Chat keyboard trigger error: {e}")
+            logger.error(f"❌ Error in button_handler: {e}")
             traceback.print_exc()
             try:
-                update.message.reply_text("⚠️ Neural desync — please retry.")
+                update.message.reply_text("⚠️ Internal error while running that button.")
             except Exception:
                 pass
 
-    # === Register Handlers ===
+    # === /about command (example) ===
+    def about_cmd(update: Update, context: CallbackContext):
+        text = (
+            f"🌐 <b>About WENBNB</b>\n\n"
+            f"Hybrid AI + Web3 Neural Assistant — blending emotion with precision.\n"
+            f"Currently running <b>WENBNB Neural Engine {ENGINE_VERSION}</b>.\n\n"
+            f"💫 Always learning, always adapting.\n\n"
+            f"{BRAND_SIGNATURE}"
+        )
+        update.message.reply_text(text, parse_mode=ParseMode.HTML)
+
+    # Register core handlers first (so button_handler runs before ai_auto_reply)
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
 
-    # Add the button handler BEFORE ai_auto_reply so it can take precedence for labels
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
+    # button_handler should be BEFORE the ai_auto_reply message handler so it intercepts keyboard presses
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler), group=0)
 
-    # === Plugin Command Handlers & AI Auto-Reply ===
+    # === Plugin command handlers (these rely on plugin modules) ===
     try:
-        # register plugin command handlers as usual (they respond to /commands)
+        # plugin-provided commands
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
+        # ai_auto_reply should come AFTER button_handler; it handles general messages (non-commands)
+        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
+        # admin commands (kept as commands)
         dp.add_handler(CommandHandler("admin", lambda u, c: admin_tools.admin_status(u, c, {
             "version": ENGINE_VERSION,
             "branding": {"footer": BRAND_SIGNATURE},
@@ -265,33 +261,12 @@ def start_bot():
         dp.add_handler(CommandHandler("reboot", lambda u, c: admin_tools.admin_reboot(u, c, {
             "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
         })))
-
-        # --- IMPORTANT: prevent ai_auto_reply from answering when the message exactly equals a keyboard label.
-        # Build a regex matching any of the keyboard labels exactly.
-        button_labels_regex = r'^(?:' + r'|'.join(
-            [
-                r'💰 Price',
-                r'📊 Token Info',
-                r'😂 Meme',
-                r'🧠 AI Analyze',
-                r'🎁 Airdrop Check',
-                r'🚨 Airdrop Alert',
-                r'🌐 Web3',
-                r'ℹ️ About',
-                r'⚙️ Admin'
-            ]
-        ) + r')$'
-
-        # Register AI auto-reply but exclude exact button labels and commands
-        dp.add_handler(MessageHandler(Filters.text & ~Filters.command & ~Filters.regex(button_labels_regex),
-                                      ai_auto_reply.ai_auto_chat))
-
-        logger.info("💬 Plugin command handlers active (and AI auto-reply filtered from keyboard labels)")
+        logger.info("💬 Plugin command handlers registered")
     except Exception as e:
-        logger.warning(f"⚠️ Plugin load issue: {e}")
+        logger.warning(f"⚠️ Plugin handler registration issue: {e}")
         traceback.print_exc()
 
-    # === Heartbeat ===
+    # === Heartbeat Thread ===
     def heartbeat():
         while True:
             time.sleep(30)
@@ -300,13 +275,13 @@ def start_bot():
                     requests.get(f"{RENDER_APP_URL}/ping", timeout=5)
                 logger.info("💓 Poll heartbeat alive")
             except Exception:
-                logger.warning("⚠️ Heartbeat missed")
+                logger.warning("⚠️ Poll heartbeat missed — continuing")
 
     threading.Thread(target=heartbeat, daemon=True).start()
 
-    # === Start Polling ===
+    # === Start polling ===
     try:
-        logger.info("🚀 Starting Telegram polling (ChatKeyboardUltraStable)...")
+        logger.info("🚀 Starting Telegram polling (ChatKeyboardForceTriggerStable)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
