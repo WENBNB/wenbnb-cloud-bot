@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v9.0.4–ChatKeyboardHumanMode
-# Emotion Sync + Human-style Chat Keyboard + Full Plugin Integration
+# 💫 WENBNB Neural Engine v8.9.5 – ChatKeyboardStableFinal
+# Emotion Sync + Chat Keyboard (Command Text Trigger)
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
@@ -14,7 +14,7 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v9.0.4–ChatKeyboardHumanMode"
+ENGINE_VERSION = "v8.9.5–ChatKeyboardStableFinal"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = (
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
@@ -127,8 +127,16 @@ def start_bot():
 
     register_all_plugins(dp)
 
-    # --- Button Label → Command Mapping ---
-    button_map = {
+    # === Chat Keyboard Layout ===
+    keyboard = [
+        ["💰 Price", "📊 Token Info"],
+        ["😂 Meme", "🧠 AI Analyze"],
+        ["🎁 Airdrop Check", "🚨 Airdrop Alert"],
+        ["🌐 Web3", "ℹ️ About"],
+        ["⚙️ Admin"]
+    ]
+
+    button_to_command = {
         "💰 Price": "/price",
         "📊 Token Info": "/tokeninfo",
         "😂 Meme": "/meme",
@@ -140,21 +148,13 @@ def start_bot():
         "⚙️ Admin": "/admin"
     }
 
-    # --- Keyboard Layout ---
-    keyboard = [
-        ["💰 Price", "📊 Token Info"],
-        ["😂 Meme", "🧠 AI Analyze"],
-        ["🎁 Airdrop Check", "🚨 Airdrop Alert"],
-        ["🌐 Web3", "ℹ️ About", "⚙️ Admin"]
-    ]
-
     # === /start Command ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
         text = (
             f"👋 Hey <b>{user}</b>!\n\n"
             f"✨ Neural Core synced and online.\n"
-            f"⚡ <b>WENBNB Neural Engine {ENGINE_VERSION}</b> — running in HumanMode.\n\n"
+            f"⚡ <b>WENBNB Neural Engine {ENGINE_VERSION}</b> — running in ProStable Mode.\n\n"
             f"<i>All modules operational — choose your next move!</i>\n\n"
             f"{BRAND_SIGNATURE}"
         )
@@ -164,31 +164,12 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Button Handler (User-Visible Trigger + Command Execution) ===
+    # === Chat Button Handler — Sends Only Command Text ===
     def button_handler(update: Update, context: CallbackContext):
-        try:
-            msg = update.message
-            if not msg or not msg.text:
-                return
-
-            label = msg.text.strip()
-            cmd_text = button_map.get(label)
-            if not cmd_text:
-                return  # normal message, not a button
-
-            # Step 1: Show message as if user sent the command
-            update.message.reply_text(cmd_text)
-
-            # Step 2: Internally trigger the same command handler
-            fake_update = Update(update.update_id, message=update.message)
-            fake_update.message.text = cmd_text
-            context.dispatcher.process_update(fake_update)
-
-            logger.info(f"✅ Human-mode trigger executed → {cmd_text}")
-
-        except Exception as e:
-            logger.error(f"❌ Button trigger failed: {e}")
-            traceback.print_exc()
+        user_input = update.message.text.strip()
+        if user_input in button_to_command:
+            command = button_to_command[user_input]
+            context.bot.send_message(chat_id=update.effective_chat.id, text=command)
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -238,7 +219,7 @@ def start_bot():
 
     # === Start Polling ===
     try:
-        logger.info("🚀 Starting Telegram polling (ChatKeyboardHumanMode)...")
+        logger.info("🚀 Starting Telegram polling (ChatKeyboardStableFinal)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
