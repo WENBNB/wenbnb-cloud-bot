@@ -129,15 +129,15 @@ def start_bot():
 
     # --- Button Label → Command Mapping ---
     button_map = {
-        "💰 Price": "price",
-        "📊 Token Info": "tokeninfo",
-        "😂 Meme": "meme",
-        "🧠 AI Analyze": "aianalyze",
-        "🎁 Airdrop Check": "airdropcheck",
-        "🚨 Airdrop Alert": "airdropalert",
-        "🌐 Web3": "web3",
-        "ℹ️ About": "about",
-        "⚙️ Admin": "admin"
+        "/price": "price",
+        "/tokeninfo": "tokeninfo",
+        "/meme": "meme",
+        "/aianalyze": "aianalyze",
+        "/airdropcheck": "airdropcheck",
+        "/airdropalert": "airdropalert",
+        "/web3": "web3",
+        "/about": "about",
+        "/admin": "admin"
     }
 
     # --- Keyboard Layout ---
@@ -292,3 +292,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
