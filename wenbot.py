@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.9.0–ChatKeyboardUltraStable (ready)
-# Emotion Sync + Real Chat Keyboard + Full Plugin Integration
+# 💫 WENBNB Neural Engine v9.0.4–ChatKeyboardHumanMode
+# Emotion Sync + Human-style Chat Keyboard + Full Plugin Integration
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
@@ -14,7 +14,7 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.9.0–ChatKeyboardUltraStable"
+ENGINE_VERSION = "v9.0.4–ChatKeyboardHumanMode"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = (
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
@@ -129,15 +129,15 @@ def start_bot():
 
     # --- Button Label → Command Mapping ---
     button_map = {
-        "💰 Price": "price",
-        "📊 Token Info": "tokeninfo",
-        "😂 Meme": "meme",
-        "🧠 AI Analyze": "aianalyze",
-        "🎁 Airdrop Check": "airdropcheck",
-        "🚨 Airdrop Alert": "airdropalert",
-        "🌐 Web3": "web3",
-        "ℹ️ About": "about",
-        "⚙️ Admin": "admin"
+        "💰 Price": "/price",
+        "📊 Token Info": "/tokeninfo",
+        "😂 Meme": "/meme",
+        "🧠 AI Analyze": "/aianalyze",
+        "🎁 Airdrop Check": "/airdropcheck",
+        "🚨 Airdrop Alert": "/airdropalert",
+        "🌐 Web3": "/web3",
+        "ℹ️ About": "/about",
+        "⚙️ Admin": "/admin"
     }
 
     # --- Keyboard Layout ---
@@ -154,7 +154,7 @@ def start_bot():
         text = (
             f"👋 Hey <b>{user}</b>!\n\n"
             f"✨ Neural Core synced and online.\n"
-            f"⚡ <b>WENBNB Neural Engine {ENGINE_VERSION}</b> — running in ProStable Mode.\n\n"
+            f"⚡ <b>WENBNB Neural Engine {ENGINE_VERSION}</b> — running in HumanMode.\n\n"
             f"<i>All modules operational — choose your next move!</i>\n\n"
             f"{BRAND_SIGNATURE}"
         )
@@ -163,6 +163,32 @@ def start_bot():
             parse_mode=ParseMode.HTML,
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
+
+    # === Button Handler (User-Visible Trigger + Command Execution) ===
+    def button_handler(update: Update, context: CallbackContext):
+        try:
+            msg = update.message
+            if not msg or not msg.text:
+                return
+
+            label = msg.text.strip()
+            cmd_text = button_map.get(label)
+            if not cmd_text:
+                return  # normal message, not a button
+
+            # Step 1: Show message as if user sent the command
+            update.message.reply_text(cmd_text)
+
+            # Step 2: Internally trigger the same command handler
+            fake_update = Update(update.update_id, message=update.message)
+            fake_update.message.text = cmd_text
+            context.dispatcher.process_update(fake_update)
+
+            logger.info(f"✅ Human-mode trigger executed → {cmd_text}")
+
+        except Exception as e:
+            logger.error(f"❌ Button trigger failed: {e}")
+            traceback.print_exc()
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -175,103 +201,15 @@ def start_bot():
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-    # === Chat Button Handler (sends visible /command then runs plugin) ===
-    def button_handler(update: Update, context: CallbackContext):
-        try:
-            msg = update.message
-            if not msg or not msg.text:
-                return
-            label = msg.text.strip()
-            cmd_name = button_map.get(label)
-            if not cmd_name:
-                return  # normal chat; let other handlers decide
-
-            logger.info(f"⚡ Button Pressed → /{cmd_name} (label='{label}')")
-
-            # 1) Visible bot message showing the command (so user sees "/price")
-            try:
-                # send as bot message so it appears in chat like you requested
-                update.message.reply_text(f"/{cmd_name}")
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to echo /{cmd_name} as bot message: {e}")
-
-            # 2) Execute the plugin command directly (safe: we call plugin function)
-            # Map command name -> (module.path, function_name)
-            commands = {
-                "price": ("plugins.price", "price_cmd"),
-                "tokeninfo": ("plugins.tokeninfo", "tokeninfo_cmd"),
-                "meme": ("plugins.meme", "meme_cmd"),
-                "aianalyze": ("plugins.aianalyze", "aianalyze_cmd"),
-                "airdropcheck": ("plugins.airdropcheck", "airdropcheck_cmd"),
-                "airdropalert": ("plugins.airdropalert", "airdropalert_cmd"),
-                "web3": ("plugins.web3", "web3_cmd"),
-                "about": (__name__, "about_cmd"),
-                "admin": ("plugins.admin_tools", "admin_status")
-            }
-
-            module_name, func_name = commands[cmd_name]
-            mod = __import__(module_name, fromlist=[func_name])
-            func = getattr(mod, func_name)
-
-            # admin needs extra args
-            if cmd_name == "admin":
-                func(update, context, {
-                    "version": ENGINE_VERSION,
-                    "branding": {"footer": BRAND_SIGNATURE},
-                    "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
-                })
-            else:
-                # call plugin handler - most plugin handlers expect (update, context)
-                try:
-                    func(update, context)
-                except TypeError:
-                    # fallback if plugin expects other signature
-                    func(update, context)
-
-            logger.info(f"✅ Executed → /{cmd_name}")
-
-            # IMPORTANT: we've handled this input — return so wrapper or other handlers won't re-run
-            return
-        except Exception as e:
-            logger.error(f"❌ Chat keyboard trigger error: {e}")
-            traceback.print_exc()
-            try:
-                update.message.reply_text("⚠️ Neural desync — please retry.")
-            except Exception:
-                pass
-
-    # === Wrapper to prevent AI double-reply on keyboard label messages ===
-    # We wrap the ai_auto_reply handler so it ignores keyboard label presses (the ones in button_map).
-    def ai_auto_chat_guard(update: Update, context: CallbackContext):
-        try:
-            msg = update.message
-            if not msg or not msg.text:
-                return
-            text = msg.text.strip()
-            # If the incoming text is one of our keyboard labels, do NOT run auto-reply.
-            if text in button_map:
-                logger.info(f"🔇 Suppressed ai_auto_reply for keyboard label: {text}")
-                return
-            # Otherwise delegate to the original ai_auto_reply module
-            try:
-                return ai_auto_reply.ai_auto_chat(update, context)
-            except Exception as e:
-                logger.warning(f"⚠️ ai_auto_reply failed: {e}")
-                traceback.print_exc()
-        except Exception:
-            traceback.print_exc()
-
-    # === Register Handlers (order matters) ===
+    # === Register Handlers ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
-    # Button handler must come BEFORE the auto-reply guard
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
-    # Register our guard wrapper (will call ai_auto_reply only if message is not a keyboard label)
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_chat_guard))
 
     # === Plugin Command Handlers ===
     try:
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
+        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
         dp.add_handler(CommandHandler("admin", lambda u, c: admin_tools.admin_status(u, c, {
             "version": ENGINE_VERSION,
             "branding": {"footer": BRAND_SIGNATURE},
@@ -300,7 +238,7 @@ def start_bot():
 
     # === Start Polling ===
     try:
-        logger.info("🚀 Starting Telegram polling (ChatKeyboardUltraStable)...")
+        logger.info("🚀 Starting Telegram polling (ChatKeyboardHumanMode)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
