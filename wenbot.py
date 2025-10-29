@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.9.7 – HumanTriggerPremium
-# Inline Smart Buttons (User Command Fill Mode)
+# 💫 WENBNB Neural Engine v8.9.8 – HumanTriggerPolish
+# Inline Smart Buttons • Clean Start • Real User Command Effect
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
 from flask import Flask, jsonify
 from telegram import (
-    Update, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
+    Update, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
 )
 from telegram.ext import (
     Updater, CommandHandler, CallbackQueryHandler, MessageHandler,
@@ -17,7 +17,7 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.9.7–HumanTriggerPremium"
+ENGINE_VERSION = "v8.9.8–HumanTriggerPolish"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = (
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
@@ -149,15 +149,7 @@ def start_bot():
 
     # === /start Command ===
     def start_cmd(update: Update, context: CallbackContext):
-        chat_id = update.effective_chat.id
         user = update.effective_user.first_name or "friend"
-
-        # Clean any old keyboards
-        try:
-            context.bot.send_message(chat_id=chat_id, text=".", reply_markup=ReplyKeyboardRemove())
-        except:
-            pass
-
         text = (
             f"👋 Hey <b>{user}</b>!\n\n"
             f"✨ Neural Core synced and online.\n"
@@ -166,32 +158,31 @@ def start_bot():
             f"{BRAND_SIGNATURE}"
         )
 
-        context.bot.send_message(
-            chat_id=chat_id,
-            text=text,
+        update.message.reply_text(
+            text,
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(inline_keyboard)
         )
 
-    # === Inline Button Handler — HumanTrigger Mode ===
+    # === Inline Button Callback (Instant User Command Trigger) ===
     def button_callback(update: Update, context: CallbackContext):
         query = update.callback_query
         if not query:
             return
-        data = query.data
-        chat_id = query.message.chat_id
+        data = query.data.strip()  # e.g. "price"
+        chat_id = query.message.chat.id
         user = query.from_user
 
         try:
-            query.answer()
+            query.answer()  # acknowledge button press (no alert)
             command_text = f"/{data}"
 
-            # Instead of sending message as bot, we simulate user input
+            # send message like user typed it
             context.bot.send_message(chat_id=chat_id, text=command_text)
-            logger.info(f"🧠 UserTrigger → {command_text} by @{user.username or user.id}")
+            logger.info(f"⚡ Button '{data}' pressed by @{user.username or user.id}")
 
         except Exception as e:
-            logger.error(f"❌ Inline button handler error: {e}")
+            logger.error(f"❌ Button handler error: {e}")
             traceback.print_exc()
 
     # === /about Command ===
@@ -242,7 +233,7 @@ def start_bot():
 
     # === Start Polling ===
     try:
-        logger.info("🚀 Starting Telegram polling (HumanTriggerPremium)...")
+        logger.info("🚀 Starting Telegram polling (HumanTriggerPolish)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
