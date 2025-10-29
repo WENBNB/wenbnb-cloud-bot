@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.9.2–ChatKeyboardLockdown Final
+# 💫 WENBNB Neural Engine v8.9.3–ChatKeyboardPriorityOverride Stable
 # Emotion Sync + Real Chat Keyboard + Full Plugin Integration
 # ============================================================
 
@@ -11,12 +11,11 @@ from telegram.ext import (
     Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 )
 from telegram.ext.dispatcher import run_async
-from telegram.utils.helpers import escape_markdown
 
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.9.2–ChatKeyboardLockdown Final"
+ENGINE_VERSION = "v8.9.3–ChatKeyboardPriorityOverride Stable"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = (
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
@@ -129,15 +128,15 @@ def start_bot():
 
     # --- Button Label → Command Mapping ---
     button_map = {
-        "/price": "price",
-        "/tokeninfo": "tokeninfo",
-        "/meme": "meme",
-        "/aianalyze": "aianalyze",
-        "/airdropcheck": "airdropcheck",
-        "/airdropalert": "airdropalert",
-        "/web3": "web3",
-        "/about": "about",
-        "/admin": "admin"
+        "💰 Price": "price",
+        "📊 Token Info": "tokeninfo",
+        "😂 Meme": "meme",
+        "🧠 AI Analyze": "aianalyze",
+        "🎁 Airdrop Check": "airdropcheck",
+        "🚨 Airdrop Alert": "airdropalert",
+        "🌐 Web3": "web3",
+        "ℹ️ About": "about",
+        "⚙️ Admin": "admin"
     }
 
     # --- Keyboard Layout ---
@@ -164,7 +163,7 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Chat Button Handler — Lockdown Fix ===
+    # === Chat Button Handler (Priority Override) ===
     @run_async
     def button_handler(update: Update, context: CallbackContext):
         try:
@@ -230,29 +229,26 @@ def start_bot():
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-    # === Register Handlers (order critical) ===
+    # === Register Handlers (Group Priority Fix) ===
+    dp.handlers.clear()
+
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
+    dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
+    dp.add_handler(CommandHandler("admin", lambda u, c: admin_tools.admin_status(u, c, {
+        "version": ENGINE_VERSION,
+        "branding": {"footer": BRAND_SIGNATURE},
+        "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
+    })))
+    dp.add_handler(CommandHandler("reboot", lambda u, c: admin_tools.admin_reboot(u, c, {
+        "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
+    })))
 
-    # === Plugin Commands ===
-    try:
-        dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
-        dp.add_handler(CommandHandler("admin", lambda u, c: admin_tools.admin_status(u, c, {
-            "version": ENGINE_VERSION,
-            "branding": {"footer": BRAND_SIGNATURE},
-            "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
-        })))
-        dp.add_handler(CommandHandler("reboot", lambda u, c: admin_tools.admin_reboot(u, c, {
-            "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
-        })))
-        logger.info("💬 Plugin command handlers active")
-    except Exception as e:
-        logger.warning(f"⚠️ Plugin load issue: {e}")
-        traceback.print_exc()
+    # 🧠 Chat keyboard handler — highest priority
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler), group=0)
 
-    # === AI Auto-Reply (MUST BE LAST) ===
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
+    # 🧩 AI auto-reply — last priority
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat), group=99)
 
     # === Heartbeat ===
     def heartbeat():
@@ -269,7 +265,7 @@ def start_bot():
 
     # === Start Polling ===
     try:
-        logger.info("🚀 Starting Telegram polling (ChatKeyboardLockdown Final)…")
+        logger.info("🚀 Starting Telegram polling (ChatKeyboardPriorityOverride Stable)…")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
@@ -292,4 +288,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
