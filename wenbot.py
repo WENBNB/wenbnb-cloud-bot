@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.9.5 – ChatKeyboardStableFinal (Fixed)
-# Emotion Sync + Chat Keyboard (Command Text Trigger)
+# 💫 WENBNB Neural Engine v8.9.6 – InlinePremiumStable
+# Emotion Sync + Inline Smart Buttons + Full Plugin Integration
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
 from flask import Flask, jsonify
-from telegram import Update, ParseMode, ReplyKeyboardMarkup
+from telegram import (
+    Update, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
+)
 from telegram.ext import (
-    Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+    Updater, CommandHandler, CallbackQueryHandler, MessageHandler,
+    Filters, CallbackContext
 )
 
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.9.5–ChatKeyboardStableFinal"
+ENGINE_VERSION = "v8.9.6–InlinePremiumStable"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = (
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
@@ -28,7 +31,7 @@ logging.basicConfig(
 logger = logging.getLogger("WENBNB")
 
 # ===========================
-# 🔐 Environment Variables
+# 🔐 Environment
 # ===========================
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 RENDER_APP_URL = os.getenv("RENDER_APP_URL", "")
@@ -38,7 +41,7 @@ if not TELEGRAM_TOKEN:
     raise SystemExit("❌ TELEGRAM_TOKEN missing. Exiting...")
 
 # ===========================
-# 🌐 Flask Keep-Alive Server
+# 🌐 Flask Keep-Alive
 # ===========================
 app = Flask(__name__)
 
@@ -66,14 +69,14 @@ def start_keep_alive():
         logger.info("🩵 Keep-alive enabled (RenderSafe++)")
 
 # ===========================
-# 🧩 Plugin Manager Integration
+# 🧩 Plugin Manager
 # ===========================
 from plugins import plugin_manager
 
 def register_all_plugins(dispatcher):
     try:
         plugin_manager.load_all_plugins(dispatcher)
-        logger.info("✅ PluginManager: All plugins loaded successfully.")
+        logger.info("✅ PluginManager loaded successfully.")
     except Exception as e:
         logger.error(f"❌ PluginManager failed: {e}")
 
@@ -127,13 +130,24 @@ def start_bot():
 
     register_all_plugins(dp)
 
-    # === Chat Keyboard Layout ===
-    keyboard = [
-        ["💰 Price", "📊 Token Info"],
-        ["😂 Meme", "🧠 AI Analyze"],
-        ["🎁 Airdrop Check", "🚨 Airdrop Alert"],
-        ["🌐 Web3", "ℹ️ About"],
-        ["⚙️ Admin"]
+    # === Inline Button Layout ===
+    inline_keyboard = [
+        [
+            InlineKeyboardButton("💰 Price", callback_data="price"),
+            InlineKeyboardButton("📊 Token Info", callback_data="tokeninfo")
+        ],
+        [
+            InlineKeyboardButton("😂 Meme", callback_data="meme"),
+            InlineKeyboardButton("🧠 AI Analyze", callback_data="aianalyze")
+        ],
+        [
+            InlineKeyboardButton("🎁 Airdrop Check", callback_data="airdropcheck"),
+            InlineKeyboardButton("🚨 Airdrop Alert", callback_data="airdropalert")
+        ],
+        [
+            InlineKeyboardButton("🌐 Web3", callback_data="web3"),
+            InlineKeyboardButton("ℹ️ About", callback_data="about")
+        ]
     ]
 
     # === /start Command ===
@@ -149,45 +163,30 @@ def start_bot():
         update.message.reply_text(
             text,
             parse_mode=ParseMode.HTML,
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            reply_markup=InlineKeyboardMarkup(inline_keyboard)
         )
 
-    # === Chat Button Handler — Sends /command text cleanly ===
-    def button_handler(update: Update, context: CallbackContext):
+    # === Inline Button Handler ===
+    def button_callback(update: Update, context: CallbackContext):
+        query = update.callback_query
+        data = query.data
+        chat_id = query.message.chat_id
+
         try:
-            user_input = update.message.text.strip()
-            chat_id = update.effective_chat.id
+            # Delete previous inline message (for clean interface)
+            try:
+                context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
+            except:
+                pass
 
-            button_to_command = {
-                "💰 Price": "/price",
-                "📊 Token Info": "/tokeninfo",
-                "😂 Meme": "/meme",
-                "🧠 AI Analyze": "/aianalyze",
-                "🎁 Airdrop Check": "/airdropcheck",
-                "🚨 Airdrop Alert": "/airdropalert",
-                "🌐 Web3": "/web3",
-                "ℹ️ About": "/about",
-                "⚙️ Admin": "/admin"
-            }
-
-            # Check if pressed button matches command
-            if user_input in button_to_command:
-                command = button_to_command[user_input]
-
-                # Delete user’s original emoji message for clean UI
-                try:
-                    context.bot.delete_message(chat_id=chat_id, message_id=update.message.message_id)
-                except:
-                    pass
-
-                # Send /command text as if user typed it
-                context.bot.send_message(chat_id=chat_id, text=command)
-
-                # Optional log
-                logger.info(f"🧩 Button pressed: {user_input} → Sent: {command}")
+            # Send /command like user typed
+            command = f"/{data}"
+            context.bot.send_message(chat_id=chat_id, text=command)
+            logger.info(f"⚡ Inline Button Triggered: {command}")
 
         except Exception as e:
-            logger.error(f"❌ Button handler error: {e}")
+            logger.error(f"❌ Inline button handler error: {e}")
+            traceback.print_exc()
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -203,12 +202,12 @@ def start_bot():
     # === Register Handlers ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
+    dp.add_handler(CallbackQueryHandler(button_callback))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
 
     # === Plugin Command Handlers ===
     try:
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
-        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
         dp.add_handler(CommandHandler("admin", lambda u, c: admin_tools.admin_status(u, c, {
             "version": ENGINE_VERSION,
             "branding": {"footer": BRAND_SIGNATURE},
@@ -237,7 +236,7 @@ def start_bot():
 
     # === Start Polling ===
     try:
-        logger.info("🚀 Starting Telegram polling (ChatKeyboardStableFinal)...")
+        logger.info("🚀 Starting Telegram polling (InlinePremiumStable)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
@@ -260,4 +259,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
