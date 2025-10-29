@@ -164,45 +164,57 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Chat Button Handler — Manual Command Execution ===
+    # === Chat Button Handler — Human Trigger UltraStable ===
     def button_handler(update: Update, context: CallbackContext):
-        label = update.message.text.strip()
-        cmd_name = button_map.get(label)
-        if not cmd_name:
-            return  # normal chat
-        logger.info(f"⚡ Button Pressed → /{cmd_name}")
+        try:
+            if not update.message or not update.message.text:
+                return
 
-        # manually call the matching command handler function
-        if cmd_name == "price":
-            from plugins import price
-            price.price_cmd(update, context)
-        elif cmd_name == "tokeninfo":
-            from plugins import tokeninfo
-            tokeninfo.tokeninfo_cmd(update, context)
-        elif cmd_name == "meme":
-            from plugins import meme
-            meme.meme_cmd(update, context)
-        elif cmd_name == "aianalyze":
-            from plugins import aianalyze
-            aianalyze.aianalyze_cmd(update, context)
-        elif cmd_name == "airdropcheck":
-            from plugins import airdropcheck
-            airdropcheck.airdropcheck_cmd(update, context)
-        elif cmd_name == "airdropalert":
-            from plugins import airdropalert
-            airdropalert.airdropalert_cmd(update, context)
-        elif cmd_name == "web3":
-            from plugins import web3
-            web3.web3_cmd(update, context)
-        elif cmd_name == "about":
-            about_cmd(update, context)
-        elif cmd_name == "admin":
-            from plugins import admin_tools
-            admin_tools.admin_status(update, context, {
-                "version": ENGINE_VERSION,
-                "branding": {"footer": BRAND_SIGNATURE},
-                "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
-            })
+            label = update.message.text.strip()
+            cmd_name = button_map.get(label)
+            if not cmd_name:
+                return  # ignore unrelated messages
+
+            logger.info(f"⚡ Chat Button Pressed → /{cmd_name}")
+
+            # --- Safe manual command trigger (no import conflicts) ---
+            plugin_routes = {
+                "price": ("plugins.price", "price_cmd"),
+                "tokeninfo": ("plugins.tokeninfo", "tokeninfo_cmd"),
+                "meme": ("plugins.meme", "meme_cmd"),
+                "aianalyze": ("plugins.aianalyze", "aianalyze_cmd"),
+                "airdropcheck": ("plugins.airdropcheck", "airdropcheck_cmd"),
+                "airdropalert": ("plugins.airdropalert", "airdropalert_cmd"),
+                "web3": ("plugins.web3", "web3_cmd"),
+                "about": (__name__, "about_cmd"),
+                "admin": ("plugins.admin_tools", "admin_status")
+            }
+
+            if cmd_name in plugin_routes:
+                module_name, func_name = plugin_routes[cmd_name]
+                mod = __import__(module_name, fromlist=[func_name])
+                func = getattr(mod, func_name)
+
+                if cmd_name == "admin":
+                    func(update, context, {
+                        "version": ENGINE_VERSION,
+                        "branding": {"footer": BRAND_SIGNATURE},
+                        "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
+                    })
+                else:
+                    func(update, context)
+
+                logger.info(f"✅ Command executed → /{cmd_name}")
+            else:
+                update.message.reply_text("⚠️ Command not available right now.")
+
+        except Exception as e:
+            logger.error(f"❌ Chat keyboard trigger error: {e}")
+            traceback.print_exc()
+            try:
+                update.message.reply_text("⚠️ Neural desync — please retry.")
+            except Exception:
+                pass
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -275,6 +287,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
