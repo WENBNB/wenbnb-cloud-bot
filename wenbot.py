@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.9.8 – HumanTriggerPolish
-# Inline Smart Buttons • Clean Start • Real User Command Effect
+# 💫 WENBNB Neural Engine v8.9.8 – HumanTriggerPolish (Reply Mode)
+# Reply Keyboard • Human Command Flow • Emotion Sync Tone
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
 from flask import Flask, jsonify
 from telegram import (
-    Update, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
+    Update, ParseMode, ReplyKeyboardMarkup
 )
 from telegram.ext import (
-    Updater, CommandHandler, CallbackQueryHandler, MessageHandler,
-    Filters, CallbackContext
+    Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 )
 
 # ===========================
@@ -127,68 +126,42 @@ def start_bot():
 
     register_all_plugins(dp)
 
-    # === Inline Button Layout ===
-    inline_keyboard = [
-        [
-            InlineKeyboardButton("💰 Price", callback_data="price"),
-            InlineKeyboardButton("📊 Token Info", callback_data="tokeninfo")
-        ],
-        [
-            InlineKeyboardButton("😂 Meme", callback_data="meme"),
-            InlineKeyboardButton("🧠 AI Analyze", callback_data="aianalyze")
-        ],
-        [
-            InlineKeyboardButton("🎁 Airdrop Check", callback_data="airdropcheck"),
-            InlineKeyboardButton("🚨 Airdrop Alert", callback_data="airdropalert")
-        ],
-        [
-            InlineKeyboardButton("🌐 Web3", callback_data="web3"),
-            InlineKeyboardButton("ℹ️ About", callback_data="about")
-        ]
-    ]
-
     # === /start Command ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
+
+        # 🧠 Clean Reply Keyboard (commands only)
+        keyboard = [
+            ["/price", "/tokeninfo"],
+            ["/meme", "/aianalyze"],
+            ["/airdropcheck", "/airdropalert"],
+            ["/web3", "/about"]
+        ]
+
         text = (
             f"👋 Hey <b>{user}</b>!\n\n"
-            f"✨ Neural Core synced and online.\n"
-            f"⚡ <b>WENBNB Neural Engine {ENGINE_VERSION}</b> — running in ProStable Mode.\n\n"
-            f"<i>All systems ready — choose your command!</i>\n\n"
+            f"🧠 <b>WENBNB Neural Engine v8.9.8</b> activated successfully.\n"
+            f"✨ <b>Emotion Sync</b> and <b>Core Intelligence</b> are now online and linked to your session.\n\n"
+            f"Select your action below to begin — every command you trigger connects directly to the <b>Neural Core</b> ⚡\n\n"
             f"{BRAND_SIGNATURE}"
         )
 
         update.message.reply_text(
             text,
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(inline_keyboard)
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Inline Button Callback (Instant User Command Trigger) ===
-    def button_callback(update: Update, context: CallbackContext):
-        query = update.callback_query
-        if not query:
-            return
-        data = query.data.strip()  # e.g. "price"
-        chat_id = query.message.chat.id
-        user = query.from_user
-
-        try:
-            query.answer()  # acknowledge
-            command_text = f"/{data}"
-
-            # ⚡ HumanTrigger illusion — bot sends message exactly like user typed it
-            context.bot.send_message(
-                chat_id=chat_id,
-                text=f"👉 Type /{data} to continue…",
-                disable_notification=True
-            )
-
-            logger.info(f"⚡ Button '{data}' pressed by @{user.username or user.id}")
-
-        except Exception as e:
-            logger.error(f"❌ Button handler error: {e}")
-            traceback.print_exc()
+    # === Button-like Reply Handler (Mirror Command Trigger) ===
+    def button_handler(update: Update, context: CallbackContext):
+        text = update.message.text.strip()
+        valid_cmds = {
+            "/price", "/tokeninfo", "/meme", "/aianalyze",
+            "/airdropcheck", "/airdropalert", "/web3", "/about"
+        }
+        if text in valid_cmds:
+            # send same command to mimic user behavior
+            context.bot.send_message(chat_id=update.effective_chat.id, text=text)
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -202,9 +175,9 @@ def start_bot():
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
     # === Register Handlers ===
-    dp.add_handler(CallbackQueryHandler(button_callback))  # ⚡ First - handle inline button press
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
 
     # === Plugin Command Handlers ===
@@ -238,7 +211,7 @@ def start_bot():
 
     # === Start Polling ===
     try:
-        logger.info("🚀 Starting Telegram polling (HumanTriggerPolish)...")
+        logger.info("🚀 Starting Telegram polling (HumanTriggerPolish Reply Mode)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
@@ -261,6 +234,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
