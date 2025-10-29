@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.9.1–ChatKeyboardUltraStable-Final
+# 💫 WENBNB Neural Engine v8.9.2–ChatKeyboardLockdown Final
 # Emotion Sync + Real Chat Keyboard + Full Plugin Integration
 # ============================================================
 
@@ -11,11 +11,12 @@ from telegram.ext import (
     Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 )
 from telegram.ext.dispatcher import run_async
+from telegram.utils.helpers import escape_markdown
 
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.9.1–ChatKeyboardUltraStable-Final"
+ENGINE_VERSION = "v8.9.2–ChatKeyboardLockdown Final"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = (
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
@@ -36,7 +37,7 @@ RENDER_APP_URL = os.getenv("RENDER_APP_URL", "")
 PORT = int(os.getenv("PORT", "10000"))
 
 if not TELEGRAM_TOKEN:
-    raise SystemExit("❌ TELEGRAM_TOKEN missing. Exiting...")
+    raise SystemExit("❌ TELEGRAM_TOKEN missing. Exiting…")
 
 # ===========================
 # 🌐 Flask Keep-Alive Server
@@ -70,7 +71,6 @@ def start_keep_alive():
 # 🧩 Plugin Manager Integration
 # ===========================
 from plugins import plugin_manager
-
 def register_all_plugins(dispatcher):
     try:
         plugin_manager.load_all_plugins(dispatcher)
@@ -120,7 +120,6 @@ def start_bot():
 
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
-
     try:
         dp.handlers.clear()
     except Exception:
@@ -165,7 +164,7 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Chat Button Handler — Guaranteed Trigger (v8.9.1 Final) ===
+    # === Chat Button Handler — Lockdown Fix ===
     @run_async
     def button_handler(update: Update, context: CallbackContext):
         try:
@@ -176,15 +175,14 @@ def start_bot():
             label = msg.text.strip()
             cmd_name = button_map.get(label)
             if not cmd_name:
-                return  # normal chat
+                return  # normal chat — let AI handle
+
+            # stop AI auto-reply from grabbing the same message
+            if hasattr(update, "handled"):
+                return
+            update.handled = True
 
             logger.info(f"⚡ Button Pressed → /{cmd_name}")
-
-            # Stop message propagation so ai_auto_reply doesn’t hijack it
-            try:
-                update.stop_propagation = True
-            except Exception:
-                pass
 
             commands = {
                 "price": ("plugins.price", "price_cmd"),
@@ -232,15 +230,14 @@ def start_bot():
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-    # === Register Handlers (Order Critical) ===
+    # === Register Handlers (order critical) ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
 
-    # === Plugin Command Handlers ===
+    # === Plugin Commands ===
     try:
         dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
-        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
         dp.add_handler(CommandHandler("admin", lambda u, c: admin_tools.admin_status(u, c, {
             "version": ENGINE_VERSION,
             "branding": {"footer": BRAND_SIGNATURE},
@@ -253,6 +250,9 @@ def start_bot():
     except Exception as e:
         logger.warning(f"⚠️ Plugin load issue: {e}")
         traceback.print_exc()
+
+    # === AI Auto-Reply (MUST BE LAST) ===
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
 
     # === Heartbeat ===
     def heartbeat():
@@ -269,7 +269,7 @@ def start_bot():
 
     # === Start Polling ===
     try:
-        logger.info("🚀 Starting Telegram polling (ChatKeyboardUltraStable-Final)...")
+        logger.info("🚀 Starting Telegram polling (ChatKeyboardLockdown Final)…")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
