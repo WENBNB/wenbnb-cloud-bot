@@ -197,8 +197,8 @@ def start_bot():
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
     # === Register Handlers ===
+    dp.add_handler(CallbackQueryHandler(button_callback))  # ⚡ First - handle inline button press
     dp.add_handler(CommandHandler("start", start_cmd))
-    dp.add_handler(CallbackQueryHandler(button_callback))
     dp.add_handler(CommandHandler("about", about_cmd))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
 
@@ -256,3 +256,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
