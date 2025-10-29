@@ -164,7 +164,7 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Chat Button Handler — v13 True UltraStable (Final Release) ===
+    # === Chat Button Handler — v13 UltraStable (Guaranteed Trigger) ===
     def button_handler(update: Update, context: CallbackContext):
         try:
             if not update.message or not update.message.text:
@@ -173,35 +173,33 @@ def start_bot():
             label = update.message.text.strip()
             cmd_name = button_map.get(label)
             if not cmd_name:
-                return  # Let AI AutoReply handle other messages
+                return  # let AI auto-reply handle normal text
 
             logger.info(f"⚡ Chat Button Pressed → /{cmd_name}")
 
-            # --- manually build a new message object with correct binding ---
-            from telegram import Message, Chat, Update
+            from telegram import Message, Update
 
             fake_message = Message(
-                message_id=update.message.message_id + 9000,
+                message_id=update.message.message_id + 10000,
                 date=update.message.date,
                 chat=update.message.chat,
                 from_user=update.message.from_user,
                 text=f"/{cmd_name}",
-                bot=context.bot  # ✅ critical for v13 binding
+                bot=context.bot
             )
 
-            # --- Create new Update with correct bot context ---
-            fake_update = Update(update.update_id + 9000, message=fake_message)
+            fake_update = Update(update.update_id + 10000, message=fake_message)
 
-            # --- Feed it back into dispatcher (native trigger) ---
-            context.dispatcher.process_update(fake_update)
+            # ✅ Send fake update directly into dispatcher queue
+            context.dispatcher.update_queue.put(fake_update)
 
-            logger.info(f"✅ Triggered successfully → /{cmd_name}")
+            logger.info(f"✅ Queued and triggered → /{cmd_name}")
 
         except Exception as e:
-            logger.error(f"❌ Error executing chat button /{cmd_name}: {e}")
+            logger.error(f"❌ Button execution failed for /{cmd_name}: {e}")
             traceback.print_exc()
             try:
-                update.message.reply_text("⚠️ Neural misfire while executing command.")
+                update.message.reply_text("⚠️ Neural signal failed — retry command manually.")
             except Exception:
                 pass
 
@@ -276,6 +274,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
