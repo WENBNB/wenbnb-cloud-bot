@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.9.3–ChatKeyboardPriorityOverride Stable
-# Emotion Sync + Real Chat Keyboard + Full Plugin Integration
+# 💫 WENBNB Neural Engine v8.9.5 – ChatKeyboardDualSafe Final
+# Emotion Sync + Dual Layer Safety + Plugin Precision
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
@@ -15,7 +15,7 @@ from telegram.ext.dispatcher import run_async
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.9.3–ChatKeyboardPriorityOverride Stable"
+ENGINE_VERSION = "v8.9.5–ChatKeyboardDualSafe Final"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = (
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
@@ -67,13 +67,14 @@ def start_keep_alive():
         logger.info("🩵 Keep-alive enabled (RenderSafe++)")
 
 # ===========================
-# 🧩 Plugin Manager Integration
+# 🧩 Plugin Manager
 # ===========================
 from plugins import plugin_manager
+
 def register_all_plugins(dispatcher):
     try:
         plugin_manager.load_all_plugins(dispatcher)
-        logger.info("✅ PluginManager: All plugins loaded successfully.")
+        logger.info("✅ PluginManager: All plugins loaded.")
     except Exception as e:
         logger.error(f"❌ PluginManager failed: {e}")
 
@@ -86,7 +87,7 @@ try:
         ai_auto_reply,
         admin_tools
     )
-    logger.info("🧠 Core modules loaded successfully (AI, Admin, Auto-Reply)")
+    logger.info("🧠 Core modules loaded (AI, Admin, Auto-Reply)")
 except Exception as e:
     logger.warning(f"⚠️ Core plugin import failed: {e}")
 
@@ -97,7 +98,7 @@ LOCK_FILE = "/tmp/wenbnb_lock"
 
 def check_single_instance():
     if os.path.exists(LOCK_FILE):
-        logger.error("⚠️ Another WENBNB instance already running — aborting startup.")
+        logger.error("⚠️ Another instance running — aborting startup.")
         raise SystemExit(1)
     with open(LOCK_FILE, "w") as f:
         f.write(str(os.getpid()))
@@ -111,22 +112,17 @@ def release_instance_lock():
 # ===========================
 # 💬 Telegram Bot Setup
 # ===========================
-failure_count = 0
-
 def start_bot():
-    global failure_count
     check_single_instance()
 
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
-    try:
-        dp.handlers.clear()
-    except Exception:
-        pass
+    try: dp.handlers.clear()
+    except Exception: pass
 
     register_all_plugins(dp)
 
-    # --- Button Label → Command Mapping ---
+    # --- Button Map ---
     button_map = {
         "💰 Price": "price",
         "📊 Token Info": "tokeninfo",
@@ -139,7 +135,6 @@ def start_bot():
         "⚙️ Admin": "admin"
     }
 
-    # --- Keyboard Layout ---
     keyboard = [
         ["💰 Price", "📊 Token Info"],
         ["😂 Meme", "🧠 AI Analyze"],
@@ -147,7 +142,7 @@ def start_bot():
         ["🌐 Web3", "ℹ️ About", "⚙️ Admin"]
     ]
 
-    # === /start Command ===
+    # === /start ===
     def start_cmd(update: Update, context: CallbackContext):
         user = update.effective_user.first_name or "friend"
         text = (
@@ -158,12 +153,11 @@ def start_bot():
             f"{BRAND_SIGNATURE}"
         )
         update.message.reply_text(
-            text,
-            parse_mode=ParseMode.HTML,
+            text, parse_mode=ParseMode.HTML,
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Chat Button Handler (Priority Override) ===
+    # === Chat Button Handler — DualSafe Final ===
     @run_async
     def button_handler(update: Update, context: CallbackContext):
         try:
@@ -171,17 +165,13 @@ def start_bot():
             if not msg or not msg.text:
                 return
 
-            label = msg.text.strip()
-            cmd_name = button_map.get(label)
+            text_input = msg.text.strip()
+            cmd_name = button_map.get(text_input)
             if not cmd_name:
-                return  # normal chat — let AI handle
-
-            # stop AI auto-reply from grabbing the same message
-            if hasattr(update, "handled"):
-                return
-            update.handled = True
+                return  # allow AI for normal text
 
             logger.info(f"⚡ Button Pressed → /{cmd_name}")
+            context.user_data["lock_ai"] = True
 
             commands = {
                 "price": ("plugins.price", "price_cmd"),
@@ -192,7 +182,7 @@ def start_bot():
                 "airdropalert": ("plugins.airdropalert", "airdropalert_cmd"),
                 "web3": ("plugins.web3", "web3_cmd"),
                 "about": (__name__, "about_cmd"),
-                "admin": ("plugins.admin_tools", "admin_status")
+                "admin": ("plugins.admin_tools", "admin_status"),
             }
 
             module_name, func_name = commands[cmd_name]
@@ -217,38 +207,50 @@ def start_bot():
                 update.message.reply_text("⚠️ Neural desync — please retry.")
             except Exception:
                 pass
+        finally:
+            def _unlock_ai():
+                time.sleep(1.5)
+                context.user_data["lock_ai"] = False
+            threading.Thread(target=_unlock_ai, daemon=True).start()
 
-    # === /about Command ===
+    # === /about ===
     def about_cmd(update: Update, context: CallbackContext):
         text = (
             f"🌐 <b>About WENBNB</b>\n\n"
-            f"Hybrid AI + Web3 Neural Assistant — blending emotion with precision.\n"
+            f"Hybrid AI + Web3 Neural Assistant — emotion + precision.\n"
             f"Currently running <b>{ENGINE_VERSION}</b>.\n\n"
             f"💫 Always learning, always adapting.\n\n"
             f"{BRAND_SIGNATURE}"
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-    # === Register Handlers (Group Priority Fix) ===
-    dp.handlers.clear()
-
+    # === Handlers ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
-    dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
-    dp.add_handler(CommandHandler("admin", lambda u, c: admin_tools.admin_status(u, c, {
-        "version": ENGINE_VERSION,
-        "branding": {"footer": BRAND_SIGNATURE},
-        "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
-    })))
-    dp.add_handler(CommandHandler("reboot", lambda u, c: admin_tools.admin_reboot(u, c, {
-        "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
-    })))
-
-    # 🧠 Chat keyboard handler — highest priority
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler), group=0)
 
-    # 🧩 AI auto-reply — last priority
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat), group=99)
+    # === Plugin Commands + AI ===
+    dp.add_handler(CommandHandler("aianalyze", aianalyze.aianalyze_cmd))
+    dp.add_handler(CommandHandler("admin", lambda u, c:
+        admin_tools.admin_status(u, c, {
+            "version": ENGINE_VERSION,
+            "branding": {"footer": BRAND_SIGNATURE},
+            "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
+        })
+    ))
+    dp.add_handler(CommandHandler("reboot", lambda u, c:
+        admin_tools.admin_reboot(u, c, {
+            "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
+        })
+    ))
+
+    dp.add_handler(
+        MessageHandler(
+            Filters.text & ~Filters.command,
+            lambda u, c: None if c.user_data.get("lock_ai") else ai_auto_reply.ai_auto_chat(u, c)
+        ),
+        group=99
+    )
 
     # === Heartbeat ===
     def heartbeat():
@@ -265,7 +267,7 @@ def start_bot():
 
     # === Start Polling ===
     try:
-        logger.info("🚀 Starting Telegram polling (ChatKeyboardPriorityOverride Stable)…")
+        logger.info("🚀 Starting Telegram polling (DualSafe Final)…")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
