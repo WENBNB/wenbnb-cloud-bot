@@ -174,11 +174,16 @@ def start_bot():
         user = query.from_user
 
         try:
-            query.answer()  # acknowledge button press (no alert)
+            query.answer()  # acknowledge
             command_text = f"/{data}"
 
-            # send message like user typed it
-            context.bot.send_message(chat_id=chat_id, text=command_text)
+            # ⚡ HumanTrigger illusion — bot sends message exactly like user typed it
+            context.bot.send_message(
+                chat_id=chat_id,
+                text=command_text,
+                disable_notification=True
+            )
+
             logger.info(f"⚡ Button '{data}' pressed by @{user.username or user.id}")
 
         except Exception as e:
@@ -256,4 +261,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
