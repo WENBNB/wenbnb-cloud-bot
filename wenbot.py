@@ -164,36 +164,45 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Chat Button Handler — v13 UltraFinal (Human-Send Simulation) ===
+    # === Chat Button Handler — Manual Command Execution ===
     def button_handler(update: Update, context: CallbackContext):
-        try:
-            if not update.message or not update.message.text:
-                return
+        label = update.message.text.strip()
+        cmd_name = button_map.get(label)
+        if not cmd_name:
+            return  # normal chat
+        logger.info(f"⚡ Button Pressed → /{cmd_name}")
 
-            label = update.message.text.strip()
-            cmd_name = button_map.get(label)
-            if not cmd_name:
-                return  # Let AI handle unrelated messages
-
-            logger.info(f"⚡ Chat Button Pressed → /{cmd_name}")
-
-            chat_id = update.message.chat.id
-
-            # 🧠 Simulate real user typing the command
-            context.bot.send_message(
-                chat_id=chat_id,
-                text=f"/{cmd_name}"
-            )
-
-            logger.info(f"✅ Simulated send → /{cmd_name}")
-
-        except Exception as e:
-            logger.error(f"❌ Button execution failed: {e}")
-            traceback.print_exc()
-            try:
-                update.message.reply_text("⚠️ Neural desync — retry your command.")
-            except Exception:
-                pass
+        # manually call the matching command handler function
+        if cmd_name == "price":
+            from plugins import price
+            price.price_cmd(update, context)
+        elif cmd_name == "tokeninfo":
+            from plugins import tokeninfo
+            tokeninfo.tokeninfo_cmd(update, context)
+        elif cmd_name == "meme":
+            from plugins import meme
+            meme.meme_cmd(update, context)
+        elif cmd_name == "aianalyze":
+            from plugins import aianalyze
+            aianalyze.aianalyze_cmd(update, context)
+        elif cmd_name == "airdropcheck":
+            from plugins import airdropcheck
+            airdropcheck.airdropcheck_cmd(update, context)
+        elif cmd_name == "airdropalert":
+            from plugins import airdropalert
+            airdropalert.airdropalert_cmd(update, context)
+        elif cmd_name == "web3":
+            from plugins import web3
+            web3.web3_cmd(update, context)
+        elif cmd_name == "about":
+            about_cmd(update, context)
+        elif cmd_name == "admin":
+            from plugins import admin_tools
+            admin_tools.admin_status(update, context, {
+                "version": ENGINE_VERSION,
+                "branding": {"footer": BRAND_SIGNATURE},
+                "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
+            })
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -266,6 +275,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
