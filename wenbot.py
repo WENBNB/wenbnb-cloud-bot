@@ -180,7 +180,7 @@ def start_bot():
             # ⚡ HumanTrigger illusion — bot sends message exactly like user typed it
             context.bot.send_message(
                 chat_id=chat_id,
-                text=command_text,
+                text=f"👉 Type /{data} to continue…",
                 disable_notification=True
             )
 
@@ -261,5 +261,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
