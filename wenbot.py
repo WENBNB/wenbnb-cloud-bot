@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.9.6 – InlinePremiumStable
+# 💫 WENBNB Neural Engine v8.9.6 – InlinePremiumStable (patched)
 # Emotion Sync + Inline Smart Buttons + Full Plugin Integration
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
 from flask import Flask, jsonify
 from telegram import (
-    Update, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
+    Update, ParseMode, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 )
 from telegram.ext import (
     Updater, CommandHandler, CallbackQueryHandler, MessageHandler,
@@ -123,6 +123,7 @@ def start_bot():
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
 
+    # try to clear prior handlers (safe)
     try:
         dp.handlers.clear()
     except Exception:
@@ -152,7 +153,30 @@ def start_bot():
 
     # === /start Command ===
     def start_cmd(update: Update, context: CallbackContext):
+        chat_id = update.effective_chat.id
         user = update.effective_user.first_name or "friend"
+
+        # 1) Remove any lingering reply-keyboards from clients by sending a remove and deleting it quickly
+        try:
+            rem = context.bot.send_message(chat_id=chat_id, text=".", reply_markup=ReplyKeyboardRemove())
+            # delete the temporary removal message to keep chat clean
+            try:
+                context.bot.delete_message(chat_id=chat_id, message_id=rem.message_id)
+            except Exception:
+                pass
+        except Exception:
+            # ignore if sending/removing fails
+            pass
+
+        # 2) delete previous start/welcome message if we stored one (clean UX)
+        try:
+            prev_mid = context.chat_data.get("start_msg_id")
+            if prev_mid:
+                context.bot.delete_message(chat_id=chat_id, message_id=prev_mid)
+        except Exception:
+            pass
+
+        # 3) send inline welcome message and save its message_id for deletion later
         text = (
             f"👋 Hey <b>{user}</b>!\n\n"
             f"✨ Neural Core synced and online.\n"
@@ -160,33 +184,52 @@ def start_bot():
             f"<i>All modules operational — choose your next move!</i>\n\n"
             f"{BRAND_SIGNATURE}"
         )
-        update.message.reply_text(
-            text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(inline_keyboard)
-        )
+        try:
+            sent = context.bot.send_message(
+                chat_id=chat_id,
+                text=text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard)
+            )
+            context.chat_data["start_msg_id"] = sent.message_id
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to send start inline message: {e}")
 
     # === Inline Button Handler ===
     def button_callback(update: Update, context: CallbackContext):
         query = update.callback_query
-        data = query.data
+        if not query:
+            return
+        data = query.data  # e.g. "price"
         chat_id = query.message.chat_id
+        user = query.from_user
+
+        # Acknowledge the press quickly
+        try:
+            query.answer(text="⚡ Sent command...")
+        except Exception:
+            pass
 
         try:
-            # Delete previous inline message (for clean interface)
+            # Delete the inline welcome message (clean)
             try:
                 context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
-            except:
+            except Exception:
                 pass
 
-            # Send /command like user typed
-            command = f"/{data}"
-            context.bot.send_message(chat_id=chat_id, text=command)
-            logger.info(f"⚡ Inline Button Triggered: {command}")
+            # Send exact /command text in chat (visible)
+            command_text = f"/{data}"
+            context.bot.send_message(chat_id=chat_id, text=command_text)
+
+            logger.info(f"⚡ Inline Button Triggered by @{user.username or user.id}: {command_text}")
 
         except Exception as e:
             logger.error(f"❌ Inline button handler error: {e}")
             traceback.print_exc()
+            try:
+                query.message.reply_text("⚠️ Error executing that option.")
+            except Exception:
+                pass
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -199,10 +242,13 @@ def start_bot():
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-    # === Register Handlers ===
+    # === Register Handlers (order matters) ===
+    # CallbackQueryHandler must be registered before general message handlers
     dp.add_handler(CommandHandler("start", start_cmd))
-    dp.add_handler(CommandHandler("about", about_cmd))
     dp.add_handler(CallbackQueryHandler(button_callback))
+    dp.add_handler(CommandHandler("about", about_cmd))
+
+    # Register ai_auto_reply AFTER the button callback (prevents double triggers)
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
 
     # === Plugin Command Handlers ===
