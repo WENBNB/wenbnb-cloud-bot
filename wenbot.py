@@ -154,26 +154,40 @@ def start_bot():
 
     # === Chat Button Handler — Sends /command text cleanly ===
     def button_handler(update: Update, context: CallbackContext):
-        user_input = update.message.text.strip()
-        button_to_command = {
-            "💰 Price": "/price",
-            "📊 Token Info": "/tokeninfo",
-            "😂 Meme": "/meme",
-            "🧠 AI Analyze": "/aianalyze",
-            "🎁 Airdrop Check": "/airdropcheck",
-            "🚨 Airdrop Alert": "/airdropalert",
-            "🌐 Web3": "/web3",
-            "ℹ️ About": "/about",
-            "⚙️ Admin": "/admin"
-        }
+        try:
+            user_input = update.message.text.strip()
+            chat_id = update.effective_chat.id
 
-        if user_input in button_to_command:
-            command = button_to_command[user_input]
-            try:
-                context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
-            except:
-                pass
-            context.bot.send_message(chat_id=update.effective_chat.id, text=command)
+            button_to_command = {
+                "💰 Price": "/price",
+                "📊 Token Info": "/tokeninfo",
+                "😂 Meme": "/meme",
+                "🧠 AI Analyze": "/aianalyze",
+                "🎁 Airdrop Check": "/airdropcheck",
+                "🚨 Airdrop Alert": "/airdropalert",
+                "🌐 Web3": "/web3",
+                "ℹ️ About": "/about",
+                "⚙️ Admin": "/admin"
+            }
+
+            # Check if pressed button matches command
+            if user_input in button_to_command:
+                command = button_to_command[user_input]
+
+                # Delete user’s original emoji message for clean UI
+                try:
+                    context.bot.delete_message(chat_id=chat_id, message_id=update.message.message_id)
+                except:
+                    pass
+
+                # Send /command text as if user typed it
+                context.bot.send_message(chat_id=chat_id, text=command)
+
+                # Optional log
+                logger.info(f"🧩 Button pressed: {user_input} → Sent: {command}")
+
+        except Exception as e:
+            logger.error(f"❌ Button handler error: {e}")
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -246,3 +260,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
