@@ -163,47 +163,56 @@ def start_bot():
             parse_mode=ParseMode.HTML,
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-
-    # === Chat Button Handler — UltraStable Manual Trigger ===
+        
+    from telegram.ext.dispatcher import run_async
+    # === Chat Button Handler — Guaranteed Trigger Fix ===
+    @run_async
     def button_handler(update: Update, context: CallbackContext):
         try:
-            message = update.message
-            if not message or not message.text:
+            msg = update.message
+            if not msg or not msg.text:
                 return
 
-            label = message.text.strip()
+            label = msg.text.strip()
             cmd_name = button_map.get(label)
             if not cmd_name:
-                return  # ignore normal text
+                return  # normal chat
 
-            logger.info(f"⚡ Chat Button Pressed → /{cmd_name}")
+            logger.info(f"⚡ Button Pressed → /{cmd_name}")
 
-            # simulate a command message with "/" prefix
-            message.text = f"/{cmd_name}"
+            # run command handler directly on main thread
+            commands = {
+                "price": ("plugins.price", "price_cmd"),
+                "tokeninfo": ("plugins.tokeninfo", "tokeninfo_cmd"),
+                "meme": ("plugins.meme", "meme_cmd"),
+                "aianalyze": ("plugins.aianalyze", "aianalyze_cmd"),
+                "airdropcheck": ("plugins.airdropcheck", "airdropcheck_cmd"),
+                "airdropalert": ("plugins.airdropalert", "airdropalert_cmd"),
+                "web3": ("plugins.web3", "web3_cmd"),
+                "about": (__name__, "about_cmd"),
+                "admin": ("plugins.admin_tools", "admin_status")
+            }
 
-            # manually dispatch the command to Telegram's dispatcher
-            context.dispatcher.process_update(Update.de_json({
-                "update_id": update.update_id + 1,
-                "message": {
-                    "message_id": message.message_id + 1,
-                    "date": int(time.time()),
-                    "chat": {"id": message.chat.id, "type": message.chat.type},
-                    "from": {
-                        "id": message.from_user.id,
-                        "is_bot": False,
-                        "first_name": message.from_user.first_name
-                    },
-                    "text": f"/{cmd_name}"
-                }
-            }, context.bot))
+            module_name, func_name = commands[cmd_name]
+            mod = __import__(module_name, fromlist=[func_name])
+            func = getattr(mod, func_name)
 
-            logger.info(f"✅ Triggered → /{cmd_name}")
+            if cmd_name == "admin":
+                func(update, context, {
+                    "version": ENGINE_VERSION,
+                    "branding": {"footer": BRAND_SIGNATURE},
+                    "admin": {"allowed_admins": [int(os.getenv("OWNER_ID", "0"))]}
+                })
+            else:
+                func(update, context)
+
+            logger.info(f"✅ Executed → /{cmd_name}")
 
         except Exception as e:
-            logger.error(f"❌ Error triggering /{cmd_name}: {e}")
+            logger.error(f"❌ Chat keyboard trigger error: {e}")
             traceback.print_exc()
             try:
-                update.message.reply_text("⚠️ Internal trigger error — try again.")
+                update.message.reply_text("⚠️ Neural desync — please retry.")
             except Exception:
                 pass
 
@@ -278,6 +287,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
