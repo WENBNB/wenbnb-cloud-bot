@@ -164,7 +164,7 @@ def start_bot():
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    # === Chat Button Handler — v13 UltraStable (Guaranteed Trigger) ===
+    # === Chat Button Handler — v13 UltraFinal (Human-Send Simulation) ===
     def button_handler(update: Update, context: CallbackContext):
         try:
             if not update.message or not update.message.text:
@@ -173,33 +173,25 @@ def start_bot():
             label = update.message.text.strip()
             cmd_name = button_map.get(label)
             if not cmd_name:
-                return  # let AI auto-reply handle normal text
+                return  # Let AI handle unrelated messages
 
             logger.info(f"⚡ Chat Button Pressed → /{cmd_name}")
 
-            from telegram import Message, Update
+            chat_id = update.message.chat.id
 
-            fake_message = Message(
-                message_id=update.message.message_id + 10000,
-                date=update.message.date,
-                chat=update.message.chat,
-                from_user=update.message.from_user,
-                text=f"/{cmd_name}",
-                bot=context.bot
+            # 🧠 Simulate real user typing the command
+            context.bot.send_message(
+                chat_id=chat_id,
+                text=f"/{cmd_name}"
             )
 
-            fake_update = Update(update.update_id + 10000, message=fake_message)
-
-            # ✅ Send fake update directly into dispatcher queue
-            context.dispatcher.update_queue.put(fake_update)
-
-            logger.info(f"✅ Queued and triggered → /{cmd_name}")
+            logger.info(f"✅ Simulated send → /{cmd_name}")
 
         except Exception as e:
-            logger.error(f"❌ Button execution failed for /{cmd_name}: {e}")
+            logger.error(f"❌ Button execution failed: {e}")
             traceback.print_exc()
             try:
-                update.message.reply_text("⚠️ Neural signal failed — retry command manually.")
+                update.message.reply_text("⚠️ Neural desync — retry your command.")
             except Exception:
                 pass
 
@@ -274,6 +266,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
