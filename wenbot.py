@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.9.0–ChatKeyboardUltraStable
+# 💫 WENBNB Neural Engine v8.9.1–ChatKeyboardUltraStable-Final
 # Emotion Sync + Real Chat Keyboard + Full Plugin Integration
 # ============================================================
 
@@ -10,11 +10,12 @@ from telegram import Update, ParseMode, ReplyKeyboardMarkup
 from telegram.ext import (
     Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 )
+from telegram.ext.dispatcher import run_async
 
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.9.0–ChatKeyboardUltraStable"
+ENGINE_VERSION = "v8.9.1–ChatKeyboardUltraStable-Final"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = (
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
@@ -163,9 +164,8 @@ def start_bot():
             parse_mode=ParseMode.HTML,
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-        
-    from telegram.ext.dispatcher import run_async
-    # === Chat Button Handler — Guaranteed Trigger Fix ===
+
+    # === Chat Button Handler — Guaranteed Trigger (v8.9.1 Final) ===
     @run_async
     def button_handler(update: Update, context: CallbackContext):
         try:
@@ -180,7 +180,12 @@ def start_bot():
 
             logger.info(f"⚡ Button Pressed → /{cmd_name}")
 
-            # run command handler directly on main thread
+            # Stop message propagation so ai_auto_reply doesn’t hijack it
+            try:
+                update.stop_propagation = True
+            except Exception:
+                pass
+
             commands = {
                 "price": ("plugins.price", "price_cmd"),
                 "tokeninfo": ("plugins.tokeninfo", "tokeninfo_cmd"),
@@ -227,7 +232,7 @@ def start_bot():
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-    # === Register Handlers ===
+    # === Register Handlers (Order Critical) ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
@@ -264,7 +269,7 @@ def start_bot():
 
     # === Start Polling ===
     try:
-        logger.info("🚀 Starting Telegram polling (ChatKeyboardUltraStable)...")
+        logger.info("🚀 Starting Telegram polling (ChatKeyboardUltraStable-Final)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
@@ -287,14 +292,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
