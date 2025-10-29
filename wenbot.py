@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ============================================================
-# 💫 WENBNB Neural Engine v8.9.6 – InlinePremiumStable (patched)
-# Emotion Sync + Inline Smart Buttons + Full Plugin Integration
+# 💫 WENBNB Neural Engine v8.9.7 – HumanTriggerPremium
+# Inline Smart Buttons (User Command Fill Mode)
 # ============================================================
 
 import os, sys, time, logging, threading, requests, traceback
@@ -17,7 +17,7 @@ from telegram.ext import (
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
-ENGINE_VERSION = "v8.9.6–InlinePremiumStable"
+ENGINE_VERSION = "v8.9.7–HumanTriggerPremium"
 CORE_VERSION = "v5.3"
 BRAND_SIGNATURE = (
     "🚀 <b>Powered by WENBNB Neural Engine</b> — Emotional Intelligence 24×7 ⚡"
@@ -114,16 +114,12 @@ def release_instance_lock():
 # ===========================
 # 💬 Telegram Bot Setup
 # ===========================
-failure_count = 0
-
 def start_bot():
-    global failure_count
     check_single_instance()
 
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
 
-    # try to clear prior handlers (safe)
     try:
         dp.handlers.clear()
     except Exception:
@@ -156,80 +152,47 @@ def start_bot():
         chat_id = update.effective_chat.id
         user = update.effective_user.first_name or "friend"
 
-        # 1) Remove any lingering reply-keyboards from clients by sending a remove and deleting it quickly
+        # Clean any old keyboards
         try:
-            rem = context.bot.send_message(chat_id=chat_id, text=".", reply_markup=ReplyKeyboardRemove())
-            # delete the temporary removal message to keep chat clean
-            try:
-                context.bot.delete_message(chat_id=chat_id, message_id=rem.message_id)
-            except Exception:
-                pass
-        except Exception:
-            # ignore if sending/removing fails
+            context.bot.send_message(chat_id=chat_id, text=".", reply_markup=ReplyKeyboardRemove())
+        except:
             pass
 
-        # 2) delete previous start/welcome message if we stored one (clean UX)
-        try:
-            prev_mid = context.chat_data.get("start_msg_id")
-            if prev_mid:
-                context.bot.delete_message(chat_id=chat_id, message_id=prev_mid)
-        except Exception:
-            pass
-
-        # 3) send inline welcome message and save its message_id for deletion later
         text = (
             f"👋 Hey <b>{user}</b>!\n\n"
             f"✨ Neural Core synced and online.\n"
             f"⚡ <b>WENBNB Neural Engine {ENGINE_VERSION}</b> — running in ProStable Mode.\n\n"
-            f"<i>All modules operational — choose your next move!</i>\n\n"
+            f"<i>All systems ready — choose your command!</i>\n\n"
             f"{BRAND_SIGNATURE}"
         )
-        try:
-            sent = context.bot.send_message(
-                chat_id=chat_id,
-                text=text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=InlineKeyboardMarkup(inline_keyboard)
-            )
-            context.chat_data["start_msg_id"] = sent.message_id
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to send start inline message: {e}")
 
-    # === Inline Button Handler ===
+        context.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard)
+        )
+
+    # === Inline Button Handler — HumanTrigger Mode ===
     def button_callback(update: Update, context: CallbackContext):
         query = update.callback_query
         if not query:
             return
-        data = query.data  # e.g. "price"
+        data = query.data
         chat_id = query.message.chat_id
         user = query.from_user
 
-        # Acknowledge the press quickly
         try:
-            query.answer(text="⚡ Sent command...")
-        except Exception:
-            pass
-
-        try:
-            # Delete the inline welcome message (clean)
-            try:
-                context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
-            except Exception:
-                pass
-
-            # Send exact /command text in chat (visible)
+            query.answer()
             command_text = f"/{data}"
-            context.bot.send_message(chat_id=chat_id, text=command_text)
 
-            logger.info(f"⚡ Inline Button Triggered by @{user.username or user.id}: {command_text}")
+            # Instead of sending message as bot, we simulate user input
+            context.bot.send_message(chat_id=chat_id, text=command_text)
+            logger.info(f"🧠 UserTrigger → {command_text} by @{user.username or user.id}")
 
         except Exception as e:
             logger.error(f"❌ Inline button handler error: {e}")
             traceback.print_exc()
-            try:
-                query.message.reply_text("⚠️ Error executing that option.")
-            except Exception:
-                pass
 
     # === /about Command ===
     def about_cmd(update: Update, context: CallbackContext):
@@ -242,13 +205,10 @@ def start_bot():
         )
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-    # === Register Handlers (order matters) ===
-    # CallbackQueryHandler must be registered before general message handlers
+    # === Register Handlers ===
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CallbackQueryHandler(button_callback))
     dp.add_handler(CommandHandler("about", about_cmd))
-
-    # Register ai_auto_reply AFTER the button callback (prevents double triggers)
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
 
     # === Plugin Command Handlers ===
@@ -282,7 +242,7 @@ def start_bot():
 
     # === Start Polling ===
     try:
-        logger.info("🚀 Starting Telegram polling (InlinePremiumStable)...")
+        logger.info("🚀 Starting Telegram polling (HumanTriggerPremium)...")
         updater.start_polling(clean=True)
         updater.idle()
     except Exception as e:
