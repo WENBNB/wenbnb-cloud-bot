@@ -6,11 +6,7 @@ AI Auto-Reply — EmotionHuman v8.7.7-StableHybrid Fix
 • Replies in groups + DMs
 """
 
-import os
-import json
-import random
-import requests
-import traceback
+import os, json, random, requests, traceback
 from datetime import datetime
 from typing import Dict, Any, Optional
 from telegram import Update, ParseMode
@@ -23,10 +19,8 @@ MEMORY_FILE = "user_memory.json"
 # -------------- Memory ----------------
 def load_memory():
     if os.path.exists(MEMORY_FILE):
-        try:
-            return json.load(open(MEMORY_FILE, "r", encoding="utf-8"))
-        except:
-            return {}
+        try: return json.load(open(MEMORY_FILE, "r", encoding="utf-8"))
+        except: return {}
     return {}
 
 def save_memory(data):
@@ -46,7 +40,7 @@ def canonical_username(user):
 def display_handle(user):
     return f"@{user.username}" if getattr(user,"username",None) else (user.first_name or "friend")
 
-# -------------- Language --------------
+# -------------- Hinglish detect -------
 def contains_devanagari(t): return any("\u0900" <= ch <= "\u097F" for ch in t)
 def wants_hinglish(t):
     tokens=["bhai","yaar","kya","accha","nahi","haan","bolo","chal","kuch"]
@@ -63,24 +57,22 @@ def detect_topic(t):
         "web3":["wallet","metamask","gas","contract"]
     }
     t2=t.lower()
-    for k,v in topics.items(): 
+    for k,v in topics.items():
         if any(w in t2 for w in v): return k
     return "general"
 
-# -------------- signature --------------
+# -------------- Signature --------------
 def build_signature(m):
     if m in ("Positive","Excited"): return "<b>🚀 WENBNB Neural Engine</b>"
     if m=="Reflective": return "<i>✨ WENBNB Neural Engine</i>"
     return "<b>⚡ WENBNB Neural Engine</b>"
 
-# -------------- greet engine -----------
+# -------------- Greeting ---------------
 def smart_greeting(uid, name, hinglish, mood, mem):
     data = mem.get(uid,{})
     last = data.get("last_name_used", False)
     include = not last and random.random() < 0.85
-    vibe = "chill"
-    if mood in ("Positive","Excited"): vibe="playful"
-    elif mood=="Reflective": vibe="gentle"
+    vibe = "playful" if mood in ("Positive","Excited") else ("gentle" if mood=="Reflective" else "chill")
 
     greet=""
     if include:
@@ -97,10 +89,11 @@ def smart_greeting(uid, name, hinglish, mood, mem):
         data["last_name_used"] = True
     else:
         if random.random()<0.25: data["last_name_used"]=False
+
     mem[uid]=data
     return greet,mem
 
-# -------------- OpenAI ----------------
+# -------------- AI ---------------------
 def call_ai(prompt,user_name,mood,hinglish,mem_ctx):
     sys = "Keep replies short, playful, emotional. Avoid robotic tone."
     if hinglish: sys+=" Hinglish allowed."
@@ -118,20 +111,20 @@ def call_ai(prompt,user_name,mood,hinglish,mem_ctx):
         c=r.get("choices",[{}])[0]
         msg=c.get("message",{}).get("content") or c.get("text")
         return msg.strip() if msg else None
-    except: return None
+    except:
+        return None
 
 FALLBACK_LINES=["Signal blinked 😅, but here’s my take:"]
 FALLBACK_CONT=["Feels promising — trust vibes ✨"]
 
-# -------------- MAIN -------------------
+# -------------- MAIN ENGINE ------------
 def ai_auto_chat(update: Update, context: CallbackContext):
     msg=update.message
     if not msg or not msg.text: return
     text=msg.text.strip()
 
-    # ✅ DO NOT reply to slash commands (user or button)
-    if text.startswith("/"):
-        return
+    # ✅ skip commands
+    if text.startswith("/"): return
 
     chat_id = msg.chat_id
     user = update.effective_user
@@ -143,11 +136,12 @@ def ai_auto_chat(update: Update, context: CallbackContext):
     name = canonical_username(user)
     hinglish = wants_hinglish(text)
     mem = load_memory()
+
     last_mood = mem.get(uid,{}).get("entries",[{"mood":"Balanced"}])[-1]["mood"]
     icon = pick_mood_icon(last_mood)
 
-    # memory context
-    rec = []
+    # memory topics
+    rec=[]
     if uid in mem:
         topics=[e.get("topic") for e in mem[uid].get("entries",[])]
         seen=[]
@@ -157,14 +151,14 @@ def ai_auto_chat(update: Update, context: CallbackContext):
 
     ai = call_ai(text,name,last_mood,hinglish,rec) or random.choice(FALLBACK_LINES)+" "+random.choice(FALLBACK_CONT)
     greet,mem = smart_greeting(uid,name,hinglish,last_mood,mem)
+
+    # ✅ fix placeholder replacement
+    ai = ai.replace("{name}", name)
+
     footer = build_signature(last_mood)
-
-    # replace {name} placeholder if AI outputs it
-    ai_reply = ai_reply.replace("{name}", name_lock)
-
     final = f"{icon} {greet}{ai.strip().capitalize()}\n\n{footer}"
 
-    # log to memory
+    # save memory
     try:
         mem.setdefault(uid,{"entries":[]})
         mem[uid]["entries"].append({"text":text,"reply":ai,"mood":last_mood,"topic":detect_topic(text),"time":datetime.now().isoformat()})
@@ -175,7 +169,7 @@ def ai_auto_chat(update: Update, context: CallbackContext):
     try: msg.reply_text(final,parse_mode=ParseMode.HTML)
     except: msg.reply_text(final)
 
-# registration
+# register
 def register_handlers(dp,config=None):
     from telegram.ext import MessageHandler, Filters
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_chat))
