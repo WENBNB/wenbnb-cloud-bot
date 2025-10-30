@@ -159,6 +159,9 @@ def ai_auto_chat(update: Update, context: CallbackContext):
     greet,mem = smart_greeting(uid,name,hinglish,last_mood,mem)
     footer = build_signature(last_mood)
 
+    # replace {name} placeholder if AI outputs it
+    ai_reply = ai_reply.replace("{name}", name_lock)
+
     final = f"{icon} {greet}{ai.strip().capitalize()}\n\n{footer}"
 
     # log to memory
