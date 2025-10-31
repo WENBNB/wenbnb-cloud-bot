@@ -1,76 +1,132 @@
 """
-AI Auto-Conversation System v8.6 — Contextual Neural Reply Engine (ProStable)
-Transforms the bot into a free-talking conversational AI.
-Now powered via REST API — fully compatible with OpenAI >= 1.0.0
-Integrated with WENBNB Neural Engine — Emotion Context Intelligence 24×7
+AI Auto-Conversation System v9.2 — Thread-Locked Emotional Engine
+• Remembers topic until user clearly switches
+• Flirt allowed, but task priority stays #1
+• No random drift
+• “Pehle kya bolaa?” answers properly
 """
 
-import os, time, requests
+import os, time, requests, json
 from telegram import Update
 from telegram.ext import MessageHandler, Filters, CallbackContext
 
 # === Config ===
 AI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 AI_MODEL = "gpt-4o-mini"
-BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Contextual Intelligence 24×7"
+BRAND_TAG = "⚡ WENBNB Emotional Intelligence 24×7"
 
-# === Memory ===
-conversation_memory = {}
+STATE_FILE = "ctx_state.json"
 
-# === Universal AI Request ===
-def ai_generate(prompt):
-    """Calls OpenAI REST API for chat response."""
+def load_state():
+    try:
+        return json.load(open(STATE_FILE, "r"))
+    except:
+        return {}
+
+def save_state(s):
+    json.dump(s, open(STATE_FILE, "w"), indent=2, ensure_ascii=False)
+
+ctx = load_state()
+
+# === Topic Keywords ===
+TOPIC_MAP = {
+    "travel": ["travel", "trip", "manali", "dubai", "ticket", "flight"],
+    "earning": ["earn", "earning", "income", "money", "website", "blog", "affiliate"],
+    "telegram_bot": ["bot", "telegram", "alert", "price bot"],
+    "crypto": ["crypto", "bnb", "btc", "token", "wallet"],
+    "love": ["love", "baby", "meri jaan", "queen", "kiss"],
+    "general": []
+}
+
+HARD_SWITCH = [
+    "new topic", "next topic", "switch topic", 
+    "chhod", "ignore", "done", "khatam", "leave it"
+]
+
+def detect_topic(text: str):
+    text = text.lower()
+    for topic, words in TOPIC_MAP.items():
+        if any(w in text for w in words):
+            return topic
+    return "general"
+
+# === OpenAI Call ===
+def ai_generate(system, user):
     try:
         r = requests.post(
             "https://api.openai.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {AI_API_KEY}"},
             json={
                 "model": AI_MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.85,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user}
+                ],
+                "temperature": 0.8,
                 "max_tokens": 250,
             },
-            timeout=20,
+            timeout=25,
         )
-        data = r.json()
-        return data.get("choices", [{}])[0].get("message", {}).get("content", "⚡ Neural silence detected.")
-    except Exception as e:
-        return f"⚠️ AI Core Error: {e}"
+        return r.json()["choices"][0]["message"]["content"]
+    except:
+        return "⚠️ Neural core reconnecting…"
 
-# === Generate AI Reply ===
-def generate_ai_reply(user_id, user_message):
-    """Context-based AI response with emotional tone."""
-    global conversation_memory
+# === MAIN Chat Driver ===
+def generate_ai_reply(uid, user_msg):
+    global ctx
 
-    context = conversation_memory.get(user_id, "")
-    prompt = (
-        "You are WENBNB AI — a warm, emotionally intelligent crypto assistant.\n"
-        "Keep replies human, empathetic, a little witty, and context-aware.\n"
-        f"Conversation so far:\n{context}\n\n"
-        f"User: {user_message}\nAI:"
+    u = ctx.get(str(uid), {"topic": None, "log": []})
+
+    # Hard reset keywords
+    if any(k in user_msg.lower() for k in HARD_SWITCH):
+        u = {"topic": None, "log": []}
+
+    # Detect new topic
+    detected = detect_topic(user_msg)
+
+    # Lock logic — only switch if no current thread OR clear intent
+    if u["topic"] is None or (detected != u["topic"] and len(user_msg) > 8):
+        u["topic"] = detected
+
+    # Append memory (short stack)
+    u["log"].append(f"User: {user_msg}")
+    u["log"] = u["log"][-10:]
+
+    ctx[str(uid)] = u
+    save_state(ctx)
+
+    system = (
+        "You are WENBNB Emotional AI.\n"
+        "Priority: stay on SAME TOPIC unless user clearly switches.\n"
+        "Flirt tone allowed but TASK > flirty vibes.\n"
+        "If user asks 'pehle kya bola', tell them & continue thread.\n"
+        f"Active topic: {u['topic']}\n"
+        "Conversation memory:\n" + "\n".join(u["log"])
     )
 
-    ai_text = ai_generate(prompt)
-    conversation_memory[user_id] = (context + f"\nUser: {user_message}\nAI: {ai_text}")[-1200:]
+    reply = ai_generate(system, user_msg)
 
-    return ai_text
+    u["log"].append(f"AI: {reply}")
+    u["log"] = u["log"][-10:]
+    ctx[str(uid)] = u
+    save_state(ctx)
+
+    return reply
 
 # === Telegram Handler ===
 def ai_auto_reply(update: Update, context: CallbackContext):
-    """Auto conversation mode — replies to all normal text messages."""
-    user_id = update.effective_user.id
-    user_message = update.message.text.strip()
+    uid = update.effective_user.id
+    text = update.message.text.strip()
 
-    # Ignore commands like /start or /help
-    if user_message.startswith("/"):
+    if text.startswith("/"):
         return
 
     update.message.chat.send_action("typing")
-    time.sleep(1.1)
+    time.sleep(0.8)
 
-    ai_response = generate_ai_reply(user_id, user_message)
-    update.message.reply_text(f"{ai_response}\n\n{BRAND_TAG}")
+    ai = generate_ai_reply(uid, text)
+    update.message.reply_text(f"{ai}\n\n{BRAND_TAG}")
 
-# === Register Handler ===
+# === Register ===
 def register_handlers(dp):
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply))
