@@ -1,12 +1,11 @@
 """
-WENBNB Neural Memory Engine v8.7.5 — MemoryContext++ Edition
-──────────────────────────────────────────────────────────────
-Purpose:
-• Fuses user memory + emotion_sync + stabilizer data
-• Adds long-term tone continuity and emotional drift balance
-• Smart expiry (auto-cleans entries >48h old)
-• Provides emotional context tags for AI core replies
-• 100% backward compatible with v8.3 memory file
+WENBNB Neural Memory Engine v9.0 — Queen Recall Core
+───────────────────────────────────────────────────────
+• Emotional memory + tone sync
+• Task + IntentLock memory (NEW)
+• Recalls earning/crypto/travel/website goals
+• 48h auto cleanup + short-term intent expiry
+• AI girlfriend brain + productivity assistant 😏
 """
 
 import os
@@ -26,7 +25,6 @@ STABILIZER_FILE = "emotion_stabilizer.db"
 BRAND_TAG = "🚀 Powered by WENBNB Neural Engine — Emotional Intelligence 24×7"
 
 # ====== Load & Save ======
-
 def load_json(path, default=None):
     if not os.path.exists(path):
         return default or {}
@@ -47,7 +45,6 @@ def load_memory(): return load_json(MEMORY_FILE, {})
 def save_memory(data): save_json(MEMORY_FILE, data)
 
 # ====== Emotion Analysis ======
-
 def analyze_emotion(text):
     blob = TextBlob(text)
     polarity = blob.sentiment.polarity
@@ -59,9 +56,7 @@ def analyze_emotion(text):
         return "Balanced"
 
 # ====== Expiry Cleanup ======
-
 def clean_expired_entries(entries):
-    """Remove entries older than 48 hours"""
     cleaned = []
     now = datetime.now()
     for e in entries:
@@ -71,12 +66,48 @@ def clean_expired_entries(entries):
                 cleaned.append(e)
         except Exception:
             cleaned.append(e)
-    return cleaned[-12:]  # keep last 12 recent ones
+    return cleaned[-12:]
+
+# ====== Intent Memory (NEW v9.0) ======
+INTENT_KEYS = [
+    "earn", "earning", "income", "money",
+    "crypto", "trade", "signals", "market", "bnb", "btc",
+    "bot", "telegram bot", "tg bot",
+    "website", "blog", "ecommerce",
+    "travel", "flight", "usa", "visa",
+    "plan", "project", "build", "startup"
+]
+
+def update_user_task(user_id, text, memory):
+    uid = str(user_id)
+    detected = [k for k in INTENT_KEYS if k in text.lower()]
+
+    if not detected:
+        return
+
+    if uid not in memory:
+        memory[uid] = {}
+
+    memory[uid]["current_task"] = " | ".join(detected)
+    memory[uid]["last_task_time"] = time.time()
+    save_memory(memory)
+
+def get_user_task(user_id, memory, expire_sec=7200):
+    uid = str(user_id)
+    user = memory.get(uid, {})
+
+    if not user or "current_task" not in user:
+        return None
+
+    if time.time() - user.get("last_task_time", 0) > expire_sec:
+        user["current_task"] = None
+        save_memory(memory)
+        return None
+
+    return user.get("current_task")
 
 # ====== Merge External Emotion Data ======
-
 def merge_emotion_state(user_id, mood):
-    """Merges mood with external emotion_sync or stabilizer files"""
     sync = load_json(EMOTION_SYNC_FILE, {})
     stab = load_json(STABILIZER_FILE, {})
 
@@ -94,7 +125,6 @@ def merge_emotion_state(user_id, mood):
     return merged
 
 # ====== Memory Update ======
-
 def update_memory(user_id, message, memory):
     mood = analyze_emotion(message)
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -117,11 +147,14 @@ def update_memory(user_id, message, memory):
     entries = clean_expired_entries(entries)
     memory[uid]["entries"] = entries
     memory[uid]["context_tags"] = merged_emotion["context_tags"]
+
+    # **New Intent Memory call**
+    update_user_task(user_id, message, memory)
+
     save_memory(memory)
     return mood, merged_emotion
 
 # ====== Commands ======
-
 def aianalyze(update: Update, context: CallbackContext):
     user = update.effective_user
     memory = load_memory()
@@ -137,26 +170,9 @@ def aianalyze(update: Update, context: CallbackContext):
     text = " ".join(args)
     mood, emo_data = update_memory(user.id, text, memory)
 
-    tones = {
-        "Positive": [
-            f"✨ Love that energy, {user.first_name}! Your {emo_data['label']} vibe is on fire — pure WENBNB alpha!",
-            f"🌞 Radiating optimism, {user.first_name}. Neural tone synced: {emo_data['label']} {emo_data['last_emoji']}"
-        ],
-        "Negative": [
-            f"💭 Hey {user.first_name}, I can feel some turbulence — but your {emo_data['label']} tone will stabilize soon.",
-            f"😔 Storms don’t last forever, {user.first_name}. Emotional state synced as {emo_data['label']}."
-        ],
-        "Balanced": [
-            f"🌙 Steady and mindful, {user.first_name}. Your tone {emo_data['label']} {emo_data['last_emoji']} shows real discipline.",
-            f"🧘 Calm pulse detected, {user.first_name}. Context: {emo_data['context_tags']}."
-        ]
-    }
-
-    chosen = random.choice(tones.get(mood, ["Processing your vibe..."]))
     reply = (
         f"🪞 <b>Emotional Sync Active:</b> {mood}\n"
         f"<b>Context:</b> {emo_data['context_tags']}\n\n"
-        f"{chosen}\n\n"
         f"{BRAND_TAG}"
     )
     update.message.reply_text(reply, parse_mode="HTML")
@@ -167,10 +183,14 @@ def show_memory(update: Update, context: CallbackContext):
     data = memory.get(str(user.id))
 
     if not data or not data.get("entries"):
-        update.message.reply_text("🫧 No emotional data found yet. Use /aianalyze to start syncing 💫")
+        update.message.reply_text("🫧 No emotional data stored. Use /aianalyze first.")
         return
 
-    text = f"<b>🧠 WENBNB Emotional Memory Snapshot — v8.7.5 MemoryContext++</b>\n\n"
+    task = get_user_task(user.id, memory) or "None"
+
+    text = f"<b>🧠 Memory Snapshot (v9.0)</b>\n"
+    text += f"🎯 Current Intent: <b>{task}</b>\n\n"
+
     for item in data["entries"][-5:]:
         text += (
             f"🕒 {item['time']}\n"
@@ -189,13 +209,13 @@ def reset_memory(update: Update, context: CallbackContext):
     if str(user.id) in memory:
         del memory[str(user.id)]
         save_memory(memory)
-        update.message.reply_text("🧹 Memory cleared successfully.\nStarting fresh with you ✨")
+        update.message.reply_text("🧹 Memory reset. Fresh start 🤝✨")
     else:
-        update.message.reply_text("🫧 No stored memory to reset.")
+        update.message.reply_text("🫧 No memory stored.")
 
 # ====== Register ======
 def register_handlers(dp):
     dp.add_handler(CommandHandler("aianalyze", aianalyze))
     dp.add_handler(CommandHandler("memory", show_memory))
     dp.add_handler(CommandHandler("forget", reset_memory))
-    print("✅ Loaded plugin: memory_engine.py v8.7.5 MemoryContext++ Edition")
+    print("✅ Loaded plugin: memory_engine v9.0 (Queen Recall)")
