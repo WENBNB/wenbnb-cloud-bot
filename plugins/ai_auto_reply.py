@@ -1,6 +1,6 @@
 # ============================================================
-# WENBNB • AI Auto-Reply v9.4 "Ultra Queen Mode"
-# Girlfriend vibe + CEO execution + TaskMode + IntentLock++
+# WENBNB • AI Auto-Reply v9.4.3 "Ultra Queen Stable"
+# Girlfriend vibe + CEO execution + Smart Short Replies + IntentLock++
 # ============================================================
 
 import os, json, random, requests, re
@@ -15,8 +15,8 @@ MEMORY_FILE  = os.getenv("WENBNB_MEMORY_FILE", "user_memory.json")
 
 TOPIC_LOCK_WINDOW_SEC = 420
 
-# === Load / Save Memory ===
-def load_memory(): 
+# === Memory ===
+def load_memory():
     if os.path.exists(MEMORY_FILE):
         try: return json.load(open(MEMORY_FILE,"r",encoding="utf-8"))
         except: return {}
@@ -26,7 +26,7 @@ def save_memory(data):
     try: json.dump(data,open(MEMORY_FILE,"w",encoding="utf-8"),indent=2,ensure_ascii=False)
     except: pass
 
-# === Mood icons ===
+# === Mood Icons ===
 MOOD_ICON = {
     "Positive":["🔥","🚀","✨"],
     "Balanced":["🙂","💫","😌"],
@@ -35,17 +35,18 @@ MOOD_ICON = {
     "Sad":["😔","💔"],
     "Angry":["😠","😤"]
 }
-
 def mood_icon(m): return random.choice(MOOD_ICON.get(m,["🙂"]))
 
-def canonical_name(u): return u.username if getattr(u,"username",None) else (u.first_name or "friend")
+# === Name Get ===
+def canonical_name(u):
+    return u.username if getattr(u,"username",None) else (u.first_name or "friend")
 
-# Hinglish detector
+# === Hinglish Detection ===
 def devanagari(t): return any("\u0900"<=c<="\u097F" for c in t)
 HING = ["bhai","yaar","kya","accha","nahi","haan","bolo","karna","madad","chalo","kaise","kese","tips","earning"]
 def hinglish(t): return devanagari(t) or any(x in t.lower() for x in HING)
 
-# Topic clusters
+# === Topic Detect ===
 TOPICS = {
     "market":["bnb","btc","eth","crypto","token","chart","pump","market","price","trade"],
     "airdrop":["airdrop","claim","reward","points","quest","farm"],
@@ -53,28 +54,24 @@ TOPICS = {
     "life":["love","sleep","work","tired","busy","mood","relationship"],
     "fun":["meme","joke","lol","funny"],
 }
-
 def detect_topic(t):
     t=t.lower()
     for k,v in TOPICS.items():
         if any(x in t for x in v): return k
     return "general"
 
-# --- Task Mode keywords ---
+# === Task Detection ===
 TASK_KEYWORDS = ["kaise","kese","steps","plan","help","madad","guide","process","workflow","banao","setup","banani","earning","kro","karao"]
+def wants_task(text): return any(k in text.lower() for k in TASK_KEYWORDS)
 
-def wants_task(text):
-    t=text.lower()
-    return any(k in t for k in TASK_KEYWORDS)
-
-# === Topic Lock ===
+# === Topic Lock Memory ===
 def topic_lock(mem,uid):
     st=mem.get(uid,{}).get("lock")
     if not st: return None
-    try: last=datetime.fromisoformat(st["t"])
-    except: return None
-    if datetime.utcnow()-last<=timedelta(seconds=TOPIC_LOCK_WINDOW_SEC):
-        return st["topic"]
+    try:
+        if datetime.utcnow()-datetime.fromisoformat(st["t"])<=timedelta(seconds=TOPIC_LOCK_WINDOW_SEC):
+            return st["topic"]
+    except: pass
     return None
 
 def set_lock(mem,uid,topic):
@@ -85,7 +82,7 @@ def refresh(mem,uid):
     if "lock" in mem.get(uid,{}):
         mem[uid]["lock"]["t"]=datetime.utcnow().isoformat()
 
-# === Intent Lock (NEW) ===
+# === Intent Lock ===
 def set_intent(mem,uid,intent):
     mem.setdefault(uid,{})
     mem[uid]["intent"]=intent
@@ -109,84 +106,85 @@ def detect_intent(text):
     if "earning" in txt: return "earning"
     return ""
 
-# === Prompt Builder ===
+# === System Prompt ===
 def sys_prompt(name, mood, h, rec, lock, intent, task):
-    p="You are WENBNB girlfriend-coach AI. Warm, playful, loyal, but FOCUSED.\n"
-    p+="Rules:\n"
-    p+="• Replies short (2–4 lines)\n"
-    p+="• Stay on topic. Never forget current goal\n"
-    p+="• Hinglish if user uses it\n"
-    p+="• Flirt soft but never lose discipline\n"
-    if lock: p+=f"• TopicLock: stay on {lock}\n"
-    if intent: p+=f"• User goal = {intent}. Keep pushing progress\n"
-    if task: p+="• **User wants steps. Give actionable steps, bullet points, ask next detail.**\n"
-    if h: p+="• Use Hinglish\n"
-    if rec: p+=f"Recent thoughts: {', '.join(rec)}\n"
-    p+=f"User name is {name}. Mood = {mood}.\n"
+    p = (
+    "You are WENBNB girlfriend-coach AI — warm, teasing, loyal, strict focus.\n"
+    "Default replies = MAX 2–3 lines, crisp, emotional intelligence.\n"
+    "If user asks guide/steps/info → longer allowed + bullet points.\n"
+    "Ask 1 follow-up question to push action.\n"
+    "Flirt soft, never cringe, never over sweet.\n"
+    "Don't repeat user's name too much.\n"
+    "If romance → respond sweet but steer back to goals.\n"
+    "Stay on topic unless user clearly changes.\n"
+    )
+    if h: p+="Use Hinglish tone.\n"
+    if lock: p+=f"TopicLock = {lock}.\n"
+    if intent: p+=f"User goal = {intent}.\n"
+    if task: p+="User wants steps: Give clear steps.\n"
+    if rec: p+=f"Recent themes: {', '.join(rec)}\n"
+    p+=f"User = {name}. Mood = {mood}."
     return p
 
-# === Call AI ===
+# === Call OpenAI ===
 def call_ai(prompt, SYS):
     body={
         "model":"gpt-4o-mini",
-        "messages":[
-            {"role":"system","content":SYS},
-            {"role":"user","content":prompt}
-        ],
+        "messages":[{"role":"system","content":SYS},{"role":"user","content":prompt}],
         "temperature":0.9,"max_tokens":200
     }
-    url=AI_PROXY_URL or "https://api.openai.com/v1/chat/completions"
+    url = AI_PROXY_URL or "https://api.openai.com/v1/chat/completions"
     headers={"Content-Type":"application/json"}
     if not AI_PROXY_URL: headers["Authorization"]=f"Bearer {AI_API_KEY}"
     try:
         r=requests.post(url,json=body,headers=headers,timeout=22).json()
         return r.get("choices",[{}])[0].get("message",{}).get("content","")
     except:
-        return "Network thoda blush kar gaya 😅 but hum yahin hai ❤️"
+        return "Network glitch tha but main yahin ho 😌"
 
-# === Smalltalk flair ===
-SMALL = re.compile(r"(hi|hello|hey|love|😘|❤️|😉|🥰|😏)",re.I)
+# === Smalltalk ===
+SMALL=re.compile(r"(hi|hello|hey|love|😘|❤️|😉|🥰|😏)",re.I)
 def smalltalk(t): return bool(SMALL.search(t))
 
-# === Greeting logic ===
+# === Greeting ===
 def greet(mem,uid,name,h,m):
     u=mem.get(uid,{})
     last=u.get("g",False)
-    use=not last and random.random()<0.8
-    tone="playful" if m in ("Positive","Excited") else "soft"
+    use = (not last) and random.random()<0.8
+    tone = "playful" if m in ("Positive","Excited") else "soft"
+
     if h:
         bank={
-            "playful":[f"Aree {name} 😎, ",f"Sun na {name}, ",f"{name} boss, "],
-            "soft":[f"{name}, ",f"Hey {name}, ",f"Arey {name}, "],
+            "playful":[f"Aree {name}, ", f"Sun na, ", "Dekho zara 😏, "],
+            "soft":[f"{name}, ", "Hmm suno, ", "Okay, "]
         }
     else:
         bank={
-            "playful":[f"Hey {name} 😏, ",f"Yo {name}, ",f"{name}, you there? "],
-            "soft":[f"Hi {name}, ",f"Hello {name}, ",f"{name}, "],
+            "playful":[f"Hey {name}, ", "Yo, ", "Guess what 😉, "],
+            "soft":[f"Hi, ", "Alright, ", "Okay, "]
         }
-    if use:
-        g=random.choice(bank[tone])
-        u["g"]=True
-    else:
-        if random.random()<0.3: u["g"]=False
-        g=""
-    mem[uid]=u
-    return g,mem
 
-# === MAIN Handler ===
+    if not use:
+        if random.random()<0.3: u["g"]=False
+        mem[uid]=u; return "",mem
+
+    u["g"]=True; mem[uid]=u
+    return random.choice(bank[tone]),mem
+
+# === Main Handler ===
 def ai_auto_chat(update:Update, context:CallbackContext):
-    msg=update.message
+    msg = update.message
     if not msg or not msg.text: return
-    text=msg.text.strip()
+    text = msg.text.strip()
     if text.startswith("/") or update.effective_user.is_bot: return
 
-    chat=msg.chat_id
-    user=update.effective_user
-    uid=str(user.id)
+    chat = msg.chat_id
+    user = update.effective_user
+    uid  = str(user.id)
     try: context.bot.send_chat_action(chat,"typing")
     except: pass
 
-    name=canonical_name(user)
+    name = canonical_name(user)
     h = hinglish(text)
     mem = load_memory()
     st  = mem.setdefault(uid,{"e":[]})
@@ -196,17 +194,17 @@ def ai_auto_chat(update:Update, context:CallbackContext):
     lock = topic_lock(mem,uid) or cur_topic
     set_lock(mem,uid,lock); refresh(mem,uid)
 
-    # Intent Lock
+    # intent
     intent = get_intent(mem,uid)
     new_intent = detect_intent(text)
-    if new_intent: 
+    if new_intent:
         intent = new_intent
         set_intent(mem,uid,intent)
 
-    # Task-mode detect
+    # task
     task = wants_task(text)
 
-    # Recent memory 
+    # context memory
     seen=[]
     for e in reversed(st["e"]):
         t=e.get("t")
@@ -215,17 +213,21 @@ def ai_auto_chat(update:Update, context:CallbackContext):
     rec=list(reversed(seen))
 
     SYS = sys_prompt(name,last_m,h,rec,lock,intent,task)
-    ai = call_ai(text,SYS)
+    ai  = call_ai(text,SYS) or ""
+    ai  = ai.strip()
 
-    if ai and ai[0].isalpha(): ai = ai[0].upper() + ai[1:]
+    # Fix name spam
+    if ai.lower().count(name.lower())>1:
+        ai = ai.replace(name,"").strip()
 
-    icon = mood_icon(last_m)
+    if ai and ai[0].isalpha(): ai = ai[0].upper()+ai[1:]
+
+    ic = mood_icon(last_m)
     g,mem = greet(mem,uid,name,h,last_m)
-
     tail = " 😉" if smalltalk(text) and lock in ("general","fun") else ""
-    final = f"{icon} {g}{ai}{tail}\n\n<b>⚡ WENBNB Neural Engine</b> — Focus + Emotion 24×7"
 
-    # Save memory
+    final = f"{ic} {g}{ai}{tail}\n\n<b>⚡ WENBNB Neural Engine</b> — Focus + Emotion"
+
     st["e"].append({"u":text,"r":ai,"m":last_m,"t":cur_topic,"time":datetime.utcnow().isoformat()})
     st["e"]=st["e"][-18:]
     mem[uid]=st; save_memory(mem)
