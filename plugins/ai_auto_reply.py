@@ -1,6 +1,6 @@
 # plugins/ai_auto_reply.py
 """
-AI Auto-Reply — EmotionHuman v8.7.6-HybridFeel Update (Ready-to-paste)
+AI Auto-Reply — EmotionHuman v8.7.6-HybridFeel Update (+ ContinuityPatch v2)
 • Exact-case NameLock (preserve username casing where available)
 • SmartNick Engine (avoids repeating username too often)
 • MoodIcon Variation (not a single boring emoji)
@@ -8,6 +8,7 @@ AI Auto-Reply — EmotionHuman v8.7.6-HybridFeel Update (Ready-to-paste)
 • MemoryContext++ (remembers recent topics + last names used)
 • Hinglish-aware replies
 • Render/OpenAI proxy safe fallback
+• NEW: Conversation Continuity — last themes + last user lines recall (no goal forcing)
 """
 
 import os
@@ -89,7 +90,7 @@ def contains_devanagari(text: str) -> bool:
 
 def wants_hinglish(text: str) -> bool:
     # detect Devanagari or common Hinglish tokens
-    tokens = ["bhai", "yaar", "kya", "accha", "nahi", "haan", "bolo", "kise", "chal", "kuch"]
+    tokens = ["bhai", "yaar", "kya", "accha", "acha", "nahi", "haan", "bolo", "kise", "chal", "kuch", "kar", "ho", "tips"]
     text_l = text.lower()
     return contains_devanagari(text) or any(t in text_l for t in tokens)
 
@@ -98,11 +99,12 @@ def wants_hinglish(text: str) -> bool:
 # -------------------------
 def detect_topic(text: str) -> str:
     topics = {
-        "market": ["bnb", "btc", "crypto", "token", "coin", "chart", "pump", "dump", "market"],
-        "airdrop": ["airdrop", "claim", "reward", "points", "task"],
-        "life": ["sleep", "love", "work", "tired", "busy"],
+        "market": ["bnb", "btc", "crypto", "token", "coin", "chart", "pump", "dump", "market", "price", "trend"],
+        "airdrop": ["airdrop", "claim", "reward", "points", "task", "quest"],
+        "life": ["sleep", "love", "work", "tired", "busy", "relationship", "mood"],
         "fun": ["meme", "joke", "haha", "funny", "lol"],
-        "web3": ["wallet", "connect", "metamask", "gas", "contract"]
+        "web3": ["wallet", "connect", "metamask", "gas", "contract", "deploy", "bot", "stake", "dex"],
+        "travel": ["travel", "trip", "itinerary", "flight", "hotel", "tour"]
     }
     t = text.lower()
     for k, keywords in topics.items():
@@ -169,25 +171,72 @@ def smart_greeting(user_id: int, display_name: str, hinglish: bool, mood: str, m
     mem[uid] = user_data
     return greeting, mem
 
+# ====================================================================
+#                       CONTINUITY PATCH (Add-on)
+# ====================================================================
+# We DO NOT force goals. We just remember the last thread & last lines.
+# Stored per user:
+#   mem[uid]["thread"] -> last 5 topic tags (no duplicates in a row)
+#   mem[uid]["last_lines"] -> last 6 raw user texts (trimmed)
+# These are only used to give the model context to continue naturally.
+
+def _trim_line(s: str) -> str:
+    s = (s or "").strip()
+    if len(s) > 140:
+        return s[:140].rstrip() + "…"
+    return s
+
+def continuity_update(mem: Dict[str, Any], uid: str, user_text: str) -> Dict[str, Any]:
+    u = mem.setdefault(uid, {})
+    # thread update
+    topic = detect_topic(user_text)
+    thr: List[str] = u.setdefault("thread", [])
+    if not thr or thr[-1] != topic:
+        thr.append(topic)
+        u["thread"] = thr[-5:]  # keep last 5 themes
+
+    # last_lines update
+    lines: List[str] = u.setdefault("last_lines", [])
+    lines.append(_trim_line(user_text))
+    u["last_lines"] = lines[-6:]  # keep last 6 lines
+
+    mem[uid] = u
+    return mem
+
+def continuity_context(mem: Dict[str, Any], uid: str) -> Dict[str, List[str]]:
+    u = mem.get(uid, {})
+    return {
+        "thread": u.get("thread", []),
+        "last_lines": u.get("last_lines", [])
+    }
+
 # -------------------------
 # OpenAI / proxy call
 # -------------------------
-def build_system_prompt(user_name: str, mood: str, hinglish: bool, memory_context: Optional[List[str]]):
+def build_system_prompt(user_name: str, mood: str, hinglish: bool, memory_context: Optional[List[str]], contx: Dict[str, List[str]]):
+    """
+    Continuation-first prompt. No coach forcing. Uses thread & last user lines
+    only as light memory so replies feel continuous and human.
+    """
     p = (
         "You are WENBNB AI — a warm, witty, emotionally-aware companion. "
-        "Keep replies short (1-4 sentences), natural, and slightly playful. "
+        "Continue the conversation naturally with short (1–4 sentences) replies. "
+        "Stay casual and human; slight flirt is fine. Do NOT impose goals. "
         "Avoid robotic phrasing and avoid repeating the user's handle twice. "
     )
     if hinglish:
         p += "Prefer a casual Hinglish mix (Hindi + English) when appropriate. "
     if memory_context:
-        p += f"Recently discussed: {', '.join(memory_context)}. Stay consistent with that vibe. "
-    p += f"User name: {user_name}. Mood context: {mood}."
-    p += " Use at most one emoji inline only if natural."
+        p += f"Recently discussed topics: {', '.join(memory_context)}. "
+    if contx.get("thread"):
+        p += f"Conversation thread tags: {', '.join(contx['thread'])}. "
+    if contx.get("last_lines"):
+        p += "Recent user lines: " + " | ".join(contx["last_lines"]) + ". "
+    p += f"User name: {user_name}. Mood context: {mood}. Use at most one emoji only if natural."
     return p
 
-def call_ai(prompt: str, user_name: str, mood: str, hinglish: bool, memory_context: Optional[List[str]]) -> Optional[str]:
-    sys_prompt = build_system_prompt(user_name, mood, hinglish, memory_context)
+def call_ai(prompt: str, user_name: str, mood: str, hinglish: bool, memory_context: Optional[List[str]], contx: Dict[str, List[str]]) -> Optional[str]:
+    sys_prompt = build_system_prompt(user_name, mood, hinglish, memory_context, contx)
     body = {
         "model": "gpt-4o-mini",
         "messages": [
@@ -280,8 +329,12 @@ def ai_auto_chat(update: Update, context: CallbackContext):
                 seen.append(t)
         recent_topics = list(reversed(seen))[:3]
 
+    # >>> Continuity: update + fetch light context
+    mem = continuity_update(mem, uid, text)
+    contx = continuity_context(mem, uid)
+
     # call AI
-    ai_reply = call_ai(text, name_lock, mood, hinglish, recent_topics)
+    ai_reply = call_ai(text, name_lock, mood, hinglish, recent_topics, contx)
     if not ai_reply:
         ai_reply = random.choice(FALLBACK_LINES) + "\n\n" + random.choice(FALLBACK_CONT)
 
@@ -332,4 +385,4 @@ def register_handlers(dp, config=None):
 
 # quick standalone test
 if __name__ == "__main__":
-    print("ai_auto_reply v8.7.6 — paste into plugins/ and load via your plugin manager.")
+    print("ai_auto_reply v8.7.6 — paste into plugins/ and load via your plugin manager. (ContinuityPatch v2)")
