@@ -13,6 +13,10 @@ from telegram.ext import (
     Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 )
 
+# WENBNB AI brains
+from plugins.ai_auto_reply import register_handlers as reply_handlers
+from plugins.ai_auto_context import register_handlers as context_handlers
+
 # ===========================
 # ⚙️ Engine & Branding
 # ===========================
@@ -118,6 +122,10 @@ def start_bot():
 
     updater = Updater(TELEGRAM_TOKEN, use_context=True)
     dp = updater.dispatcher
+
+    # WENBNB Neural core sequence
+    context_handlers(dp)  # thread + topic lock
+    reply_handlers(dp)    # human vibe + emotional replies
 
     try:
         dp.handlers.clear()
@@ -234,3 +242,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
