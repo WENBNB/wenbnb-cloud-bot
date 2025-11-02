@@ -26,9 +26,6 @@ AI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 AI_PROXY_URL = os.getenv("AI_PROXY_URL", "")  # optional proxy to use instead of direct OpenAI
 MEMORY_FILE = "user_memory.json"
 
-# -------------------------
-# Memory helpers
-# -------------------------
 def load_memory() -> Dict[str, Any]:
     if os.path.exists(MEMORY_FILE):
         try:
@@ -42,9 +39,6 @@ def save_memory(data: Dict[str, Any]) -> None:
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-# -------------------------
-# Mood / emoji helpers
-# -------------------------
 MOOD_ICON_VARIANTS = {
     "Positive": ["🔥", "🚀", "✨"],
     "Reflective": ["🌙", "💭", "✨"],
@@ -58,45 +52,24 @@ def pick_mood_icon(mood: str) -> str:
     variants = MOOD_ICON_VARIANTS.get(mood, MOOD_ICON_VARIANTS["Balanced"])
     return random.choice(variants)
 
-# -------------------------
-# username / NameLock helpers
-# -------------------------
 def canonical_username(user) -> str:
-    """
-    Preserve exact case for username when available; fallback to first_name.
-    Telegram's .username may be None. Keep nickname exactly as provided.
-    """
     if getattr(user, "username", None):
-        # username on Telegram is returned without @ but with original case sometimes,
-        # preserve exactly as returned and keep the @ when used publically.
-        return user.username  # exact returned value
+        return user.username
     return user.first_name or "friend"
 
 def display_handle(user) -> str:
-    """
-    A display string like '@CrypTechKing™👑' if username exists,
-    otherwise the preserved first_name.
-    """
     if getattr(user, "username", None):
-        # Keep exact case and prefix with @ in chat lines
         return f"@{user.username}"
     return user.first_name or "friend"
 
-# -------------------------
-# language/hybrid helpers
-# -------------------------
 def contains_devanagari(text: str) -> bool:
     return any("\u0900" <= ch <= "\u097F" for ch in text)
 
 def wants_hinglish(text: str) -> bool:
-    # detect Devanagari or common Hinglish tokens
     tokens = ["bhai", "yaar", "kya", "accha", "acha", "nahi", "haan", "bolo", "kise", "chal", "kuch", "kar", "ho", "tips"]
     text_l = text.lower()
     return contains_devanagari(text) or any(t in text_l for t in tokens)
 
-# -------------------------
-# topic detector (basic)
-# -------------------------
 def detect_topic(text: str) -> str:
     topics = {
         "market": ["bnb", "btc", "crypto", "token", "coin", "chart", "pump", "dump", "market", "price", "trend"],
@@ -112,34 +85,18 @@ def detect_topic(text: str) -> str:
             return k
     return "general"
 
-# -------------------------
-# dynamic signature
-# -------------------------
 def build_signature(mood: str) -> str:
-    """
-    - Energetic moods -> bold brand signature
-    - Reflective/Calm -> softer signature wording
-    """
     if mood in ("Positive", "Excited"):
         return "<b>🚀 WENBNB Neural Engine</b> — Always on, always empathic"
     if mood == "Reflective":
         return "<i>✨ WENBNB Neural Engine — Calm & Thoughtful</i>"
-    # default
     return "<b>⚡ WENBNB Neural Engine</b> — Emotional Intelligence 24×7"
 
-# -------------------------
-# smart greeting / SmartNick Engine
-# -------------------------
 def smart_greeting(user_id: int, display_name: str, hinglish: bool, mood: str, mem: Dict[str, Any]) -> (str, Dict[str, Any]):
-    """
-    Use the display_name but avoid repeating it too often.
-    Track last_name_used boolean in memory per-user. Return greeting fragment + updated mem.
-    """
     uid = str(user_id)
     user_data = mem.get(uid, {})
     last_used = user_data.get("last_name_used", False)
-    # Decide whether to include name: higher chance for first message or when not used recently
-    include_name = not last_used and random.random() < 0.85  # 85% chance to greet when not used recently
+    include_name = not last_used and random.random() < 0.85
 
     vibe = "chill"
     if mood in ("Positive", "Excited"):
@@ -153,32 +110,38 @@ def smart_greeting(user_id: int, display_name: str, hinglish: bool, mood: str, m
             opts = {
                 "playful": [f"Are {display_name} 😄,", f"{display_name} yaar,", f"Sun na {display_name},"],
                 "gentle":  [f"{display_name} bhai,", f"Arey {display_name},", f"{display_name},"],
-                "chill":   [f"Bas vibe dekh {display_name},", f"{display_name},", f"Yo {display_name},"]
+
+                # ✅ patched chill options
+                "chill": [
+                    f"{display_name},",
+                    f"Sun na {display_name},",
+                    f"Arre {display_name}, kya chal raha hai?",
+                    f"Tell me {display_name},",
+                    f"Aaja baat karein {display_name},"
+                ]
             }
         else:
             opts = {
                 "playful": [f"Hey {display_name} 👋,", f"Yo {display_name},", f"{display_name}, good to see you!"],
                 "gentle":  [f"Hey {display_name},", f"{display_name},", f"Hello {display_name},"],
-                "chill":   [f"Yo {display_name},", f"Sup {display_name},", f"{display_name},"]
+
+                # ✅ patched English chill
+                "chill": [
+                    f"Hey {display_name},",
+                    f"So what's up {display_name}?",
+                    f"Talk to me {display_name},",
+                    f"{display_name}, you there?",
+                    f"Alright tell me {display_name},"
+                ]
             }
         greeting = random.choice(opts[vibe]) + " "
         user_data["last_name_used"] = True
     else:
-        # occasionally reset the flag so next messages may include the name again later
         if random.random() < 0.25:
             user_data["last_name_used"] = False
 
     mem[uid] = user_data
     return greeting, mem
-
-# ====================================================================
-#                       CONTINUITY PATCH (Add-on)
-# ====================================================================
-# We DO NOT force goals. We just remember the last thread & last lines.
-# Stored per user:
-#   mem[uid]["thread"] -> last 5 topic tags (no duplicates in a row)
-#   mem[uid]["last_lines"] -> last 6 raw user texts (trimmed)
-# These are only used to give the model context to continue naturally.
 
 def _trim_line(s: str) -> str:
     s = (s or "").strip()
@@ -188,18 +151,14 @@ def _trim_line(s: str) -> str:
 
 def continuity_update(mem: Dict[str, Any], uid: str, user_text: str) -> Dict[str, Any]:
     u = mem.setdefault(uid, {})
-    # thread update
     topic = detect_topic(user_text)
     thr: List[str] = u.setdefault("thread", [])
     if not thr or thr[-1] != topic:
         thr.append(topic)
-        u["thread"] = thr[-5:]  # keep last 5 themes
-
-    # last_lines update
+        u["thread"] = thr[-5:]
     lines: List[str] = u.setdefault("last_lines", [])
     lines.append(_trim_line(user_text))
-    u["last_lines"] = lines[-6:]  # keep last 6 lines
-
+    u["last_lines"] = lines[-6:]
     mem[uid] = u
     return mem
 
@@ -210,14 +169,7 @@ def continuity_context(mem: Dict[str, Any], uid: str) -> Dict[str, List[str]]:
         "last_lines": u.get("last_lines", [])
     }
 
-# -------------------------
-# OpenAI / proxy call
-# -------------------------
 def build_system_prompt(user_name: str, mood: str, hinglish: bool, memory_context: Optional[List[str]], contx: Dict[str, List[str]]):
-    """
-    Continuation-first prompt. No coach forcing. Uses thread & last user lines
-    only as light memory so replies feel continuous and human.
-    """
     p = (
         "You are WENBNB AI — a warm, witty, emotionally-aware companion. "
         "Continue the conversation naturally with short (1–4 sentences) replies. "
@@ -225,14 +177,14 @@ def build_system_prompt(user_name: str, mood: str, hinglish: bool, memory_contex
         "Avoid robotic phrasing and avoid repeating the user's handle twice. "
     )
     if hinglish:
-        p += "Prefer a casual Hinglish mix (Hindi + English) when appropriate. "
+        p += "Prefer a casual Hinglish mix. "
     if memory_context:
-        p += f"Recently discussed topics: {', '.join(memory_context)}. "
-    if contx.get("thread"):
+        p += f"Recently talked about: {', '.join(memory_context)}. "
+    if contx.get('thread'):
         p += f"Conversation thread tags: {', '.join(contx['thread'])}. "
-    if contx.get("last_lines"):
+    if contx.get('last_lines'):
         p += "Recent user lines: " + " | ".join(contx["last_lines"]) + ". "
-    p += f"User name: {user_name}. Mood context: {mood}. Use at most one emoji only if natural."
+    p += f"User name: {user_name}. Mood: {mood}. Use max 1 emoji if natural."
     return p
 
 def call_ai(prompt: str, user_name: str, mood: str, hinglish: bool, memory_context: Optional[List[str]], contx: Dict[str, List[str]]) -> Optional[str]:
@@ -250,30 +202,21 @@ def call_ai(prompt: str, user_name: str, mood: str, hinglish: bool, memory_conte
     headers = {"Content-Type": "application/json"}
     if not AI_PROXY_URL:
         headers["Authorization"] = f"Bearer {AI_API_KEY}"
-
     try:
         r = requests.post(url, headers=headers, json=body, timeout=20)
         data = r.json()
         if "choices" in data and data["choices"]:
-            # chat format
             msg = data["choices"][0].get("message", {}).get("content") or data["choices"][0].get("text")
             if msg:
                 return msg.strip()
-        # if openai returned an error field
         if "error" in data:
             raise RuntimeError(data["error"].get("message", "OpenAI error"))
     except Exception as e:
-        # small console trace for diagnostics on Render
         print("[AI Auto-Reply] call failed:", e)
-        try:
-            traceback.print_exc(limit=1)
-        except Exception:
-            pass
+        try: traceback.print_exc(limit=1)
+        except: pass
     return None
 
-# -------------------------
-# Fallbacks (human-style)
-# -------------------------
 FALLBACK_LINES = [
     "Hmm — small glitch with the neural cloud, but here's my take:",
     "Signal blinked for a sec 😅 — still feeling the energy:",
@@ -286,9 +229,6 @@ FALLBACK_CONT = [
     "That vibe deserves a careful look — good instincts."
 ]
 
-# -------------------------
-# main handler
-# -------------------------
 def ai_auto_chat(update: Update, context: CallbackContext):
     msg = update.message
     if not msg or not msg.text or msg.text.startswith("/"):
@@ -299,17 +239,12 @@ def ai_auto_chat(update: Update, context: CallbackContext):
     uid = str(user.id)
     chat_id = update.effective_chat.id
 
-    # typing indicator
-    try:
-        context.bot.send_chat_action(chat_id=chat_id, action="typing")
-    except Exception:
-        pass
+    try: context.bot.send_chat_action(chat_id=chat_id, action="typing")
+    except: pass
 
-    # prepare identity: prefer exact-case username if available, else first_name
-    name_lock = canonical_username(user)        # keep exact-case username or first_name
-    display_handle_str = display_handle(user)   # @username or first_name for public mention
+    name_lock = canonical_username(user)
+    display_handle_str = display_handle(user)
 
-    # mood & language
     mem = load_memory()
     last_mood = "Balanced"
     if uid in mem and mem[uid].get("entries"):
@@ -318,38 +253,28 @@ def ai_auto_chat(update: Update, context: CallbackContext):
     icon = pick_mood_icon(mood)
     hinglish = wants_hinglish(text)
 
-    # build memory_context (recent topics)
     recent_topics = []
     if uid in mem:
         context_list = [e.get("topic") for e in mem[uid].get("entries", []) if e.get("topic")]
-        # last 3 unique topics
         seen = []
         for t in reversed(context_list):
             if t not in seen:
                 seen.append(t)
         recent_topics = list(reversed(seen))[:3]
-        # >>> continuity update
         mem = continuity_update(mem, uid, text)
         contx = continuity_context(mem, uid)
 
-    # >>> Continuity: update + fetch light context
     mem = continuity_update(mem, uid, text)
     contx = continuity_context(mem, uid)
 
-    # call AI
     ai_reply = call_ai(text, name_lock, mood, hinglish, recent_topics, contx)
     if not ai_reply:
         ai_reply = random.choice(FALLBACK_LINES) + "\n\n" + random.choice(FALLBACK_CONT)
 
-    # Smart greeting: avoid repeating name too often & preserve exact-case
     greet_fragment, mem = smart_greeting(user.id, name_lock, hinglish, mood, mem)
-
-    # finalize message: prefer display handle when announcing publicly, keep name_lock for greeting
     footer = build_signature(mood)
-    # If name is an @ handle, show without duplicating (smart_greeting already used the name_lock)
     final = f"{icon} {greet_fragment}{ai_reply.strip().capitalize()}\n\n{footer}"
 
-    # save memory entry
     try:
         mem.setdefault(uid, {"entries": []})
         entry = {
@@ -360,32 +285,22 @@ def ai_auto_chat(update: Update, context: CallbackContext):
             "time": datetime.now().isoformat()
         }
         mem[uid]["entries"].append(entry)
-        # keep last 15 entries
         mem[uid]["entries"] = mem[uid]["entries"][-15:]
         save_memory(mem)
     except Exception as e:
         print("[AI Auto-Reply] memory save failed:", e)
 
-    # send (HTML allowed)
-    try:
-        msg.reply_text(final, parse_mode=ParseMode.HTML)
+    try: msg.reply_text(final, parse_mode=ParseMode.HTML)
     except Exception:
-        try:
-            msg.reply_text(final)
-        except Exception:
-            pass
+        try: msg.reply_text(final)
+        except: pass
 
-# -------------------------
-# register handler (plugin loader expects register_handlers)
-# -------------------------
 def register_handlers(dp, config=None):
-    # legacy compatibility: plugin_manager may call without config
     try:
         from telegram.ext import MessageHandler, Filters
         dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_chat))
     except Exception as e:
         print("[ai_auto_reply] register failed:", e)
 
-# quick standalone test
 if __name__ == "__main__":
     print("ai_auto_reply v8.7.6 — paste into plugins/ and load via your plugin manager. (ContinuityPatch v2)")
