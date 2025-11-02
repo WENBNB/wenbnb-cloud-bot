@@ -15,7 +15,7 @@ from telegram.ext import (
 
 # WENBNB AI brains
 from plugins.ai_auto_reply import register_handlers as reply_handlers
-from plugins.ai_auto_context import register_handlers as context_handlers
+# from plugins.ai_auto_context import register_handlers as context_handlers
 
 # ===========================
 # ⚙️ Engine & Branding
@@ -124,8 +124,8 @@ def start_bot():
     dp = updater.dispatcher
 
     # WENBNB Neural core sequence
-    context_handlers(dp)  # thread + topic lock
-    reply_handlers(dp)    # human vibe + emotional replies
+    # context_handlers(dp)   # thread + topic lock
+    reply_handlers(dp)     # human vibe + emotion sync
 
     try:
         dp.handlers.clear()
@@ -242,4 +242,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
