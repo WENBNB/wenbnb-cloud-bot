@@ -1,138 +1,143 @@
-# ========================================================
-# WENBNB AI Auto-Reply v9.5 Hybrid Ultra (Final)
-# Girlfriend Warmth + CEO Focus (Only When Asked)
-# Romantic Priority | Marwadi Toggle | Name Polishing
-# ========================================================
+# plugins/ai_auto_reply.py
+"""
+AI Auto-Reply — EmotionHuman v8.7.6 + Continuity Patch v8.8 Final
+• Exact-case NameLock (preserve username casing)
+• SmartNick (no name spam)
+• Hinglish-aware
+• MemoryContext++ (recent 5 messages context)
+• CONTINUITY MODE ✅ remembers flow like human chat
+• No task forcing, no over-smart locks, just natural vibe
+"""
 
-import os, json, random, requests, re
-from datetime import datetime, timedelta
+import os, json, random, requests, traceback, re
+from datetime import datetime
+from typing import List, Dict, Any, Optional
 from telegram import Update, ParseMode
 from telegram.ext import CallbackContext
 
-AI_KEY = os.getenv("OPENAI_API_KEY","")
-PROXY  = os.getenv("AI_PROXY_URL","")
-MEM    = "user_memory.json"
+AI_API_KEY   = os.getenv("OPENAI_API_KEY", "")
+AI_PROXY_URL = os.getenv("AI_PROXY_URL", "")
+MEMORY_FILE  = "user_memory.json"
 
-# Load/save memory
-def load(): return json.load(open(MEM,"r",encoding="utf-8")) if os.path.exists(MEM) else {}
-def save(d): json.dump(d,open(MEM,"w",encoding="utf-8"),indent=2,ensure_ascii=False)
+# ---------------- memory -----------------
+def load_memory():
+    if os.path.exists(MEMORY_FILE):
+        try:
+            return json.load(open(MEMORY_FILE,"r",encoding="utf-8"))
+        except: return {}
+    return {}
 
-# Mood icons
+def save_memory(d):
+    json.dump(d,open(MEMORY_FILE,"w",encoding="utf-8"),
+              indent=2,ensure_ascii=False)
+
+# ---------------- mood -----------------
 MOOD = {
- "love":["💋","❤️‍🔥","😘","💞"],
- "calm":["🙂","✨","😊"],
- "focus":["⚡","🚀","🔥"],
- "fun":["😏","😂","😉"],
+    "Positive":["🔥","🚀","✨"],
+    "Balanced":["🙂","💫","😌"],
+    "Reflective":["🌙","💭","✨"],
+    "Excited":["🤩","💥","🎉"],
+    "Sad":["😔","💔"],
+    "Angry":["😠","😤"]
 }
-def emo(mode): return random.choice(MOOD.get(mode,["✨"]))
+def mood_icon(m): return random.choice(MOOD.get(m,["🙂"]))
 
-# Hinglish detect
-HING = ["kya","haan","nahi","kar","karo","batao","yaar","bhai","chalo","tum","me","mera"]
-def hing(t): t=t.lower(); return any(h in t for h in HING) or any("\u0900"<=c<="\u097F" for c in t)
+# ---------------- id -----------------
+def name(u): return u.username if getattr(u,"username",None) else (u.first_name or "friend")
 
-# Romance trigger
-LOVE = ["baby","jaan","love","miss","kiss","meri","chhori","princess","queen"]
-def romantic(t): return any(x in t.lower() for x in LOVE)
+# ---------------- hinglish -----------------
+def dev(t): return any("\u0900"<=c<="\u097F" for c in t)
+HING = ["bhai","yaar","kya","accha","nahi","haan","bolo","karna","madad","kaise","kese","acha"]
+def hing(t): return dev(t) or any(x in t.lower() for x in HING)
 
-# Work trigger
-WORK = ["earning","kaise","banao","plan","steps","help","guide","crypto","bot","website","business","target"]
-def wants_work(t): return any(x in t.lower() for x in WORK)
+# ---------------- topic -----------------
+TOP={"market":["bnb","btc","eth","crypto","token"],"airdrop":["airdrop","claim"],
+     "web3":["wallet","metamask","contract","deploy"],"life":["love","sleep","work","mood"],
+     "fun":["meme","lol","funny"]}
 
-# Marwadi trigger
-MARU = ["marwadi","rajasthani","chhori","ghani","mharo","sa"]
-def maru(t): return any(x.lower() in t.lower() for x in MARU)
-
-# Topic memory small
-def history(uid,mem):
-    e=mem.get(uid,[]); seen=[]
-    for x in reversed(e):
-        if x.get("topic") not in seen:
-            seen.append(x.get("topic"))
-        if len(seen)>=3: break
-    return ", ".join(seen)
-
-def detect_topic(t):
+def topic(t):
     t=t.lower()
-    if "crypto" in t or "bnb" in t or "btc" in t: return "crypto"
-    if "bot" in t: return "bot"
-    if "site" in t or "website" in t: return "website"
-    if romantic(t): return "romance"
+    for k,w in TOP.items():
+        if any(x in t for x in w): return k
     return "general"
 
-# System prompt
-def build_sys(name, romo, focus, mar, h, hist):
-    p="You are WENBNB girlfriend AI.\nWarm, witty, teasing, loyal.\n"
-    p+="Reply max 2-4 lines.\nNever robotic.\nNo lecturing.\n"
-    if romo: p+="User is in ROMANCE mode. Prioritize love, softness, playful flirty tone.\n"
-    if focus: p+="User asked WORK. Provide short, actionable steps. Be motivating.\n"
-    if mar: p+="Reply in light Marwadi + Hinglish flavor.\n"
-    if h: p+="Use Hinglish naturally.\n"
-    if hist: p+=f"Recent vibe: {hist}\n"
-    p+=f"User name: {name}\n"
-    p+="Use max 1 emoji inline.\n"
-    p+="Avoid repeating user name every sentence.\n"
+# ---------------- greeting -----------------
+SMALL=re.compile(r"(hi|hello|love|😉|😘|❤️|😏)",re.I)
+def small(t): return bool(SMALL.search(t))
+
+def greet(mem,uid,n,h,m):
+    u=mem.get(uid,{})
+    last=u.get("g",False)
+    use=not last and random.random()<0.8
+    tone="playful" if m in ("Positive","Excited") else "soft"
+    bank = {
+        "playful":[f"Aree {n}, ",f"Sun na {n}, ",f"{n}, "],
+        "soft":[f"{n}, ",f"Hey {n}, ",f"{n}, "]
+    } if h else {
+        "playful":[f"Hey {n}, ",f"Yo {n}, ",f"{n}, "],
+        "soft":[f"Hi {n}, ",f"Hello {n}, ",f"{n}, "]
+    }
+    if not use:
+        if random.random()<0.3: u["g"]=False
+        mem[uid]=u; return "",mem
+    g=random.choice(bank[tone]); u["g"]=True; mem[uid]=u; return g,mem
+
+# ---------------- system prompt w/ continuity -----------------
+def sys_prompt(n,m,h,history):
+    p="You are WENBNB AI — warm, witty, emotional, natural girlfriend energy.\n"
+    p+="Keep replies short (1–4 lines), human tone, light tease.\n"
+    p+="Continue the conversation smoothly like you remember everything.\n"
+    p+="NEVER force tasks or plans unless user asks.\n"
+    p+="Use Hinglish if user does.\n"
+    p+="Avoid repeating user's name too much.\n"
+    p+="Use at most 1 emoji.\n"
+    if history:
+        joined=" | ".join(history[-5:])
+        p+=f"Recent conversation hints: {joined}\n"
+        p+="Follow same context naturally, like ongoing chat.\n"
+    p+=f"User: {n} | Mood:{m}\n"
     return p
 
-# API call
-def ask(prompt, sys):
-    body={
-        "model":"gpt-4o-mini",
-        "messages":[{"role":"system","content":sys},{"role":"user","content":prompt}],
-        "temperature":0.8,"max_tokens":170
-    }
-    url = PROXY or "https://api.openai.com/v1/chat/completions"
-    head={"Content-Type":"application/json"}
-    if not PROXY: head["Authorization"]=f"Bearer {AI_KEY}"
-    try:
-        r=requests.post(url,json=body,headers=head,timeout=20).json()
-        return r["choices"][0]["message"]["content"].strip()
-    except:
-        return "Network blush kar gaya 😅 thoda paas baith ❤️"
+# ---------------- call openai -----------------
+def call_ai(prompt,sys):
+    body={"model":"gpt-4o-mini",
+        "messages":[{"role":"system","content":sys},
+                    {"role":"user","content":prompt}],
+        "temperature":0.9,"max_tokens":190}
+    url=AI_PROXY_URL or "https://api.openai.com/v1/chat/completions"
+    h={"Content-Type":"application/json"}
+    if not AI_PROXY_URL: h["Authorization"]=f"Bearer {AI_API_KEY}"
+    try: 
+        r=requests.post(url,json=body,headers=h,timeout=22).json()
+        return r.get("choices",[{}])[0].get("message",{}).get("content","")
+    except: return "Thoda network blush kar gaya 😅 but I’m right here.❤️"
 
-def ai_auto_chat(update:Update,context:CallbackContext):
+# ---------------- main -----------------
+def ai_auto_chat(update:Update, context:CallbackContext):
     msg=update.message
     if not msg or not msg.text or msg.text.startswith("/"): return
-    text=msg.text.strip()
-    user=update.effective_user
-    uid=str(user.id)
+    t=msg.text.strip(); u=update.effective_user; uid=str(u.id)
     try: context.bot.send_chat_action(msg.chat_id,"typing")
     except: pass
 
-    mem=load()
-    mem.setdefault(uid,[])
-    past=mem[uid]
-    last="calm"
-    if past: last=past[-1]["mood"]
+    mem=load_memory(); st=mem.setdefault(uid,{"e":[]})
+    last_m=st["e"][-1]["m"] if st["e"] else "Balanced"
 
-    # STATES
-    romantic_mode = romantic(text)
-    focus_mode    = wants_work(text) and not romantic_mode
-    mar_mode      = maru(text)
-    h             = hing(text)
-    name          = user.first_name or "love"
-    top           = detect_topic(text)
-    hist          = history(uid,mem)
+    # recent history strings for continuity
+    hist=[e["u"] for e in st["e"][-5:]]
 
-    sys = build_sys(name, romantic_mode, focus_mode, mar_mode, h, hist)
-    ans = ask(text, sys)
+    sys=sys_prompt(name(u),last_m,hing(t),hist)
+    ai=call_ai(t,sys).strip()
+    if ai and ai[0].isalpha(): ai=ai[0].upper()+ai[1:]
 
-    # mood icon
-    mode = "love" if romantic_mode else ("focus" if focus_mode else ("fun" if mar_mode else "calm"))
-    icon = emo(mode)
+    ic=mood_icon(last_m); g,mem=greet(mem,uid,name(u),hing(t),last_m)
+    tail=" 😉" if small(t) else ""
+    final=f"{ic} {g}{ai}{tail}\n\n<b>⚡ WENBNB Neural Engine</b> — Emotional Continuity"
 
-    # greet logic short
-    greet = ""
-    if random.random()<0.7 and not romantic_mode:
-        greet = ""
+    st["e"].append({"u":t,"r":ai,"m":last_m,"t":topic(t),"time":datetime.now().isoformat()})
+    st["e"]=st["e"][-18:]; mem[uid]=st; save_memory(mem)
 
-    final = f"{icon} {ans}\n\n<b>⚡ WENBNB Neural Engine</b> — Feel + Focus"
-
-    # save mem
-    mem[uid].append({"text":text,"reply":ans,"mood":mode,"topic":top,"time":datetime.utcnow().isoformat()})
-    mem[uid]=mem[uid][-20:]
-    save(mem)
-
-    try: msg.reply_text(final,parse_mode=ParseMode.HTML)
+    try: msg.reply_text(final,parse_mode=ParseMode.HTML,disable_web_page_preview=True)
     except: msg.reply_text(final)
 
 def register_handlers(dp,config=None):
