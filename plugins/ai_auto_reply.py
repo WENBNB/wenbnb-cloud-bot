@@ -328,6 +328,9 @@ def ai_auto_chat(update: Update, context: CallbackContext):
             if t not in seen:
                 seen.append(t)
         recent_topics = list(reversed(seen))[:3]
+        # >>> continuity update
+        mem = continuity_update(mem, uid, text)
+        contx = continuity_context(mem, uid)
 
     # >>> Continuity: update + fetch light context
     mem = continuity_update(mem, uid, text)
