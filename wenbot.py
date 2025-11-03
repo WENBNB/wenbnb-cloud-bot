@@ -125,12 +125,13 @@ def start_bot():
 
     # WENBNB Neural core sequence
     # context_handlers(dp)   # thread + topic lock
-    reply_handlers(dp)     # human vibe + emotion sync
 
     try:
         dp.handlers.clear()
     except Exception:
         pass
+
+    reply_handlers(dp)     # human vibe + emotion sync
 
     register_all_plugins(dp)
 
@@ -242,6 +243,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
