@@ -202,7 +202,7 @@ def ai_auto_chat(update:Update, context:CallbackContext):
     mem=update_cont(mem,uid,txt)
     cont=ctx(mem,uid)
 
-    ai=call_ai(txt,name,mood,h,rec,cont or {})
+    ai=call_ai(txt,name,mood,h,rec,cont)
     if not ai: ai=random.choice(FL1)+"\n"+random.choice(FL2)
     if ai and ai[0].isalpha(): ai=ai[0].upper()+ai[1:]
 
