@@ -213,7 +213,9 @@ def ai_auto_chat(update:Update, context:CallbackContext):
 
     mem.setdefault(uid,{"entries":[]})
     mem[uid]["entries"].append({"text":txt,"reply":ai,"mood":mood,"topic":detect_topic(txt),"time":datetime.now().isoformat()})
-    mem[uid]["entries"]=mem[uid]["entries"][-40:]
+    
+    # mem[uid]["entries"] = mem[uid]["entries"][-40:]
+    
     save_memory(mem)
 
     try: msg.reply_text(final,parse_mode=ParseMode.HTML)
