@@ -207,22 +207,6 @@ def ai_auto_chat(update:Update, context:CallbackContext):
     if ai and ai[0].isalpha(): ai=ai[0].upper()+ai[1:]
 
     g,mem = smart_greet(uid,name,h,mood,mem)
-
-    # Soft connective phrases to feel human-flirty
-    bridges = [
-        "aur sun ❤️ ",
-        "btw 😌 ",
-        "waise 😏 ",
-        "hmm, sochi rahi thi... ",
-        "aur batao na 💕 ",
-        "accha, ek baat bolo 💋 ",
-    ]
-
-    # 35% chance to add connector if conversation is flirty / casual
-    bridge = random.choice(bridges) if random.random() < 0.35 and h else ""
-
-    ai = f"{bridge}{ai}" if ai else ai
-
     tail = "" if detect_topic(txt) not in ("general","fun") else ""
 
     final=f"{ic} {g}{ai.strip()}{tail}\n\n{signature(mood)}"
