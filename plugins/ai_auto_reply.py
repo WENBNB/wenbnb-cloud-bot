@@ -182,6 +182,10 @@ def ai_auto_chat(update:Update, context:CallbackContext):
     name=canonical_username(user)
     mem=load_memory()
     last=mem.get(uid,{}).get("entries",[])
+    
+    if uid not in mem:
+        mem[uid] = {"entries": []}
+        
     mood=last[-1]["mood"] if last else "Balanced"
     ic=mood_icon(mood)
     h=is_hinglish(txt)
