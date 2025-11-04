@@ -98,14 +98,20 @@ def button_verify(update: Update, context: CallbackContext):
 
 
 def register_handlers(dp, config=None):
-    dp.add_handler(
-        MessageHandler(Filters.status_update.new_chat_members, welcome_new_member),
-        group=2
-    )
-
+    # 1️⃣ Ignore messages from unverified users
     dp.add_handler(
         MessageHandler(Filters.text & ~Filters.command, verify_response),
-        group=2
+        group=0
     )
 
-    dp.add_handler(CallbackQueryHandler(button_verify, pattern="verify_"))
+    # 2️⃣ Detect & welcome new members
+    dp.add_handler(
+        MessageHandler(Filters.status_update.new_chat_members, welcome_new_member),
+        group=1
+    )
+
+    # 3️⃣ Verify button callback
+    dp.add_handler(
+        CallbackQueryHandler(button_verify, pattern="verify_"),
+        group=2
+    )
