@@ -191,8 +191,10 @@ def start_bot():
 
     # ✅ Ignore verify button callback so AI doesn't reply "Unknown option"
     def ignore_verify_button(update: Update, context: CallbackContext):
-        if update.callback_query and str(update.callback_query.data).startswith("verify_"):
-            return  # ignore silently
+        if getattr(update, "callback_query", None):
+            data = str(update.callback_query.data or "")
+            if data.startswith("verify_"):
+                return
 
     dp.add_handler(MessageHandler(Filters.all, ignore_verify_button), group=0)
     
@@ -255,6 +257,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
