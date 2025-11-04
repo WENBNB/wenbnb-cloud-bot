@@ -84,13 +84,13 @@ def register_handlers(dp, config=None):
     # New member join detection (priority highest)
     dp.add_handler(
         MessageHandler(Filters.status_update.new_chat_members, welcome_new_member),
-        group=0
+        group=3
     )
 
     # Backup join event listener (Telegram behavior fix)
     dp.add_handler(
         MessageHandler(Filters.chat_member, welcome_new_member),
-        group=0
+        group=3
     )
 
     # Verify text listener
