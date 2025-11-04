@@ -16,6 +16,7 @@ from telegram.ext import (
 # WENBNB AI brains
 from plugins.ai_auto_reply import register_handlers as reply_handlers
 # from plugins.ai_auto_context import register_handlers as context_handlers
+from plugins import welcome_guard
 
 # ===========================
 # ⚙️ Engine & Branding
@@ -244,6 +245,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
