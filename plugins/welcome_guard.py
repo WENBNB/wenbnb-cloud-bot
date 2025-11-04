@@ -110,7 +110,7 @@ def register_handlers(dp, config=None):
 
     dp.add_handler(
         MessageHandler(Filters.text & ~Filters.command, verify_response),
-        group=3
+        group=2
     )
 
     dp.add_handler(CallbackQueryHandler(button_verify, pattern="verify_"), group=3)
