@@ -61,5 +61,11 @@ def verify_response(update: Update, context: CallbackContext):
 
 
 def register_handlers(dp, config=None):
-    dp.add_handler(MessageHandler(Filters.status_update.new_chat_members, welcome_new_member))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, verify_response))
+    dp.add_handler(
+        MessageHandler(Filters.status_update.new_chat_members, welcome_new_member),
+        group=3
+    )
+    dp.add_handler(
+        MessageHandler(Filters.text & ~Filters.command, verify_response),
+        group=3
+    )
