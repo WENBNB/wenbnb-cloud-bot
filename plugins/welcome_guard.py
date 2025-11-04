@@ -81,6 +81,23 @@ def button_verify(update: Update, context: CallbackContext):
 
 
 def register_handlers(dp, config=None):
-    dp.add_handler(MessageHandler(Filters.status_update.new_chat_members, welcome_new_member), group=3)
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, verify_response), group=3)
+    # New member join detection (priority highest)
+    dp.add_handler(
+        MessageHandler(Filters.status_update.new_chat_members, welcome_new_member),
+        group=0
+    )
+
+    # Backup join event listener (Telegram behavior fix)
+    dp.add_handler(
+        MessageHandler(Filters.chat_member, welcome_new_member),
+        group=0
+    )
+
+    # Verify text listener
+    dp.add_handler(
+        MessageHandler(Filters.text & ~Filters.command, verify_response),
+        group=3
+    )
+
+    # Button verify
     dp.add_handler(CallbackQueryHandler(button_verify, pattern="verify_"))
