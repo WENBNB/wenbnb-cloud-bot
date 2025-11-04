@@ -19,12 +19,12 @@ def send_welcome(update, context, member):
     context.bot.restrict_chat_member(
         chat_id,
         uid,
-        permissions={
-            "can_send_messages": False,
-            "can_send_media_messages": False,
-            "can_send_other_messages": False,
-            "can_add_web_page_previews": False
-        }
+        ChatPermissions(
+            can_send_messages=False,
+            can_send_media_messages=False,
+            can_send_other_messages=False,
+            can_add_web_page_previews=False
+        )
     )
 
     keyboard = InlineKeyboardMarkup([
@@ -83,12 +83,12 @@ def button_verify(update: Update, context: CallbackContext):
         context.bot.restrict_chat_member(
             query.message.chat_id,
             uid,
-            permissions={
-                "can_send_messages": True,
-                "can_send_media_messages": True,
-                "can_send_other_messages": True,
-                "can_add_web_page_previews": True
-            }
+            ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True
+            )
         )
 
         query.answer("Verified ✅")
