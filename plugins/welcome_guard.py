@@ -1,5 +1,5 @@
 import os
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
 from telegram.ext import MessageHandler, Filters, CallbackContext, CallbackQueryHandler
 from threading import Timer
 import time
