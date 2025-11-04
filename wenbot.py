@@ -188,6 +188,14 @@ def start_bot():
     
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
+
+    # ✅ Ignore verify button callback so AI doesn't reply "Unknown option"
+    def ignore_verify_button(update: Update, context: CallbackContext):
+        if update.callback_query and str(update.callback_query.data).startswith("verify_"):
+            return  # ignore silently
+
+    dp.add_handler(MessageHandler(Filters.all, ignore_verify_button), group=0)
+    
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
 
@@ -247,6 +255,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
