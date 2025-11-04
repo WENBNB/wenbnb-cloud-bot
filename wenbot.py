@@ -190,6 +190,8 @@ def start_bot():
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
 
+    welcome_guard.register_handlers(dp)
+
 
     # === Plugin Command Handlers ===
     try:
@@ -245,6 +247,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
