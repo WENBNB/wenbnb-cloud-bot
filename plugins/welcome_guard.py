@@ -70,7 +70,7 @@ def verify_response(update: Update, context: CallbackContext):
     # silently ignore until button press
     return
 
-
+query.answer()
 def button_verify(update: Update, context: CallbackContext):
     query = update.callback_query
     uid = update.effective_user.id
