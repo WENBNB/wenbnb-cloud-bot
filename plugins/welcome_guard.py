@@ -52,13 +52,23 @@ def verify_response(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
 
-    if uid in PENDING_VERIFY and ("👋" in text or text.lower() in ["hi","hello","yo","hey"]):
+    # ✅ If user already verified, allow AI to respond (do nothing)
+    if uid not in PENDING_VERIFY:
+        return  # Important: let AI handle the message normally
+
+    # ✅ Verification accepted
+    if "👋" in text or text.lower() in ["hi", "hello", "yo", "hey"]:
         PENDING_VERIFY.pop(uid, None)
         context.bot.send_message(
             chat_id,
-            f"✅ Verified! Real banda detected 😌🔥\n"
-            f"Chalo ab vibe match karte hain 😏"
+            f"✅ Verified! Real banda detected 😎🔥\n"
+            f"Welcome to the fam! ✨"
         )
+        return
+    
+    # ❌ User did not verify yet → silently ignore
+    # No reply here, but **DO NOT** block message globally
+    return
 
 
 def register_handlers(dp, config=None):
