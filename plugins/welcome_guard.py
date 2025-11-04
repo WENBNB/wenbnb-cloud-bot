@@ -81,7 +81,7 @@ def button_verify(update: Update, context: CallbackContext):
 
         # ✅ Unrestrict user after verify
         context.bot.restrict_chat_member(
-            query.message.chat_id,
+            query.message.chat.id,
             uid,
             permissions=ChatPermissions(
                 can_send_messages=True,
