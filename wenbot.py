@@ -185,12 +185,14 @@ def start_bot():
         update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
     # === Register Handlers ===
+
+    welcome_guard.register_handlers(dp)
+    
     dp.add_handler(CommandHandler("start", start_cmd))
     dp.add_handler(CommandHandler("about", about_cmd))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, button_handler))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, ai_auto_reply.ai_auto_chat))
 
-    welcome_guard.register_handlers(dp)
 
 
     # === Plugin Command Handlers ===
@@ -247,6 +249,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
