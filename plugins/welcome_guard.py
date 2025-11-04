@@ -100,12 +100,7 @@ def button_verify(update: Update, context: CallbackContext):
 def register_handlers(dp, config=None):
     dp.add_handler(
         MessageHandler(Filters.status_update.new_chat_members, welcome_new_member),
-        group=3
-    )
-
-    dp.add_handler(
-        MessageHandler(Filters.chat_member, welcome_new_member),
-        group=3
+        group=2
     )
 
     dp.add_handler(
@@ -113,4 +108,4 @@ def register_handlers(dp, config=None):
         group=2
     )
 
-    dp.add_handler(CallbackQueryHandler(button_verify, pattern="verify_"), group=3)
+    dp.add_handler(CallbackQueryHandler(button_verify, pattern="verify_"))
