@@ -113,4 +113,4 @@ def register_handlers(dp, config=None):
         group=3
     )
 
-    dp.add_handler(CallbackQueryHandler(button_verify, pattern="verify_"))
+    dp.add_handler(CallbackQueryHandler(button_verify, pattern="verify_"), group=3)
