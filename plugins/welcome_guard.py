@@ -29,7 +29,7 @@ def send_welcome(update, context, member):
 def check_kick(context, chat_id, uid, name):
     if uid in PENDING_VERIFY:
         try:
-            context.bot.kick_chat_member(chat_id, uid)
+            # context.bot.kick_chat_member(chat_id, uid)
             context.bot.send_message(
                 chat_id,
                 f"❌ {name} suspect lag raha tha.\n"
