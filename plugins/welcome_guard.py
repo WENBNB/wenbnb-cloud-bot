@@ -19,7 +19,7 @@ def send_welcome(update, context, member):
     context.bot.restrict_chat_member(
         chat_id,
         uid,
-        ChatPermissions(
+        permissions=ChatPermissions(
             can_send_messages=False,
             can_send_media_messages=False,
             can_send_other_messages=False,
@@ -83,7 +83,7 @@ def button_verify(update: Update, context: CallbackContext):
         context.bot.restrict_chat_member(
             query.message.chat_id,
             uid,
-            ChatPermissions(
+            permissions=ChatPermissions(
                 can_send_messages=True,
                 can_send_media_messages=True,
                 can_send_other_messages=True,
