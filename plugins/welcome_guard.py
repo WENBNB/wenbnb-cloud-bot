@@ -3,19 +3,29 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ChatPer
 from telegram.ext import MessageHandler, Filters, CallbackContext, CallbackQueryHandler
 from threading import Timer
 import time
+import secrets
 
-PENDING_VERIFY = {}  # user_id: time stamp
+PENDING_VERIFY = {}  # uid: {"ts": time, "msg_id": id, "token": token}
 VERIFY_TIMEOUT = 60  # seconds
 ADMIN_IDS = [int(os.getenv("OWNER_ID", "0"))]
+
 
 def send_welcome(update, context, member):
     chat_id = update.effective_chat.id
     uid = member.id
-    name = member.first_name
+    name = member.first_name or "User"
 
-    PENDING_VERIFY[uid] = time.time()
+    token = secrets.token_urlsafe(6)  # unique button token
 
-    # 🚫 Restrict new user from sending anything until verified
+    # store pending info
+    PENDING_VERIFY[uid] = {
+        "ts": time.time(),
+        "chat_id": chat_id,
+        "token": token,
+        "msg_id": None
+    }
+
+    # Restrict new user
     context.bot.restrict_chat_member(
         chat_id,
         uid,
@@ -28,7 +38,7 @@ def send_welcome(update, context, member):
     )
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Verify", callback_data=f"verify_{uid}")]
+        [InlineKeyboardButton("✅ Verify", callback_data=f"verify_{uid}_{token}")]
     ])
 
     msg = (
@@ -38,21 +48,22 @@ def send_welcome(update, context, member):
         f"🤖 Anti-bot shield active"
     )
 
-    context.bot.send_message(chat_id, msg, reply_markup=keyboard, parse_mode="Markdown")
+    sent = context.bot.send_message(chat_id, msg, reply_markup=keyboard, parse_mode="Markdown")
+    PENDING_VERIFY[uid]["msg_id"] = sent.message_id
+
     Timer(VERIFY_TIMEOUT, check_kick, args=(context, chat_id, uid, name)).start()
 
 
 def check_kick(context, chat_id, uid, name):
-    if uid in PENDING_VERIFY:
-        try:
-            context.bot.send_message(
-                chat_id,
-                f"❌ {name} did not verify.\n"
-                f"Fake vibes = No entry 🚫"
-            )
-        except:
-            pass
-        PENDING_VERIFY.pop(uid, None)
+    if uid not in PENDING_VERIFY:
+        return
+
+    try:
+        context.bot.send_message(chat_id, f"❌ {name} did not verify.\nFake vibes = No entry 🚫")
+    except:
+        pass
+
+    PENDING_VERIFY.pop(uid, None)
 
 
 def welcome_new_member(update: Update, context: CallbackContext):
@@ -62,56 +73,85 @@ def welcome_new_member(update: Update, context: CallbackContext):
         send_welcome(update, context, member)
 
 
-# ✅ No typing allowed anyway, but still ignore text if pending
 def verify_response(update: Update, context: CallbackContext):
     uid = update.effective_user.id
-    if uid not in PENDING_VERIFY:
+    if uid in PENDING_VERIFY:
+        try:
+            update.message.delete()  # delete unverified messages
+        except:
+            pass
         return
-    # silently ignore until button press
-    return
 
 
 def button_verify(update: Update, context: CallbackContext):
     query = update.callback_query
     uid = update.effective_user.id
-    data = query.data
+    data = query.data.split("_")
 
-    if data == f"verify_{uid}" and uid in PENDING_VERIFY:
-        PENDING_VERIFY.pop(uid, None)
+    if len(data) != 3:
+        query.answer("Invalid ⚠️")
+        return
 
-        # ✅ Unrestrict user after verify
-        context.bot.restrict_chat_member(
-            query.message.chat.id,
-            uid,
-            permissions=ChatPermissions(
-                can_send_messages=True,
-                can_send_media_messages=True,
-                can_send_other_messages=True,
-                can_add_web_page_previews=True
-            )
+    action, target_uid, token = data
+
+    try:
+        target_uid = int(target_uid)
+    except:
+        query.answer("Invalid ⚠️")
+        return
+
+    if uid != target_uid:
+        query.answer("This isn't your verify button ❌", show_alert=True)
+        return
+
+    if uid not in PENDING_VERIFY:
+        query.answer("Expired ❌", show_alert=True)
+        return
+
+    if PENDING_VERIFY[uid]["token"] != token:
+        query.answer("Invalid token ❌", show_alert=True)
+        return
+
+    chat_id = PENDING_VERIFY[uid]["chat_id"]
+    msg_id = PENDING_VERIFY[uid]["msg_id"]
+
+    # verified, remove pending
+    PENDING_VERIFY.pop(uid, None)
+
+    # unrestrict user
+    context.bot.restrict_chat_member(
+        chat_id,
+        uid,
+        permissions=ChatPermissions(
+            can_send_messages=True,
+            can_send_media_messages=True,
+            can_send_other_messages=True,
+            can_add_web_page_previews=True
         )
+    )
 
-        query.answer("Verified ✅")
-        query.edit_message_text("✅ Verified! Welcome aboard 🚀")
-    else:
-        query.answer("Not for you ⚠️")
+    # delete verify button message
+    try:
+        context.bot.delete_message(chat_id, msg_id)
+    except:
+        pass
+
+    query.answer("Verified ✅")
+    context.bot.send_message(chat_id, f"✅ Verified! **Welcome to WENBNB 🧠⚡️**", parse_mode="Markdown")
 
 
 def register_handlers(dp, config=None):
-    # 1️⃣ Ignore messages from unverified users
     dp.add_handler(
         MessageHandler(Filters.text & ~Filters.command, verify_response),
         group=0
     )
 
-    # 2️⃣ Detect & welcome new members
     dp.add_handler(
         MessageHandler(Filters.status_update.new_chat_members, welcome_new_member),
         group=1
     )
 
-    # 3️⃣ Verify button callback
     dp.add_handler(
-        CallbackQueryHandler(button_verify, pattern="verify_"),
+        CallbackQueryHandler(button_verify, pattern="^verify_"),
         group=2
     )
